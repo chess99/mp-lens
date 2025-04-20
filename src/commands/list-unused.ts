@@ -12,7 +12,6 @@ export interface ListUnusedOptions extends CommandOptions {
   exclude: string[];
   outputFormat: 'text' | 'json';
   output?: string;
-  useAliases?: boolean; // 是否使用路径别名
   essentialFiles?: string;
   miniappRoot?: string;
   entryFile?: string;

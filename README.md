@@ -231,7 +231,30 @@ mp-analyzer clean --backup ./unused_backup
    }
    ```
 
-工具会自动检测项目中的别名配置并使用它们来分析项目依赖关系。这使得使用路径别名的导入也能被正确地识别为文件依赖。
+工具会自动检测项目中的别名配置并使用它们来分析项目依赖关系。这使得使用路径别名的导入也能被正确地识别为文件依赖。**不需要单独启用别名支持**，只要检测到有效的别名配置，工具会自动使用它们进行分析。
+
+### 配置文件支持
+
+`mp-analyzer` 支持多种格式的配置文件:
+
+1. **JSON 配置** - `mp-analyzer.config.json`
+2. **JavaScript 配置** - `mp-analyzer.config.js`
+3. **TypeScript 配置** - `mp-analyzer.config.ts` (需要安装 ts-node)
+
+JavaScript 和 TypeScript 配置文件可以导出静态对象或函数。如果导出函数，该函数将被执行以生成配置对象：
+
+```js
+// mp-analyzer.config.js 示例
+module.exports = function() {
+  // 可以在这里执行动态逻辑，如读取环境变量或其他配置文件
+  return {
+    excludePatterns: ["**/dist/**", "**/node_modules/**"],
+    // 其他配置项...
+  };
+};
+```
+
+使用可编程配置文件的优势在于可以根据环境变量或其他条件动态生成配置，以及重用已有的项目配置。
 
 ### 自定义项目结构支持
 

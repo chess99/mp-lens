@@ -10,9 +10,11 @@ const { version } = require('../package.json');
 import { cleanUnused } from './commands/clean';
 import { generateGraph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
+import { ConfigFileOptions } from './types/command-options';
+import { ConfigLoader } from './utils/config-loader';
 
 // Define a simpler options merging function
-function mergeOptions(cmdOptions: any, globalOptions: any) {
+async function mergeOptions(cmdOptions: any, globalOptions: any) {
   // Resolve project path to absolute path
   const projectPath = globalOptions.project || process.cwd();
   const resolvedProjectPath = path.resolve(projectPath);
@@ -31,14 +33,32 @@ function mergeOptions(cmdOptions: any, globalOptions: any) {
     console.log('Miniapp root exists?', fs.existsSync(resolvedMiniappRoot) ? 'Yes' : 'No');
   }
   
+  // 加载配置文件
+  let configOptions: ConfigFileOptions = {};
+  if (globalOptions.config || globalOptions.verbose) {
+    try {
+      const configResult = await ConfigLoader.loadConfig(globalOptions.config, resolvedProjectPath);
+      if (configResult) {
+        configOptions = configResult;
+        
+        if (globalOptions.verbose) {
+          console.log('Loaded configuration:', JSON.stringify(configOptions, null, 2));
+        }
+      }
+    } catch (error) {
+      console.error(chalk.yellow(`警告: 加载配置文件失败: ${(error as Error).message}`));
+    }
+  }
+  
   // Create merged options with all properties
   const mergedOptions = {
-    ...cmdOptions,
+    ...configOptions,  // 配置文件中的选项（最低优先级）
+    ...cmdOptions,     // 命令行命令特定选项
     project: resolvedProjectPath,
     miniappRoot: resolvedMiniappRoot !== resolvedProjectPath ? resolvedMiniappRoot : undefined,
     verbose: globalOptions.verbose || false,
     config: globalOptions.config,
-    entryFile: globalOptions.entryFile
+    entryFile: globalOptions.entryFile || configOptions.entryFile
   };
   
   // Make sure project field is set
@@ -59,7 +79,7 @@ const program = new Command();
 program
   .version(version)
   .description('微信小程序依赖分析与清理工具')
-  .option('-p, --project <path>', '指定小程序项目的根目录', process.cwd())
+  .option('-p, --project <path>', '指定项目的根目录', process.cwd())
   .option('-v, --verbose', '显示更详细的日志输出')
   .option('--config <path>', '指定配置文件的路径')
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
@@ -74,7 +94,8 @@ program
   .option('--essential-files <files>', '指定视为必要的文件（永远不会被标记为未使用），用逗号分隔', '')
   .option('--output-format <format>', '输出格式 (text|json)', 'text')
   .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
-  .action((cmdOptions) => {
+  .option('--use-aliases', '启用路径别名（tsconfig.json中paths）解析')
+  .action(async (cmdOptions) => {
     try {
       // Get global options explicitly
       const globalOptions = program.opts();
@@ -82,7 +103,7 @@ program
       console.log('Command options:', JSON.stringify(cmdOptions, null, 2));
       
       // Merge with command options
-      const options = mergeOptions(cmdOptions, globalOptions);
+      const options = await mergeOptions(cmdOptions, globalOptions);
       console.log('Final merged options:', JSON.stringify(options, null, 2));
       
       // Debug output
@@ -92,7 +113,7 @@ program
       }
       
       // Execute the command
-      listUnused(options);
+      await listUnused(options);
     } catch (error) {
       console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
       if (error instanceof Error && error.stack) {
@@ -112,16 +133,18 @@ program
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
   .option('--no-npm', '在图中排除 node_modules 或 miniprogram_npm 中的依赖')
-  .action((cmdOptions) => {
+  .option('--miniapp-root <path>', '指定小程序代码所在的子目录')
+  .option('--entry-file <path>', '指定入口文件路径')
+  .action(async (cmdOptions) => {
     try {
       // Get global options explicitly
       const globalOptions = program.opts();
       
       // Merge with command options
-      const options = mergeOptions(cmdOptions, globalOptions);
+      const options = await mergeOptions(cmdOptions, globalOptions);
       
       // Execute the command
-      generateGraph(options);
+      await generateGraph(options);
     } catch (error) {
       console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
       process.exit(1);
@@ -138,16 +161,16 @@ program
   .option('--dry-run', '模拟删除过程，不实际改动文件', false)
   .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
   .option('-y, --yes, --force', '跳过交互式确认环节', false)
-  .action((cmdOptions) => {
+  .action(async (cmdOptions) => {
     try {
       // Get global options explicitly
       const globalOptions = program.opts();
       
       // Merge with command options
-      const options = mergeOptions(cmdOptions, globalOptions);
+      const options = await mergeOptions(cmdOptions, globalOptions);
       
       // Execute the command
-      cleanUnused(options);
+      await cleanUnused(options);
     } catch (error) {
       console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
       process.exit(1);
@@ -166,10 +189,4 @@ program.on('command:*', () => {
   process.exit(1);
 });
 
-// If no arguments provided, show help
-if (process.argv.length === 2) {
-  program.help();
-}
-
-// Parse arguments
-program.parse(process.argv); 
+program.parse(process.argv);
