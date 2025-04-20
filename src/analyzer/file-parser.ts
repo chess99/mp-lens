@@ -9,16 +9,20 @@ import { AliasResolver } from '../utils/alias-resolver';
 export class FileParser {
   private projectRoot: string;
   private aliasResolver: AliasResolver | null = null;
+  private hasAliasConfig: boolean = false;
   private options: AnalyzerOptions;
 
-  constructor(projectRoot: string, options: AnalyzerOptions = { fileTypes: [], useAliases: false }) {
+  constructor(projectRoot: string, options: AnalyzerOptions = { fileTypes: [] }) {
     this.projectRoot = projectRoot;
     this.options = options;
     
-    // 只有在启用别名支持时才初始化别名解析器
-    if (options.useAliases) {
-      this.aliasResolver = new AliasResolver(projectRoot);
-      this.aliasResolver.initialize();
+    // 总是初始化别名解析器，检查是否有有效的别名配置
+    this.aliasResolver = new AliasResolver(projectRoot);
+    this.hasAliasConfig = this.aliasResolver.initialize();
+    
+    if (this.hasAliasConfig && this.options.verbose) {
+      console.log('DEBUG - 检测到别名配置，自动启用别名解析');
+      console.log('DEBUG - 别名配置:', JSON.stringify(this.aliasResolver.getAliases(), null, 2));
     }
   }
 
@@ -318,17 +322,24 @@ export class FileParser {
    */
   private resolveImportPath(importPath: string, sourcePath: string): string | null {
     // 记录导入详情
-    console.log(`DEBUG - Resolving import '${importPath}' from '${sourcePath}'`);
+    if (this.options.verbose) {
+      console.log(`DEBUG - Resolving import '${importPath}' from '${sourcePath}'`);
+    }
     
-    // 首先尝试解析是否是别名路径，但只有在启用了别名支持时才尝试解析
-    if (this.options.useAliases && this.aliasResolver && 
+    // 首先尝试解析是否是别名路径，如果有别名配置，则尝试解析别名路径
+    // 不再依赖options.useAliases参数，而是根据是否有别名配置来决定
+    if (this.hasAliasConfig && this.aliasResolver && 
         (importPath.startsWith('@') || /^[a-zA-Z]/.test(importPath) && !importPath.startsWith('./') && !importPath.startsWith('../') && !importPath.startsWith('/'))) {
       const aliasPath = this.aliasResolver.resolve(importPath, sourcePath);
       if (aliasPath) {
-        console.log(`DEBUG - Successfully resolved alias to: ${aliasPath}`);
+        if (this.options.verbose) {
+          console.log(`DEBUG - Successfully resolved alias to: ${aliasPath}`);
+        }
         return aliasPath;
       }
-      console.log(`DEBUG - Alias resolution failed`);
+      if (this.options.verbose) {
+        console.log(`DEBUG - Alias resolution failed`);
+      }
     }
     
     // 如果不是别名路径或别名解析失败，使用常规解析

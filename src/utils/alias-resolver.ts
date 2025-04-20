@@ -22,15 +22,19 @@ export class AliasResolver {
 
   /**
    * 初始化别名解析器
+   * @returns 是否找到有效的别名配置
    */
-  public initialize(): void {
-    if (this.initialized) return;
+  public initialize(): boolean {
+    if (this.initialized) return Object.keys(this.aliases).length > 0;
 
     // 尝试从不同来源加载别名
-    this.loadFromTsConfig();
-    this.loadFromCustomConfig();
+    const foundTsConfig = this.loadFromTsConfig();
+    const foundCustomConfig = this.loadFromCustomConfig();
 
     this.initialized = true;
+    
+    // 如果至少找到一个来源的别名配置，返回true
+    return foundTsConfig || foundCustomConfig;
   }
 
   /**
@@ -104,11 +108,12 @@ export class AliasResolver {
 
   /**
    * 从tsconfig.json加载路径别名
+   * @returns 是否成功加载到别名配置
    */
-  private loadFromTsConfig(): void {
+  private loadFromTsConfig(): boolean {
     const tsconfigPath = path.join(this.projectRoot, 'tsconfig.json');
     if (!fs.existsSync(tsconfigPath)) {
-      return;
+      return false;
     }
 
     try {
@@ -121,32 +126,43 @@ export class AliasResolver {
             target.replace(/\/\*$/, '')
           );
         }
+        return Object.keys(this.aliases).length > 0;
       }
     } catch (error) {
       console.warn(`无法解析 tsconfig.json: ${(error as Error).message}`);
     }
+    
+    return false;
   }
 
   /**
    * 从自定义配置文件加载路径别名
+   * @returns 是否成功加载到别名配置
    */
-  private loadFromCustomConfig(): void {
+  private loadFromCustomConfig(): boolean {
     // 尝试从mp-analyzer.config.json加载配置
     const configPath = path.join(this.projectRoot, 'mp-analyzer.config.json');
     if (!fs.existsSync(configPath)) {
-      return;
+      return false;
     }
 
     try {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       if (config.aliases && typeof config.aliases === 'object') {
+        const initialAliasCount = Object.keys(this.aliases).length;
+        
         for (const [alias, targets] of Object.entries(config.aliases)) {
           this.aliases[alias] = Array.isArray(targets) ? targets : [targets as string];
         }
+        
+        // 检查是否添加了新的别名
+        return Object.keys(this.aliases).length > initialAliasCount;
       }
     } catch (error) {
       console.warn(`无法解析 mp-analyzer.config.json: ${(error as Error).message}`);
     }
+    
+    return false;
   }
 
   /**

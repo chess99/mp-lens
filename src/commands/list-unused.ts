@@ -45,8 +45,7 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude || [],
-      verbose,
-      useAliases: options.useAliases
+      verbose
     });
     
     // 格式化输出

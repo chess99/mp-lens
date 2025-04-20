@@ -8,7 +8,6 @@ export interface AnalyzerOptions {
   fileTypes: string[];
   excludePatterns?: string[];
   verbose?: boolean;
-  useAliases?: boolean;
 }
 
 export interface OutputOptions {
@@ -22,7 +21,6 @@ export interface GraphOptions extends CommandOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
-  useAliases?: boolean;
 }
 
 export interface CleanOptions extends CommandOptions {
@@ -31,7 +29,6 @@ export interface CleanOptions extends CommandOptions {
   dryRun: boolean;
   backup?: string;
   yes: boolean;
-  useAliases?: boolean;
 }
 
 export interface ListUnusedOptions extends CommandOptions {
@@ -39,7 +36,6 @@ export interface ListUnusedOptions extends CommandOptions {
   exclude: string[];
   outputFormat: 'text' | 'json';
   output?: string;
-  useAliases?: boolean;
 }
 
 export interface ConfigFileOptions {

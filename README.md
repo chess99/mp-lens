@@ -187,11 +187,17 @@ mp-analyzer clean --backup ./unused_backup
 2. **通过配置文件配置**:
    在 `mp-analyzer.config.json` 中配置 `aliases` 部分。
 
-要启用别名支持，在命令中添加 `--use-aliases` 选项:
+   ```json
+   // mp-analyzer.config.json 示例
+   {
+     "aliases": {
+       "@": "src",
+       "@components": "src/components"
+     }
+   }
+   ```
 
-```bash
-mp-analyzer list-unused --use-aliases
-```
+工具会自动检测项目中的别名配置并使用它们来分析项目依赖关系。这使得使用路径别名的导入也能被正确地识别为文件依赖。
 
 ## ⚠️ 免责声明
 

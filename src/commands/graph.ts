@@ -44,8 +44,7 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
     const { dependencyGraph } = await analyzeProject(project, {
       fileTypes,
       excludePatterns,
-      verbose,
-      useAliases: options.useAliases
+      verbose
     });
     
     // 获取图数据
