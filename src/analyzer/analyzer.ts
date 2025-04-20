@@ -17,12 +17,16 @@ export async function analyzeProject(
   projectRoot: string,
   options: AnalyzerOptions
 ): Promise<AnalysisResult> {
-  const { fileTypes, excludePatterns = [], verbose = false } = options;
+  const { fileTypes, excludePatterns = [], verbose = false, essentialFiles = [] } = options;
   
   console.log('DEBUG - Analyzer received project path:', projectRoot);
   console.log('DEBUG - Analyzer received options:', JSON.stringify(options, null, 2));
   console.log('DEBUG - File types:', fileTypes);
   console.log('DEBUG - Exclude patterns:', excludePatterns);
+  
+  if (essentialFiles.length > 0 && verbose) {
+    console.log('DEBUG - Essential files:', essentialFiles);
+  }
   
   // 验证项目路径
   if (!projectRoot || !fs.existsSync(projectRoot)) {
@@ -64,7 +68,7 @@ export async function analyzeProject(
   }
   
   // 找出未被引用的文件（入度为0的节点，排除app.js/app.json等入口文件）
-  const unusedFiles = findUnusedFiles(dependencyGraph, projectRoot);
+  const unusedFiles = findUnusedFiles(dependencyGraph, projectRoot, essentialFiles);
   
   return {
     dependencyGraph,
@@ -106,18 +110,39 @@ function findAllFiles(
 /**
  * 查找未被使用的文件
  */
-function findUnusedFiles(graph: DependencyGraph, projectRoot: string): string[] {
-  const entryFiles = [
-    path.join(projectRoot, 'app.js'),
-    path.join(projectRoot, 'app.ts'),
-    path.join(projectRoot, 'app.json')
-  ];
+function findUnusedFiles(graph: DependencyGraph, projectRoot: string, essentialFiles: string[] = []): string[] {
+  // 默认入口文件和基本配置文件
+  const defaultEssentialFiles = [
+    'app.js',
+    'app.ts',
+    'app.json',
+    'project.config.json',
+    'tsconfig.json',
+    'mp-analyzer.config.json',
+    'package.json',
+    '.eslintrc.js',
+    '.eslintrc.json',
+    '.prettierrc',
+    '.prettierrc.js',
+    '.babelrc',
+    'babel.config.js'
+  ].map(file => path.join(projectRoot, file));
+  
+  // 合并默认的和用户定义的必要文件
+  const allEssentialFiles = [...defaultEssentialFiles, ...essentialFiles];
   
   const unusedFiles: string[] = [];
   
   for (const node of graph.nodes()) {
-    // 排除入口文件
-    if (entryFiles.includes(node)) {
+    // 排除必要文件
+    if (allEssentialFiles.includes(node) || allEssentialFiles.some(pattern => {
+      // 支持通配符匹配
+      if (pattern.includes('*')) {
+        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+        return regex.test(node);
+      }
+      return false;
+    })) {
       continue;
     }
     

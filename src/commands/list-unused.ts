@@ -13,13 +13,14 @@ export interface ListUnusedOptions extends CommandOptions {
   outputFormat: 'text' | 'json';
   output?: string;
   useAliases?: boolean; // 是否使用路径别名
+  essentialFiles?: string;
 }
 
 /**
  * 列出未使用的文件
  */
 export async function listUnused(options: ListUnusedOptions): Promise<void> {
-  const { project, verbose, types, exclude, outputFormat, output } = options;
+  const { project, verbose, types, exclude, outputFormat, output, essentialFiles } = options;
   
   // 添加额外的调试信息
   console.log('DEBUG - list-unused received options:', JSON.stringify(options, null, 2));
@@ -35,16 +36,24 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
     if (exclude && exclude.length > 0) {
       console.log(`排除模式: ${exclude.join(', ')}`);
     }
+    
+    if (essentialFiles) {
+      console.log(`必要文件: ${essentialFiles}`);
+    }
   }
 
   try {
     // 分析项目获取未使用文件列表
     const fileTypes = types.split(',').map(t => t.trim());
     
+    // 处理必要文件选项
+    const essentialFilesList = essentialFiles ? essentialFiles.split(',').map(f => f.trim()) : [];
+    
     // 使用analyzer模块分析项目
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude || [],
+      essentialFiles: essentialFilesList,
       verbose
     });
     

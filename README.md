@@ -82,6 +82,7 @@ mp-analyzer list-unused --exclude "**/mock/*" --output-format json -o unused.jso
 
 * `--types <类型1,类型2,...>`: 指定要检查的文件扩展名，用逗号分隔 (默认: js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs)。
 * `--exclude <模式>`: 用于排除文件/目录的 Glob 模式。可多次使用。
+* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被标记为未使用），用逗号分隔。
 * `--output-format <text|json>`: 输出格式 (默认: text)。
 * `-o, --output <文件>`: 将列表保存到文件，而非打印到控制台。
 
@@ -139,6 +140,7 @@ mp-analyzer clean --backup ./unused_backup
 
 * `--types <类型1,类型2,...>`: 指定要删除的文件类型。
 * `--exclude <模式>`: 排除某些文件/目录不被删除。
+* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
 * `--dry-run`: **强烈推荐使用。** 模拟删除过程，不实际改动文件。
 * `--backup <目录>`: 将删除的文件移动到此目录作为备份，而不是永久删除。
 * `-y, --yes, --force`: **谨慎使用！** 跳过交互式确认环节。
@@ -161,7 +163,13 @@ mp-analyzer clean --backup ./unused_backup
     "@utils": "src/utils",
     "@pages": "src/pages",
     "~": "."
-  }
+  },
+  "essentialFiles": [
+    "package.json",
+    "tsconfig.json",
+    "mp-analyzer.config.json",
+    "README.md"
+  ]
 }
 ```
 

@@ -51,6 +51,7 @@ program
   .description('分析项目并列出检测到的未使用文件')
   .option('--types <types>', '指定要检查的文件扩展名，用逗号分隔', 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs')
   .option('--exclude <pattern>', '用于排除文件/目录的 Glob 模式', (value: string, previous: string[]) => previous.concat([value]), ['**/output/dependency-graph.*', '**/output/unused-files.*', 'dependency-graph.*', 'unused-files.*', '**/dist/**'] as string[])
+  .option('--essential-files <files>', '指定视为必要的文件（永远不会被标记为未使用），用逗号分隔', '')
   .option('--output-format <format>', '输出格式 (text|json)', 'text')
   .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
   .action((cmdOptions) => {
@@ -113,6 +114,7 @@ program
   .description('分析项目并删除未使用的文件 (⚠️ 使用此命令务必谨慎！)')
   .option('--types <types>', '指定要删除的文件类型', 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs')
   .option('--exclude <pattern>', '排除某些文件/目录不被删除', (value: string, previous: string[]) => previous.concat([value]), ['**/output/dependency-graph.*', '**/output/unused-files.*', 'dependency-graph.*', 'unused-files.*', '**/dist/**'] as string[])
+  .option('--essential-files <files>', '指定视为必要的文件（永远不会被删除），用逗号分隔', '')
   .option('--dry-run', '模拟删除过程，不实际改动文件', false)
   .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
   .option('-y, --yes, --force', '跳过交互式确认环节', false)

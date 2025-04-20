@@ -6,7 +6,7 @@ import { analyzeProject } from '../analyzer/analyzer';
 import { CleanOptions } from '../types/command-options';
 
 export async function cleanUnused(options: CleanOptions) {
-  const { project, verbose, types, exclude, dryRun, backup, yes } = options;
+  const { project, verbose, types, exclude, dryRun, backup, yes, essentialFiles } = options;
   
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
@@ -15,6 +15,10 @@ export async function cleanUnused(options: CleanOptions) {
     
     if (exclude.length > 0) {
       console.log(`排除模式: ${exclude.join(', ')}`);
+    }
+    
+    if (essentialFiles) {
+      console.log(`必要文件: ${essentialFiles}`);
     }
     
     if (dryRun) {
@@ -50,9 +54,14 @@ export async function cleanUnused(options: CleanOptions) {
     
     // 分析项目获取未使用文件列表
     const fileTypes = types.split(',').map(t => t.trim());
+    
+    // 处理必要文件选项
+    const essentialFilesList = essentialFiles ? essentialFiles.split(',').map(f => f.trim()) : [];
+    
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude,
+      essentialFiles: essentialFilesList,
       verbose
     });
     
@@ -222,4 +231,4 @@ async function findEmptyDirectories(
   checkDir(rootDir);
   
   return emptyDirs;
-} 
+}
