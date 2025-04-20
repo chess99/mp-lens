@@ -16,8 +16,16 @@ export class FileParser {
     this.projectRoot = projectRoot;
     this.options = options;
     
+    // 如果提供了miniappRoot，则使用它；否则使用projectRoot
+    // 注意，miniappRoot应该已经是绝对路径了，不需要再处理
+    const actualRoot = options.miniappRoot || projectRoot;
+    
+    if (options.miniappRoot && options.verbose) {
+      console.log(`DEBUG - FileParser using custom miniapp root: ${options.miniappRoot}`);
+    }
+    
     // 总是初始化别名解析器，检查是否有有效的别名配置
-    this.aliasResolver = new AliasResolver(projectRoot);
+    this.aliasResolver = new AliasResolver(actualRoot);
     this.hasAliasConfig = this.aliasResolver.initialize();
     
     if (this.hasAliasConfig && this.options.verbose) {

@@ -1,0 +1,11 @@
+/* 这个样式文件没有被任何地方引用 */
+.unused-class {
+  color: red;
+  font-weight: bold;
+}
+
+.another-unused {
+  margin: 20px;
+  padding: 10px;
+  border: 1px solid #ccc;
+} 

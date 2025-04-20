@@ -21,16 +21,34 @@ function mergeOptions(cmdOptions: any, globalOptions: any) {
   console.log('Resolved project path:', resolvedProjectPath);
   console.log('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
   
+  // 处理小程序根目录选项
+  let miniappRoot = globalOptions.miniappRoot || '';
+  let resolvedMiniappRoot = resolvedProjectPath;
+  
+  if (miniappRoot) {
+    resolvedMiniappRoot = path.resolve(resolvedProjectPath, miniappRoot);
+    console.log('Miniapp root path:', resolvedMiniappRoot);
+    console.log('Miniapp root exists?', fs.existsSync(resolvedMiniappRoot) ? 'Yes' : 'No');
+  }
+  
   // Create merged options with all properties
   const mergedOptions = {
     ...cmdOptions,
     project: resolvedProjectPath,
+    miniappRoot: resolvedMiniappRoot !== resolvedProjectPath ? resolvedMiniappRoot : undefined,
     verbose: globalOptions.verbose || false,
-    config: globalOptions.config
+    config: globalOptions.config,
+    entryFile: globalOptions.entryFile
   };
   
   // Make sure project field is set
   console.log('Merged options project path:', mergedOptions.project);
+  if (mergedOptions.miniappRoot) {
+    console.log('Merged options miniapp root:', mergedOptions.miniappRoot);
+  }
+  if (mergedOptions.entryFile) {
+    console.log('Merged options entry file:', mergedOptions.entryFile);
+  }
   
   return mergedOptions;
 }
@@ -43,7 +61,9 @@ program
   .description('微信小程序依赖分析与清理工具')
   .option('-p, --project <path>', '指定小程序项目的根目录', process.cwd())
   .option('-v, --verbose', '显示更详细的日志输出')
-  .option('--config <path>', '指定配置文件的路径');
+  .option('--config <path>', '指定配置文件的路径')
+  .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
+  .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
 
 // list-unused command
 program

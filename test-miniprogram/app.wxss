@@ -1,0 +1,14 @@
+/* 全局样式文件 */
+@import "./styles/global.wxss";
+
+page {
+  font-size: 16px;
+  background-color: #f8f8f8;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+} 

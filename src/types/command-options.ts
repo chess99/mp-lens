@@ -9,6 +9,9 @@ export interface AnalyzerOptions {
   excludePatterns?: string[];
   verbose?: boolean;
   essentialFiles?: string[];
+  miniappRoot?: string;
+  entryFile?: string;
+  entryContent?: any;
 }
 
 export interface OutputOptions {
@@ -22,6 +25,8 @@ export interface GraphOptions extends CommandOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
+  miniappRoot?: string;
+  entryFile?: string;
 }
 
 export interface CleanOptions extends CommandOptions {
@@ -31,6 +36,8 @@ export interface CleanOptions extends CommandOptions {
   dryRun: boolean;
   backup?: string;
   yes: boolean;
+  miniappRoot?: string;
+  entryFile?: string;
 }
 
 export interface ListUnusedOptions extends CommandOptions {
@@ -39,6 +46,8 @@ export interface ListUnusedOptions extends CommandOptions {
   essentialFiles?: string;
   outputFormat: 'text' | 'json';
   output?: string;
+  miniappRoot?: string;
+  entryFile?: string;
 }
 
 export interface ConfigFileOptions {
@@ -47,4 +56,7 @@ export interface ConfigFileOptions {
     [key: string]: string | string[];
   };
   essentialFiles?: string[];
+  miniappRoot?: string;
+  entryFile?: string;
+  entryContent?: any;
 } 

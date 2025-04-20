@@ -8,11 +8,24 @@ import { GraphOptions } from '../types/command-options';
  * 生成依赖关系图
  */
 export async function generateGraph(options: GraphOptions): Promise<void> {
-  const { project, verbose, format, output, depth, focus, npm } = options;
+  const { 
+    project, 
+    verbose, 
+    format, 
+    output, 
+    depth, 
+    focus, 
+    npm,
+    miniappRoot,
+    entryFile
+  } = options;
   
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
     console.log(`项目路径: ${project}`);
+    if (miniappRoot) {
+      console.log(`小程序根目录: ${miniappRoot}`);
+    }
     console.log(`输出格式: ${format}`);
     
     if (output) {
@@ -25,6 +38,10 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
     
     if (focus) {
       console.log(`聚焦文件: ${focus}`);
+    }
+    
+    if (entryFile) {
+      console.log(`入口文件: ${entryFile}`);
     }
     
     console.log(`包含npm依赖: ${npm ? '是' : '否'}`);
@@ -44,7 +61,9 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
     const { dependencyGraph } = await analyzeProject(project, {
       fileTypes,
       excludePatterns,
-      verbose
+      verbose,
+      miniappRoot,
+      entryFile
     });
     
     // 获取图数据

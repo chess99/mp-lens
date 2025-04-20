@@ -14,13 +14,25 @@ export interface ListUnusedOptions extends CommandOptions {
   output?: string;
   useAliases?: boolean; // 是否使用路径别名
   essentialFiles?: string;
+  miniappRoot?: string;
+  entryFile?: string;
 }
 
 /**
  * 列出未使用的文件
  */
 export async function listUnused(options: ListUnusedOptions): Promise<void> {
-  const { project, verbose, types, exclude, outputFormat, output, essentialFiles } = options;
+  const { 
+    project, 
+    verbose, 
+    types, 
+    exclude, 
+    outputFormat, 
+    output, 
+    essentialFiles,
+    miniappRoot,
+    entryFile
+  } = options;
   
   // 添加额外的调试信息
   console.log('DEBUG - list-unused received options:', JSON.stringify(options, null, 2));
@@ -28,9 +40,20 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
   console.log('DEBUG - Verbose mode:', verbose);
   console.log('DEBUG - File types:', types);
   
+  if (miniappRoot) {
+    console.log('DEBUG - Miniapp root:', miniappRoot);
+  }
+  
+  if (entryFile) {
+    console.log('DEBUG - Entry file:', entryFile);
+  }
+  
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
     console.log(`项目路径: ${project}`);
+    if (miniappRoot) {
+      console.log(`小程序根目录: ${miniappRoot}`);
+    }
     console.log(`分析的文件类型: ${types}`);
     
     if (exclude && exclude.length > 0) {
@@ -39,6 +62,10 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
     
     if (essentialFiles) {
       console.log(`必要文件: ${essentialFiles}`);
+    }
+    
+    if (entryFile) {
+      console.log(`入口文件: ${entryFile}`);
     }
   }
 
@@ -54,7 +81,9 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
       fileTypes,
       excludePatterns: exclude || [],
       essentialFiles: essentialFilesList,
-      verbose
+      verbose,
+      miniappRoot,
+      entryFile
     });
     
     // 格式化输出

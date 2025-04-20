@@ -1,0 +1,15 @@
+/* 测试全局样式 */
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background-color: #3478f6;
+  color: white;
+}
+
+.text-center {
+  text-align: center;
+} 

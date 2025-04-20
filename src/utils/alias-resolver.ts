@@ -30,6 +30,14 @@ export class AliasResolver {
     // 尝试从不同来源加载别名
     const foundTsConfig = this.loadFromTsConfig();
     const foundCustomConfig = this.loadFromCustomConfig();
+    
+    if (foundTsConfig && this.projectRoot) {
+      console.log(`已从tsconfig.json加载别名配置，项目路径: ${this.projectRoot}`);
+    }
+    
+    if (foundCustomConfig && this.projectRoot) {
+      console.log(`已从mp-analyzer.config.json加载别名配置，项目路径: ${this.projectRoot}`);
+    }
 
     this.initialized = true;
     
@@ -111,21 +119,59 @@ export class AliasResolver {
    * @returns 是否成功加载到别名配置
    */
   private loadFromTsConfig(): boolean {
-    const tsconfigPath = path.join(this.projectRoot, 'tsconfig.json');
+    // 首先尝试在项目根目录查找
+    let tsconfigPath = path.join(this.projectRoot, 'tsconfig.json');
+    
+    // 如果根目录没有，可能在上级目录
     if (!fs.existsSync(tsconfigPath)) {
-      return false;
+      // 尝试向上查找，最多向上3级
+      let currentDir = this.projectRoot;
+      let found = false;
+      
+      for (let i = 0; i < 3; i++) {
+        currentDir = path.dirname(currentDir);
+        const testPath = path.join(currentDir, 'tsconfig.json');
+        
+        if (fs.existsSync(testPath)) {
+          tsconfigPath = testPath;
+          found = true;
+          break;
+        }
+      }
+      
+      if (!found) {
+        return false;
+      }
     }
 
     try {
+      console.log(`尝试从${tsconfigPath}加载别名配置`);
       const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
       if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
+        // 获取tsconfig所在目录，因为paths是相对于tsconfig的baseUrl
+        const tsconfigDir = path.dirname(tsconfigPath);
+        const baseUrl = tsconfig.compilerOptions.baseUrl || '.';
+        const baseDir = path.resolve(tsconfigDir, baseUrl);
+        
+        console.log(`tsconfig.json的baseUrl: ${baseUrl}, 解析为: ${baseDir}`);
+        
         for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
           // 处理 paths 中的通配符模式 (如 "@/*" => ["src/*"])
           const normalizedAlias = alias.replace(/\/\*$/, '');
-          this.aliases[normalizedAlias] = (targets as string[]).map(target => 
-            target.replace(/\/\*$/, '')
-          );
+          
+          this.aliases[normalizedAlias] = (targets as string[]).map(target => {
+            const targetPath = target.replace(/\/\*$/, '');
+            
+            // 如果目标路径是绝对路径，直接使用；否则相对于baseDir解析
+            if (path.isAbsolute(targetPath)) {
+              return targetPath;
+            } else {
+              return path.relative(this.projectRoot, path.join(baseDir, targetPath));
+            }
+          });
         }
+        
+        console.log('从tsconfig.json加载的别名:', JSON.stringify(this.aliases, null, 2));
         return Object.keys(this.aliases).length > 0;
       }
     } catch (error) {

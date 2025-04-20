@@ -6,11 +6,25 @@ import { analyzeProject } from '../analyzer/analyzer';
 import { CleanOptions } from '../types/command-options';
 
 export async function cleanUnused(options: CleanOptions) {
-  const { project, verbose, types, exclude, dryRun, backup, yes, essentialFiles } = options;
+  const { 
+    project, 
+    verbose, 
+    types, 
+    exclude, 
+    dryRun, 
+    backup, 
+    yes, 
+    essentialFiles,
+    miniappRoot,
+    entryFile
+  } = options;
   
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
     console.log(`项目路径: ${project}`);
+    if (miniappRoot) {
+      console.log(`小程序根目录: ${miniappRoot}`);
+    }
     console.log(`要删除的文件类型: ${types}`);
     
     if (exclude.length > 0) {
@@ -19,6 +33,10 @@ export async function cleanUnused(options: CleanOptions) {
     
     if (essentialFiles) {
       console.log(`必要文件: ${essentialFiles}`);
+    }
+    
+    if (entryFile) {
+      console.log(`入口文件: ${entryFile}`);
     }
     
     if (dryRun) {
@@ -62,7 +80,9 @@ export async function cleanUnused(options: CleanOptions) {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
-      verbose
+      verbose,
+      miniappRoot,
+      entryFile
     });
     
     if (unusedFiles.length === 0) {

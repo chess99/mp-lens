@@ -14,6 +14,7 @@
 * **依赖图可视化:** 生成交互式 HTML 或静态图文件（如 DOT 语言、SVG、PNG），助你清晰理解页面、组件、脚本之间的相互联系。
 * **未使用的文件检测:** 根据分析结果，识别出项目中未被任何地方引用的文件（包括页面、组件、脚本、样式、图片、WXS模块等）。
 * **路径别名支持:** 支持解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置，正确分析使用别名导入的模块依赖关系。
+* **灵活的项目结构支持:** 支持自定义小程序项目路径和入口文件路径，适用于不同目录结构的项目。
 * **安全清理:**
   * 提供 `--dry-run` (试运行)模式，预览哪些文件*将*被删除，但并**不执行**实际删除操作。
   * 默认在删除文件前进行**交互式确认**。
@@ -56,10 +57,12 @@ mp-analyzer [全局选项] <命令> [命令选项]
 
 **全局选项:**
 
-* `-p, --project <路径>`: 指定小程序项目的根目录 (默认: 当前目录)。
+* `-p, --project <路径>`: 指定项目的根目录 (默认: 当前目录)。
 * `-h, --help`: 显示帮助信息。
 * `-v, --verbose`: 显示更详细的日志输出。
 * `--config <路径>`: 指定配置文件的路径 (可选高级功能)。
+* `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。
+* `--entry-file <路径>`: 指定入口文件路径（相对于小程序根目录，默认为app.json）。
 
 **可用命令:**
 
@@ -72,10 +75,16 @@ mp-analyzer [全局选项] <命令> [命令选项]
 mp-analyzer list-unused
 
 # 在指定项目中仅列出未使用的 JS 和 WXML 文件
-mp-analyzer -p ../我的小程序 list-unused --types js,wxml
+mp-analyzer -p ../我的项目 list-unused --types js,wxml
 
 # 排除 mock 数据文件，并将结果输出为 JSON 文件
 mp-analyzer list-unused --exclude "**/mock/*" --output-format json -o unused.json
+
+# 分析嵌套目录中的小程序项目
+mp-analyzer list-unused --miniapp-root client/app
+
+# 使用自定义入口文件
+mp-analyzer list-unused --entry-file src/app.json
 ```
 
 **选项:**
@@ -169,7 +178,24 @@ mp-analyzer clean --backup ./unused_backup
     "tsconfig.json",
     "mp-analyzer.config.json",
     "README.md"
-  ]
+  ],
+  "miniappRoot": "client/app",
+  "entryFile": "app.json",
+  "entryContent": {
+    "pages": [
+      "pages/index/index",
+      "pages/user/index"
+    ],
+    "subpackages": [
+      {
+        "root": "packageA",
+        "pages": [
+          "pages/feature1/index",
+          "pages/feature2/index"
+        ]
+      }
+    ]
+  }
 }
 ```
 
@@ -206,6 +232,53 @@ mp-analyzer clean --backup ./unused_backup
    ```
 
 工具会自动检测项目中的别名配置并使用它们来分析项目依赖关系。这使得使用路径别名的导入也能被正确地识别为文件依赖。
+
+### 自定义项目结构支持
+
+`mp-analyzer` 支持分析非标准结构的微信小程序项目：
+
+1. **自定义小程序根目录**:
+   如果小程序代码位于项目的子目录中，可以使用 `--miniapp-root` 选项指定：
+
+   ```bash
+   mp-analyzer list-unused --miniapp-root client/app
+   ```
+
+2. **自定义入口文件**:
+   如果入口文件不是标准的 `app.json`，或位于不同路径，可以使用 `--entry-file` 选项：
+
+   ```bash
+   mp-analyzer list-unused --entry-file src/app.json
+   ```
+
+3. **直接提供入口文件内容**:
+   对于使用构建工具的项目，可以在配置文件中直接提供入口内容：
+
+   ```json
+   // mp-analyzer.config.json
+   {
+     "entryContent": {
+       "pages": ["pages/index/index"]
+     }
+   }
+   ```
+
+4. **入口文件处理**:
+   工具会自动将以下文件视为小程序的入口文件进行依赖分析：
+   * app.json：全局配置文件
+   * app.js/app.ts：应用逻辑文件
+   * app.wxss：全局样式文件
+   * project.config.json：项目配置文件
+   * sitemap.json：站点地图配置
+
+   此外，工具会解析app.json中的pages和subpackages字段，将所有页面的相关文件也视为可达的起点。
+
+5. **必要文件**:
+   除了从入口文件进行可达性分析外，还可以使用 `--essential-files` 选项指定必要的文件，这些文件将永远不会被标记为未使用：
+
+   ```bash
+   mp-analyzer list-unused --essential-files "config.js,build.js"
+   ```
 
 ## ⚠️ 免责声明
 
