@@ -11,7 +11,8 @@ export interface ListUnusedOptions extends CommandOptions {
   types: string;
   exclude: string[];
   outputFormat: 'text' | 'json';
-  output?: string; 
+  output?: string;
+  useAliases?: boolean; // 是否使用路径别名
 }
 
 /**
@@ -44,7 +45,8 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude || [],
-      verbose
+      verbose,
+      useAliases: options.useAliases
     });
     
     // 格式化输出

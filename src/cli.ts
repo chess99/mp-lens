@@ -53,6 +53,7 @@ program
   .option('--exclude <pattern>', '用于排除文件/目录的 Glob 模式', (value: string, previous: string[]) => previous.concat([value]), ['**/output/dependency-graph.*', '**/output/unused-files.*', 'dependency-graph.*', 'unused-files.*', '**/dist/**'] as string[])
   .option('--output-format <format>', '输出格式 (text|json)', 'text')
   .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
+  .option('--use-aliases', '启用路径别名支持（从tsconfig.json或配置文件中加载）', false)
   .action((cmdOptions) => {
     try {
       // Get global options explicitly
@@ -91,6 +92,7 @@ program
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
   .option('--no-npm', '在图中排除 node_modules 或 miniprogram_npm 中的依赖')
+  .option('--use-aliases', '启用路径别名支持（从tsconfig.json或配置文件中加载）', false)
   .action((cmdOptions) => {
     try {
       // Get global options explicitly
@@ -116,6 +118,7 @@ program
   .option('--dry-run', '模拟删除过程，不实际改动文件', false)
   .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
   .option('-y, --yes, --force', '跳过交互式确认环节', false)
+  .option('--use-aliases', '启用路径别名支持（从tsconfig.json或配置文件中加载）', false)
   .action((cmdOptions) => {
     try {
       // Get global options explicitly

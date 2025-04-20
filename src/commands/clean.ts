@@ -53,7 +53,8 @@ export async function cleanUnused(options: CleanOptions) {
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude,
-      verbose
+      verbose,
+      useAliases: options.useAliases
     });
     
     if (unusedFiles.length === 0) {

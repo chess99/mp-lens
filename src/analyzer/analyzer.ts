@@ -17,12 +17,13 @@ export async function analyzeProject(
   projectRoot: string,
   options: AnalyzerOptions
 ): Promise<AnalysisResult> {
-  const { fileTypes, excludePatterns = [], verbose = false } = options;
+  const { fileTypes, excludePatterns = [], verbose = false, useAliases = false } = options;
   
   console.log('DEBUG - Analyzer received project path:', projectRoot);
   console.log('DEBUG - Analyzer received options:', JSON.stringify(options, null, 2));
   console.log('DEBUG - File types:', fileTypes);
   console.log('DEBUG - Exclude patterns:', excludePatterns);
+  console.log('DEBUG - Using path aliases:', useAliases);
   
   // 验证项目路径
   if (!projectRoot || !fs.existsSync(projectRoot)) {
@@ -38,7 +39,7 @@ export async function analyzeProject(
 
   // 构建依赖图
   const dependencyGraph = new DependencyGraph();
-  const fileParser = new FileParser(projectRoot);
+  const fileParser = new FileParser(projectRoot, options);
   
   // 第一步：添加所有文件到图中
   for (const file of allFiles) {

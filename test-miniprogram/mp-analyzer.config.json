@@ -1,0 +1,9 @@
+{
+  "excludePatterns": [
+    "**/node_modules/**"
+  ],
+  "aliases": {
+    "@config": "config",
+    "@api": "api"
+  }
+} 
