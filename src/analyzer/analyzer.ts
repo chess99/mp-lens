@@ -109,6 +109,7 @@ function findAllFiles(
 
 /**
  * 查找未被使用的文件
+ * 使用可达性分析：从入口文件开始，标记所有可达的文件，剩余的即为未使用的文件
  */
 function findUnusedFiles(graph: DependencyGraph, projectRoot: string, essentialFiles: string[] = []): string[] {
   // 默认入口文件和基本配置文件
@@ -131,10 +132,54 @@ function findUnusedFiles(graph: DependencyGraph, projectRoot: string, essentialF
   // 合并默认的和用户定义的必要文件
   const allEssentialFiles = [...defaultEssentialFiles, ...essentialFiles];
   
-  const unusedFiles: string[] = [];
+  // 已访问的节点集合
+  const visited = new Set<string>();
   
-  for (const node of graph.nodes()) {
-    // 排除必要文件
+  // 从入口文件开始进行深度优先搜索，标记所有可达的文件
+  function dfs(node: string) {
+    if (visited.has(node)) return;
+    visited.add(node);
+    
+    // 访问所有依赖的文件（出边）
+    for (const dep of graph.outEdges(node)) {
+      dfs(dep);
+    }
+  }
+  
+  // 从每个入口文件和必要文件开始搜索
+  for (const entryFile of allEssentialFiles) {
+    if (graph.hasNode(entryFile)) {
+      dfs(entryFile);
+    }
+  }
+  
+  // 查找其他有用但可能不是从入口文件直接可达的文件
+  // 例如：通过动态导入或其他特殊方式引用的文件
+  const allNodes = graph.nodes();
+  
+  // 额外检查：任何被其他文件引用的文件，应该被标记为使用中
+  // 进行多轮传播检查，直到没有新的节点被标记
+  let newMarked = true;
+  while (newMarked) {
+    newMarked = false;
+    
+    for (const node of allNodes) {
+      // 如果节点已被标记为访问过，检查它指向的所有节点
+      if (visited.has(node)) {
+        for (const dep of graph.outEdges(node)) {
+          if (!visited.has(dep)) {
+            visited.add(dep);
+            newMarked = true;
+          }
+        }
+      }
+    }
+  }
+  
+  // 未访问的节点即为未使用的文件
+  const unusedFiles: string[] = [];
+  for (const node of allNodes) {
+    // 排除必要文件的额外检查（虽然它们应该已经在DFS中被标记）
     if (allEssentialFiles.includes(node) || allEssentialFiles.some(pattern => {
       // 支持通配符匹配
       if (pattern.includes('*')) {
@@ -146,8 +191,7 @@ function findUnusedFiles(graph: DependencyGraph, projectRoot: string, essentialF
       continue;
     }
     
-    // 如果没有其他文件引用它，则认为是未使用的文件
-    if (graph.inDegree(node) === 0) {
+    if (!visited.has(node)) {
       unusedFiles.push(node);
     }
   }
