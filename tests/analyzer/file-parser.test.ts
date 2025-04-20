@@ -4,18 +4,20 @@ import { FileParser } from '../../src/analyzer/file-parser';
 import { AnalyzerOptions } from '../../src/types/command-options';
 import { AliasResolver } from '../../src/utils/alias-resolver';
 
+// Get actual path module *before* mocking
+const actualPath = jest.requireActual('path');
+
 // Mock fs
 jest.mock('fs');
 
-// Mock path (using actual path logic where possible)
-const actualPath = jest.requireActual('path');
+// Mock path (Alternative strategy)
 jest.mock('path', () => ({
-  ...actualPath,
   resolve: jest.fn((...args) => actualPath.resolve(...args)),
   join: jest.fn((...args) => actualPath.join(...args)),
-  relative: jest.fn((...args) => actualPath.relative(...args)),
   dirname: jest.fn((p) => actualPath.dirname(p)),
   extname: jest.fn((p) => actualPath.extname(p)),
+  // Add other functions used in the test file if needed
+  relative: jest.fn((...args) => actualPath.relative(...args)),
   isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
 }));
 

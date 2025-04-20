@@ -57,7 +57,7 @@ function formatAsText(unusedFiles: string[], projectRoot: string): string {
   }
   
   // 构建输出文本
-  let output = chalk.yellow(`找到 ${unusedFiles.length} 个未使用的文件:\n\n`);
+  let output = chalk.yellow(`找到 ${unusedFiles.length} 个未使用的文件:\n`);
   
   // 按照文件类型输出
   for (const [type, files] of Object.entries(filesByType)) {
@@ -68,8 +68,6 @@ function formatAsText(unusedFiles: string[], projectRoot: string): string {
       const relativePath = path.relative(projectRoot, file);
       output += `  ${chalk.white(relativePath)}\n`;
     }
-    
-    output += '\n';
   }
   
   return output;

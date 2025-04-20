@@ -4,6 +4,9 @@ import * as path from 'path';
 import { analyzeProject } from '../../src/analyzer/analyzer';
 import { AnalyzerOptions } from '../../src/types/command-options';
 
+// Get actual path module *before* mocking
+const actualPath = jest.requireActual('path');
+
 // Mock fs
 jest.mock('fs');
 
@@ -12,10 +15,8 @@ jest.mock('glob', () => ({
   sync: jest.fn(),
 }));
 
-// Mock path (using actual path logic)
-const actualPath = jest.requireActual('path');
+// Mock path (Alternative strategy)
 jest.mock('path', () => ({
-  ...actualPath,
   resolve: jest.fn((...args) => actualPath.resolve(...args)),
   join: jest.fn((...args) => actualPath.join(...args)),
   relative: jest.fn((...args) => actualPath.relative(...args)),
@@ -132,6 +133,12 @@ describe('analyzeProject', () => {
         'specific-file.js'
       ];
 
+    // Mock existence of project root and potential default entry files
+    const appJsPath = actualPath.resolve(projectRoot, 'app.js');
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || p === appJsPath
+    );
+
     await analyzeProject(projectRoot, options);
 
     expect(mockGlob.sync).toHaveBeenCalledWith(expectedGlobPattern, {
@@ -148,6 +155,12 @@ describe('analyzeProject', () => {
     const fileC = actualPath.resolve(projectRoot, 'c.json');
     const fileD = actualPath.resolve(projectRoot, 'd.js'); // Not found by glob initially
     const allFiles = [fileA, fileB, fileC];
+
+    // Mock existence of project root and potential default entry files
+    const appJsonPath = actualPath.resolve(projectRoot, 'app.json');
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || p === appJsonPath || allFiles.includes(p as string)
+    );
 
     mockGlob.sync.mockReturnValue(allFiles);
     
@@ -191,8 +204,10 @@ describe('analyzeProject', () => {
     const allFiles = [appJs, appJson, pageA, pageB, utilC, unusedD, projConf];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    // Mock fs.existsSync for entry file checks and essential file checks
-    mockFs.existsSync.mockImplementation(p => allFiles.includes(p));
+    // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || allFiles.includes(p as string) 
+    );
 
     // Mock parseFile to setup dependency chain: app.js -> pageA -> utilC, app.json -> pageA, pageB (unreachable)
     mockParseFile.mockImplementation(async (filePath) => {
@@ -234,7 +249,10 @@ describe('analyzeProject', () => {
     const allFiles = [customEntry, depA, unusedB, appJs];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    mockFs.existsSync.mockImplementation(p => allFiles.includes(p));
+    // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || allFiles.includes(p as string) 
+    );
     mockParseFile.mockImplementation(async (filePath) => {
       if (filePath === customEntry) return [depA];
       return [];
@@ -262,8 +280,14 @@ describe('analyzeProject', () => {
      const allFiles = [appJs, depA];
 
      mockGlob.sync.mockReturnValue(allFiles);
-     // Mock that only app.js and depA exist
-     mockFs.existsSync.mockImplementation(p => p === appJs || p === depA);
+     // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+     // Also need to handle the check for the non-existent entry file
+     const nonExistentFullPath = actualPath.resolve(projectRoot, nonExistentEntry);
+     (fs.existsSync as jest.Mock).mockImplementation(p => {
+         if (p === projectRoot) return true;
+         if (p === nonExistentFullPath) return false; // Explicitly non-existent
+         return allFiles.includes(p as string);
+     });
      mockParseFile.mockImplementation(async (filePath) => {
          if (filePath === appJs) return [depA];
          return [];
@@ -287,7 +311,10 @@ describe('analyzeProject', () => {
     const allFiles = [page1Js, page1Wxml, page2Js, utilA, unusedC];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    mockFs.existsSync.mockImplementation(p => allFiles.includes(p));
+    // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || allFiles.includes(p as string) 
+    );
     mockParseFile.mockImplementation(async (filePath) => {
       if (filePath === page1Js) return [utilA];
       // page2Js depends on nothing
@@ -326,7 +353,10 @@ describe('analyzeProject', () => {
     const allFiles = [appJs, essentialUtil, essentialConfig, unusedScript];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    mockFs.existsSync.mockImplementation(p => allFiles.includes(p));
+    // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+    (fs.existsSync as jest.Mock).mockImplementation(p => 
+        p === projectRoot || allFiles.includes(p as string) 
+    );
     // Mock that app.js has no dependencies
     mockParseFile.mockResolvedValue([]);
 
@@ -356,7 +386,10 @@ describe('analyzeProject', () => {
       const allFiles = [appJs, badFile, goodFile];
 
       mockGlob.sync.mockReturnValue(allFiles);
-      mockFs.existsSync.mockImplementation(p => allFiles.includes(p));
+      // Mock fs.existsSync: check projectRoot OR if path is in allFiles
+      (fs.existsSync as jest.Mock).mockImplementation(p => 
+          p === projectRoot || allFiles.includes(p as string) 
+      );
       mockParseFile.mockImplementation(async (filePath) => {
           if (filePath === appJs) return [goodFile]; // App depends on good file
           if (filePath === badFile) throw new Error('Parsing failed!');

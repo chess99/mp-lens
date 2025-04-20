@@ -2,22 +2,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AliasResolver } from '../../src/utils/alias-resolver';
 
-// Mock fs module
-jest.mock('fs', () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-  statSync: jest.fn(),
-}));
-
-// Mock path module (using actual path logic where possible)
+// Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
+
+// Mock fs
+jest.mock('fs');
+
+// Mock path module (Alternative strategy)
 jest.mock('path', () => ({
-  ...actualPath,
   resolve: jest.fn((...args) => actualPath.resolve(...args)),
   join: jest.fn((...args) => actualPath.join(...args)),
   relative: jest.fn((...args) => actualPath.relative(...args)),
-  dirname: jest.fn((p) => actualPath.dirname(p)),
   isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
+  // Add other functions used in the test file if needed
+  dirname: jest.fn((p) => actualPath.dirname(p)),
   extname: jest.fn((p) => actualPath.extname(p)),
 }));
 
@@ -351,19 +349,29 @@ describe('AliasResolver', () => {
       const indexFile = 'index.js';
       const absoluteIndexFile = actualPath.join(absoluteTargetDir, indexFile);
 
-      // Mock the directory and the index file existence
-      (fs.existsSync as jest.Mock).mockImplementation(p => 
-        p === absoluteTargetDir || p === absoluteIndexFile
-      );
+      // Reset to default mock behavior (false)
+      (fs.existsSync as jest.Mock).mockReset();
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      
+      // Explicitly mock only the paths that should exist
+      (fs.existsSync as jest.Mock).mockImplementation(p => {
+        if (p === absoluteTargetDir) return true; // Directory itself exists
+        if (p === absoluteIndexFile) return true; // Index file exists
+        return false; // All other paths (like dir + ext) do not exist
+      });
+        
+      // Mock statSync specifically for the directory
       (fs.statSync as jest.Mock).mockImplementation((p) => {
           if (p === absoluteTargetDir) return { isDirectory: () => true };
-          throw new Error('ENOENT stat');
+          throw new Error(`ENOENT stat: path ${p} was not expected`);
       });
 
       const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
 
       // Check if it checked the base path first (as a file/with extensions)
       expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetDir);
+      // Check file extensions were attempted (and returned false per mock)
+      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetDir + '.js'); 
       // Check if it stat'ed the directory
       expect(fs.statSync).toHaveBeenCalledWith(absoluteTargetDir);
        // Check if it looked for index files

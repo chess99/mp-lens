@@ -1,7 +1,10 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { ConfigFileOptions } from '../../src/types/command-options';
 import { ConfigLoader } from '../../src/utils/config-loader';
+const path = require('path');
+
+// Get actual path module *before* mocking
+const actualPath = jest.requireActual('path');
 
 // Mock fs module
 jest.mock('fs', () => ({
@@ -9,13 +12,16 @@ jest.mock('fs', () => ({
   readFileSync: jest.fn(),
 }));
 
-// Mock path module (ensure mocks are robust)
-const actualPath = jest.requireActual('path');
+// Mock path module (Alternative strategy)
 jest.mock('path', () => ({
-  ...actualPath, // Use actual path functions by default
+  // Explicitly mock required functions, delegating to actualPath inside
   resolve: jest.fn((...args) => actualPath.resolve(...args)),
   join: jest.fn((...args) => actualPath.join(...args)),
   extname: jest.fn((p) => actualPath.extname(p)),
+  dirname: jest.fn((p) => actualPath.dirname(p)),
+  // Add other path functions used in the test file if needed
+  relative: jest.fn((...args) => actualPath.relative(...args)),
+  isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
 }));
 
 // Mock ts-node register function
@@ -88,12 +94,12 @@ describe('ConfigLoader', () => {
     });
 
     // Reset require.cache for dynamic requires
-    Object.keys(require.cache).forEach(key => {
-        // Be careful not to delete core modules if tests depend on them implicitly
-         if (key.includes(projectRoot)) { // Example: only clear cache for our fake project files
-           delete require.cache[key];
-         }
-    });
+    // Object.keys(require.cache).forEach(key => {
+    //     // Be careful not to delete core modules if tests depend on them implicitly
+    //      if (key.includes(projectRoot)) { // Example: only clear cache for our fake project files
+    //        delete require.cache[key];
+    //      }
+    // });
       
     // Spy on console methods AFTER resetting mocks
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {}); // Suppress log output during tests
@@ -128,10 +134,12 @@ describe('ConfigLoader', () => {
     const configPath = 'my-config.js';
     const fullConfigPath = actualPath.resolve(projectRoot, configPath);
 
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-      if (id === fullConfigPath) return mockConfig;
-      if (id === 'ts-node') return { register: mockTsNodeRegister };
-      throw new Error(`Unexpected require: ${id}`);
+      const resolvedId = actualPath.resolve(id); // Resolve the ID being required
+      if (resolvedId === fullConfigPath) return mockConfig;
+      if (id === 'ts-node') return { register: mockTsNodeRegister }; // Keep original check for module name
+      throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
@@ -147,10 +155,12 @@ describe('ConfigLoader', () => {
     const fullConfigPath = actualPath.resolve(projectRoot, configPath);
     const configFunction = jest.fn().mockResolvedValue(mockConfig); // Use mockResolvedValue for async function
 
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-      if (id === fullConfigPath) return configFunction;
+      const resolvedId = actualPath.resolve(id);
+      if (resolvedId === fullConfigPath) return configFunction;
       if (id === 'ts-node') return { register: mockTsNodeRegister };
-      throw new Error(`Unexpected require: ${id}`);
+      throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
@@ -163,10 +173,12 @@ describe('ConfigLoader', () => {
   it('should load config from a specified JS file path (ES module default object export)', async () => {
       const configPath = 'my-config-es.js';
       const fullConfigPath = actualPath.resolve(projectRoot, configPath);
+      // Ensure path comparison in mock is robust
       mockRequire.mockImplementation((id) => {
-          if (id === fullConfigPath) return { default: mockConfig }; // Simulate ES module export
+          const resolvedId = actualPath.resolve(id);
+          if (resolvedId === fullConfigPath) return { default: mockConfig }; // Simulate ES module export
           if (id === 'ts-node') return { register: mockTsNodeRegister };
-          throw new Error(`Unexpected require: ${id}`);
+          throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
       });
       const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
       expect(mockRequire).toHaveBeenCalledWith(fullConfigPath);
@@ -177,10 +189,12 @@ describe('ConfigLoader', () => {
       const configPath = 'my-config-es-func.js';
       const fullConfigPath = actualPath.resolve(projectRoot, configPath);
       const configFunction = jest.fn().mockResolvedValue(mockConfig);
+      // Ensure path comparison in mock is robust
       mockRequire.mockImplementation((id) => {
-          if (id === fullConfigPath) return { default: configFunction }; // Simulate ES module export
+          const resolvedId = actualPath.resolve(id);
+          if (resolvedId === fullConfigPath) return { default: configFunction }; // Simulate ES module export
           if (id === 'ts-node') return { register: mockTsNodeRegister };
-          throw new Error(`Unexpected require: ${id}`);
+          throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
       });
       const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
       expect(mockRequire).toHaveBeenCalledWith(fullConfigPath);
@@ -193,10 +207,12 @@ describe('ConfigLoader', () => {
     const configPath = 'my-config.ts';
     const fullConfigPath = actualPath.resolve(projectRoot, configPath);
 
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-      if (id === fullConfigPath) return mockConfig; // ts-node handles the require
+      const resolvedId = actualPath.resolve(id);
+      if (resolvedId === fullConfigPath) return mockConfig; // ts-node handles the require
       if (id === 'ts-node') return { register: mockTsNodeRegister };
-      throw new Error(`Unexpected require: ${id}`);
+      throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
@@ -211,10 +227,12 @@ describe('ConfigLoader', () => {
     const jsConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.js');
     (fs.existsSync as jest.Mock).mockImplementation((p) => p === jsConfigPath);
 
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-      if (id === jsConfigPath) return mockConfig;
+      const resolvedId = actualPath.resolve(id);
+      if (resolvedId === jsConfigPath) return mockConfig;
       if (id === 'ts-node') return { register: mockTsNodeRegister };
-      throw new Error(`Unexpected require: ${id}`);
+      throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(undefined, projectRoot);
@@ -231,10 +249,12 @@ describe('ConfigLoader', () => {
     const tsConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.ts');
     (fs.existsSync as jest.Mock).mockImplementation((p) => p === tsConfigPath); // Only TS exists
 
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-      if (id === tsConfigPath) return mockConfig;
+      const resolvedId = actualPath.resolve(id);
+      if (resolvedId === tsConfigPath) return mockConfig;
       if (id === 'ts-node') return { register: mockTsNodeRegister };
-      throw new Error(`Unexpected require: ${id}`);
+      throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(undefined, projectRoot);
@@ -316,10 +336,12 @@ describe('ConfigLoader', () => {
     const configPath = 'error.js';
     const fullConfigPath = actualPath.resolve(projectRoot, configPath);
     const loadError = new Error('Syntax Error in JS');
+    // Ensure path comparison in mock is robust
     mockRequire.mockImplementation((id) => {
-        if (id === fullConfigPath) throw loadError;
+        const resolvedId = actualPath.resolve(id);
+        if (resolvedId === fullConfigPath) throw loadError;
         if (id === 'ts-node') return { register: mockTsNodeRegister };
-        throw new Error(`Unexpected require: ${id}`);
+        throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
@@ -334,11 +356,13 @@ describe('ConfigLoader', () => {
     const fullConfigPath = actualPath.resolve(projectRoot, configPath); // Need path for extname check
     const tsNodeError = new Error('Cannot find module ts-node');
 
+    // Resolve path being required
     mockRequire.mockImplementation((id) => {
-        if (id === 'ts-node') throw tsNodeError;
+        if (id === 'ts-node') throw tsNodeError; // Check module name first
+        const resolvedId = actualPath.resolve(id);
         // We shouldn't reach the require for fullConfigPath if ts-node fails
-        if (id === fullConfigPath) throw new Error('Should not require config if ts-node fails');
-        throw new Error(`Unexpected require: ${id}`);
+        if (resolvedId === fullConfigPath) throw new Error('Should not require config if ts-node fails');
+        throw new Error(`Unexpected require: ${id} (resolved: ${resolvedId})`);
     });
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
