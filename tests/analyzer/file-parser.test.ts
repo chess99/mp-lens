@@ -315,15 +315,31 @@ describe('FileParser', () => {
       const iconPath = 'src/assets/icon.svg'; // Resolved alias
       const absIconPath = actualPath.resolve(projectRoot, iconPath);
       
+      // 输出测试设置信息
+      console.log("Test setup - parseWXML paths:");
+      console.log("filePath:", filePath);
+      console.log("headerPath:", headerPath);
+      console.log("footerPath:", footerPath);
+      console.log("toolsPath:", toolsPath);
+      console.log("logoPath:", logoPath);
+      console.log("bannerPath:", bannerPath);
+      console.log("iconPath:", iconPath);
+      
       // Mock AliasResolver for the image path
       mockAliasInitialize.mockReturnValue(true);
-      mockAliasResolve.mockImplementation(p => p === '@/assets/icon.svg' ? absIconPath : null);
+      mockAliasResolve.mockImplementation(p => {
+        console.log("mockAliasResolve called with:", p);
+        return p === '@/assets/icon.svg' ? absIconPath : null;
+      });
       parser = new FileParser(projectRoot, { fileTypes: ['.wxml'] }); // Recreate parser with alias config
 
       // Mock file existence
       mockFileExists([headerPath, footerPath, toolsPath, logoPath, bannerPath, iconPath]);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+      
+      // 输出实际结果
+      console.log("Result dependencies:", dependencies);
       
       expect(dependencies).toHaveLength(6);
       expect(dependencies).toEqual(expect.arrayContaining([
