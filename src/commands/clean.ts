@@ -77,54 +77,47 @@ export async function cleanUnused(options: CleanOptions) {
     // 显示将被删除的文件
     console.log(chalk.yellow(`找到 ${unusedFiles.length} 个未使用的文件:\n`));
     
-    // 按照文件类型输出
     for (const [type, files] of Object.entries(filesByType)) {
       console.log(chalk.cyan(`${type.toUpperCase()} 文件 (${files.length}):`));
       
       for (const file of files) {
-        // 显示相对路径而非绝对路径
         const relativePath = path.relative(project, file);
-        console.log(`  ${chalk.white(relativePath)}`);
+        console.log(`  ${dryRun ? '' : backup ? '📦 ' : '❌ '}${chalk.white(relativePath)}`);
       }
       
-      console.log('');
+      console.log();
     }
     
-    // 如果是干运行模式，就此结束
+    // 如果是试运行模式，不实际删除文件
     if (dryRun) {
-      console.log(chalk.yellow('干运行模式：上述文件将被删除，但尚未执行实际操作。'));
-      console.log(chalk.yellow('若要实际删除这些文件，请去掉 --dry-run 选项。'));
+      console.log(chalk.blue('试运行模式: 上述文件不会被实际删除。'));
+      console.log(chalk.blue('如果要实际删除这些文件，请移除 --dry-run 选项并重新运行命令。'));
       return;
     }
     
-    // 非强制模式下，确认删除
-    if (!yes) {
-      const answer = await inquirer.prompt([
+    // 如果需要备份，确保备份目录存在
+    if (backup) {
+      if (!fs.existsSync(backup)) {
+        fs.mkdirSync(backup, { recursive: true });
+      }
+    } else if (!yes) {
+      // 二次确认
+      const confirmation = await inquirer.prompt([
         {
           type: 'confirm',
-          name: 'confirm',
-          message: `确定要${backup ? '移动' : '删除'}这些文件吗？`,
+          name: 'proceed',
+          message: '确定要删除这些文件吗？这个操作不可撤销！',
           default: false
         }
       ]);
       
-      if (!answer.confirm) {
+      if (!confirmation.proceed) {
         console.log(chalk.blue('操作已取消。'));
         return;
       }
     }
     
-    // 创建备份目录（如果需要）
-    if (backup) {
-      if (!fs.existsSync(backup)) {
-        fs.mkdirSync(backup, { recursive: true });
-        if (verbose) {
-          console.log(`创建备份目录: ${backup}`);
-        }
-      }
-    }
-    
-    // 执行删除或移动操作
+    // 处理文件
     let processedCount = 0;
     let errorCount = 0;
     
@@ -173,69 +166,9 @@ export async function cleanUnused(options: CleanOptions) {
     if (errorCount > 0) {
       console.log(chalk.yellow(`⚠️ ${errorCount} 个文件处理失败。`));
     }
-    
-    // 检查是否有空目录可以删除
-    if (!backup) {
-      console.log(chalk.blue('正在检查空目录...'));
-      const emptyDirs = await findEmptyDirectories(project, exclude);
-      
-      if (emptyDirs.length > 0) {
-        console.log(chalk.yellow(`发现 ${emptyDirs.length} 个空目录:`));
-        
-        for (const dir of emptyDirs) {
-          console.log(`  ${chalk.white(path.relative(project, dir))}`);
-        }
-        
-        // 确认是否删除空目录
-        if (!yes) {
-          const answer = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'confirm',
-              message: '是否要删除这些空目录？',
-              default: false
-            }
-          ]);
-          
-          if (!answer.confirm) {
-            console.log(chalk.blue('已跳过删除空目录。'));
-            return;
-          }
-        }
-        
-        // 删除空目录
-        let dirProcessed = 0;
-        let dirErrors = 0;
-        
-        for (const dir of emptyDirs) {
-          try {
-            fs.rmdirSync(dir);
-            dirProcessed++;
-            
-            if (verbose) {
-              console.log(`已删除空目录: ${path.relative(project, dir)}`);
-            }
-          } catch (error) {
-            console.error(chalk.red(`无法删除目录 ${dir}: ${(error as Error).message}`));
-            dirErrors++;
-          }
-        }
-        
-        console.log(chalk.green(`✅ 已删除 ${dirProcessed} 个空目录`));
-        
-        if (dirErrors > 0) {
-          console.log(chalk.yellow(`⚠️ ${dirErrors} 个目录删除失败。`));
-        }
-      } else {
-        console.log(chalk.green('没有发现空目录。'));
-      }
-    }
   } catch (error) {
-    console.error(chalk.red(`❌ 操作失败: ${(error as Error).message}`));
-    if (verbose) {
-      console.error((error as Error).stack);
-    }
-    process.exit(1);
+    console.error(chalk.red(`❌ 分析失败: ${(error as Error).message}`));
+    throw error;
   }
 }
 

@@ -19,8 +19,10 @@ export async function analyzeProject(
 ): Promise<AnalysisResult> {
   const { fileTypes, excludePatterns = [], verbose = false } = options;
   
+  console.log('DEBUG - Analyzer received project path:', projectRoot);
+  
   // 验证项目路径
-  if (!fs.existsSync(projectRoot)) {
+  if (!projectRoot || !fs.existsSync(projectRoot)) {
     throw new Error(`项目路径不存在: ${projectRoot}`);
   }
 

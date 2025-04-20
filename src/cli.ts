@@ -1,13 +1,34 @@
 #!/usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
+import * as fs from 'fs';
+import * as path from 'path';
 import { version } from '../package.json';
 import { cleanUnused } from './commands/clean';
 import { generateGraph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
 
+// Define a simpler options merging function
+function mergeOptions(cmdOptions: any, globalOptions: any) {
+  // Resolve project path to absolute path
+  const projectPath = globalOptions.project || process.cwd();
+  const resolvedProjectPath = path.resolve(projectPath);
+  
+  console.log('Original project path:', projectPath);
+  console.log('Resolved project path:', resolvedProjectPath);
+  console.log('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
+  
+  return {
+    project: resolvedProjectPath,
+    verbose: globalOptions.verbose || false,
+    config: globalOptions.config,
+    ...cmdOptions
+  };
+}
+
 const program = new Command();
 
+// Define the global options
 program
   .version(version)
   .description('微信小程序依赖分析与清理工具')
@@ -23,7 +44,32 @@ program
   .option('--exclude <pattern>', '用于排除文件/目录的 Glob 模式', (value: string, previous: string[]) => previous.concat([value]), [] as string[])
   .option('--output-format <format>', '输出格式 (text|json)', 'text')
   .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
-  .action(listUnused);
+  .action((cmdOptions) => {
+    try {
+      // Get global options explicitly
+      const globalOptions = program.opts();
+      console.log('Global options:', globalOptions);
+      console.log('Command options:', cmdOptions);
+      
+      // Merge with command options
+      const options = mergeOptions(cmdOptions, globalOptions);
+      
+      // Debug output
+      if (options.verbose) {
+        console.log('项目路径:', options.project);
+        console.log('详细模式:', options.verbose);
+      }
+      
+      // Execute the command
+      listUnused(options);
+    } catch (error) {
+      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      if (error instanceof Error && error.stack) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
 
 // graph command
 program
@@ -35,7 +81,21 @@ program
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
   .option('--no-npm', '在图中排除 node_modules 或 miniprogram_npm 中的依赖')
-  .action(generateGraph);
+  .action((cmdOptions) => {
+    try {
+      // Get global options explicitly
+      const globalOptions = program.opts();
+      
+      // Merge with command options
+      const options = mergeOptions(cmdOptions, globalOptions);
+      
+      // Execute the command
+      generateGraph(options);
+    } catch (error) {
+      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      process.exit(1);
+    }
+  });
 
 // clean command
 program
@@ -44,9 +104,23 @@ program
   .option('--types <types>', '指定要删除的文件类型', 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs')
   .option('--exclude <pattern>', '排除某些文件/目录不被删除', (value: string, previous: string[]) => previous.concat([value]), [] as string[])
   .option('--dry-run', '模拟删除过程，不实际改动文件', false)
-  .option('--backup <dir>', '将删除的文件移动到此目录作为备份，而不是永久删除')
+  .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
   .option('-y, --yes, --force', '跳过交互式确认环节', false)
-  .action(cleanUnused);
+  .action((cmdOptions) => {
+    try {
+      // Get global options explicitly
+      const globalOptions = program.opts();
+      
+      // Merge with command options
+      const options = mergeOptions(cmdOptions, globalOptions);
+      
+      // Execute the command
+      cleanUnused(options);
+    } catch (error) {
+      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      process.exit(1);
+    }
+  });
 
 // Handle invalid commands
 program.on('command:*', () => {
@@ -65,4 +139,5 @@ if (process.argv.length === 2) {
   program.help();
 }
 
+// Parse arguments
 program.parse(process.argv); 
