@@ -78,30 +78,38 @@ export class AliasResolver {
           // 如果路径存在，直接返回
           if (fs.existsSync(absolutePath)) {
             console.log(`DEBUG - Path exists, returning: ${absolutePath}`);
+            
+            // 检查是否是目录，如果是，尝试查找index文件
+            try {
+              if (fs.statSync(absolutePath).isDirectory()) {
+                console.log(`DEBUG - Path is a directory, checking for index files`);
+                const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
+                for (const ext of possibleExts) {
+                  const indexPath = path.join(absolutePath, `index${ext}`);
+                  console.log(`DEBUG - Trying index file: ${indexPath}`);
+                  if (fs.existsSync(indexPath)) {
+                    console.log(`DEBUG - Index file exists, returning: ${indexPath}`);
+                    return indexPath;
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn(`Error checking if path is directory: ${(error as Error).message}`);
+            }
+            
+            // 如果不是目录或目录中没有找到index文件，返回路径本身
             return absolutePath;
           }
           
           // 处理没有扩展名的情况，尝试添加常见的扩展名
           const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
           for (const ext of possibleExts) {
-            const pathWithExt = absolutePath + ext;
+            // 重要：使用字符串连接格式，确保测试能捕获到这些调用
+            const pathWithExt = `${absolutePath}${ext}`;
             console.log(`DEBUG - Trying with extension: ${pathWithExt}`);
             if (fs.existsSync(pathWithExt)) {
               console.log(`DEBUG - Path with extension exists, returning: ${pathWithExt}`);
               return pathWithExt;
-            }
-          }
-          
-          // 尝试作为目录处理，查找目录下的index文件
-          if (fs.existsSync(absolutePath) && fs.statSync(absolutePath).isDirectory()) {
-            console.log(`DEBUG - Path is a directory, checking for index files`);
-            for (const ext of possibleExts) {
-              const indexPath = path.join(absolutePath, `index${ext}`);
-              console.log(`DEBUG - Trying index file: ${indexPath}`);
-              if (fs.existsSync(indexPath)) {
-                console.log(`DEBUG - Index file exists, returning: ${indexPath}`);
-                return indexPath;
-              }
             }
           }
         }
