@@ -20,6 +20,12 @@ export interface ListUnusedOptions extends CommandOptions {
 export async function listUnused(options: ListUnusedOptions): Promise<void> {
   const { project, verbose, types, exclude, outputFormat, output } = options;
   
+  // 添加额外的调试信息
+  console.log('DEBUG - list-unused received options:', JSON.stringify(options, null, 2));
+  console.log('DEBUG - Project path:', project);
+  console.log('DEBUG - Verbose mode:', verbose);
+  console.log('DEBUG - File types:', types);
+  
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
     console.log(`项目路径: ${project}`);

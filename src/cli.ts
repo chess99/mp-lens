@@ -3,7 +3,10 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { version } from '../package.json';
+
+// Import package.json using require instead of ES6 import
+const { version } = require('../package.json');
+
 import { cleanUnused } from './commands/clean';
 import { generateGraph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
@@ -18,12 +21,18 @@ function mergeOptions(cmdOptions: any, globalOptions: any) {
   console.log('Resolved project path:', resolvedProjectPath);
   console.log('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
   
-  return {
+  // Create merged options with all properties
+  const mergedOptions = {
+    ...cmdOptions,
     project: resolvedProjectPath,
     verbose: globalOptions.verbose || false,
-    config: globalOptions.config,
-    ...cmdOptions
+    config: globalOptions.config
   };
+  
+  // Make sure project field is set
+  console.log('Merged options project path:', mergedOptions.project);
+  
+  return mergedOptions;
 }
 
 const program = new Command();
@@ -41,18 +50,19 @@ program
   .command('list-unused')
   .description('分析项目并列出检测到的未使用文件')
   .option('--types <types>', '指定要检查的文件扩展名，用逗号分隔', 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs')
-  .option('--exclude <pattern>', '用于排除文件/目录的 Glob 模式', (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option('--exclude <pattern>', '用于排除文件/目录的 Glob 模式', (value: string, previous: string[]) => previous.concat([value]), ['**/output/dependency-graph.*', '**/output/unused-files.*', 'dependency-graph.*', 'unused-files.*', '**/dist/**'] as string[])
   .option('--output-format <format>', '输出格式 (text|json)', 'text')
   .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
   .action((cmdOptions) => {
     try {
       // Get global options explicitly
       const globalOptions = program.opts();
-      console.log('Global options:', globalOptions);
-      console.log('Command options:', cmdOptions);
+      console.log('Global options:', JSON.stringify(globalOptions, null, 2));
+      console.log('Command options:', JSON.stringify(cmdOptions, null, 2));
       
       // Merge with command options
       const options = mergeOptions(cmdOptions, globalOptions);
+      console.log('Final merged options:', JSON.stringify(options, null, 2));
       
       // Debug output
       if (options.verbose) {
@@ -102,7 +112,7 @@ program
   .command('clean')
   .description('分析项目并删除未使用的文件 (⚠️ 使用此命令务必谨慎！)')
   .option('--types <types>', '指定要删除的文件类型', 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs')
-  .option('--exclude <pattern>', '排除某些文件/目录不被删除', (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option('--exclude <pattern>', '排除某些文件/目录不被删除', (value: string, previous: string[]) => previous.concat([value]), ['**/output/dependency-graph.*', '**/output/unused-files.*', 'dependency-graph.*', 'unused-files.*', '**/dist/**'] as string[])
   .option('--dry-run', '模拟删除过程，不实际改动文件', false)
   .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
   .option('-y, --yes, --force', '跳过交互式确认环节', false)

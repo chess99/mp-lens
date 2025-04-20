@@ -20,6 +20,9 @@ export async function analyzeProject(
   const { fileTypes, excludePatterns = [], verbose = false } = options;
   
   console.log('DEBUG - Analyzer received project path:', projectRoot);
+  console.log('DEBUG - Analyzer received options:', JSON.stringify(options, null, 2));
+  console.log('DEBUG - File types:', fileTypes);
+  console.log('DEBUG - Exclude patterns:', excludePatterns);
   
   // 验证项目路径
   if (!projectRoot || !fs.existsSync(projectRoot)) {
@@ -78,10 +81,22 @@ function findAllFiles(
   excludePatterns: string[]
 ): string[] {
   const globPattern = `**/*.{${fileTypes.join(',')}}`;
+  
+  // 默认排除的模式
+  const defaultIgnorePatterns = [
+    '**/node_modules/**', 
+    '**/miniprogram_npm/**',
+    '**/output/dependency-graph.*',
+    '**/output/unused-files.*',
+    'dependency-graph.*',
+    'unused-files.*',
+    '**/dist/**'
+  ];
+  
   const globOptions: glob.IOptions = {
     cwd: rootDir,
     absolute: true,
-    ignore: ['**/node_modules/**', '**/miniprogram_npm/**', ...excludePatterns],
+    ignore: [...defaultIgnorePatterns, ...excludePatterns],
     nodir: true
   };
   

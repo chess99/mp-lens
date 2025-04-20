@@ -41,6 +41,7 @@ coverage/
 yarn.lock
 .yarn-integrity
 
-# Output of dependency analysis
-dependency-graph.*
-unused-files.* 
+# Output of dependency analysis (be specific to not ignore source files)
+/dependency-graph.*
+/unused-files.*
+/output/ 
