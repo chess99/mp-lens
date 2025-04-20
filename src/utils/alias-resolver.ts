@@ -70,8 +70,13 @@ export class AliasResolver {
         
         for (const target of targets) {
           // 替换别名为目标路径
-          const relativePath = importPath.replace(aliasPattern, target + '$1');
-          const absolutePath = path.join(this.projectRoot, relativePath);
+          // target is now potentially an absolute path from tsconfig or relative from custom config
+          const resolvedBase = path.isAbsolute(target) 
+                               ? target 
+                               : path.resolve(this.projectRoot, target);
+                               
+          const remainingPath = importPath.replace(aliasPattern, '$1').slice(1); // Get the part after alias/, e.g., 'components/button'
+          const absolutePath = path.join(resolvedBase, remainingPath);
           
           console.log(`DEBUG - Trying resolved path: ${absolutePath}`);
           
@@ -165,17 +170,24 @@ export class AliasResolver {
         
         for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
           // 处理 paths 中的通配符模式 (如 "@/*" => ["src/*"])
-          const normalizedAlias = alias.replace(/\/\*$/, '');
+          const normalizedAlias = alias.replace(/\/\*$/, ''); // e.g., '@'
           
           this.aliases[normalizedAlias] = (targets as string[]).map(target => {
-            const targetPath = target.replace(/\/\*$/, '');
+            const targetPath = target.replace(/\/\*$/, ''); // e.g., 'src'
             
-            // 如果目标路径是绝对路径，直接使用；否则相对于baseDir解析
-            if (path.isAbsolute(targetPath)) {
-              return targetPath;
-            } else {
-              return path.relative(this.projectRoot, path.join(baseDir, targetPath));
-            }
+            // 总是解析为绝对路径
+            const absoluteTargetPath = path.resolve(baseDir, targetPath);
+            console.log(`DEBUG - Mapping alias '${normalizedAlias}' target '${target}' -> '${absoluteTargetPath}'`);
+            return absoluteTargetPath;
+            
+            // --- 旧逻辑: 存储相对路径 ---
+            // // 如果目标路径是绝对路径，直接使用；否则相对于baseDir解析
+            // if (path.isAbsolute(targetPath)) {
+            //   return targetPath;
+            // } else {
+            //   return path.relative(this.projectRoot, path.join(baseDir, targetPath));
+            // }
+            // --- 结束旧逻辑 ---
           });
         }
         

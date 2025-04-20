@@ -115,12 +115,14 @@ describe('AliasResolver', () => {
       expect(fs.existsSync).toHaveBeenCalledWith(tsconfigPath);
       expect(fs.readFileSync).toHaveBeenCalledWith(tsconfigPath, 'utf-8');
       expect(resolver.getAliases()).toEqual({
-        '@': ['src'], // Relative to projectRoot
-        '~components': ['src/components', 'src/shared/components'] // Relative to projectRoot
+        '@': [actualPath.resolve(projectRoot, 'src')], 
+        '~components': [
+          actualPath.resolve(projectRoot, 'src/components'), 
+          actualPath.resolve(projectRoot, 'src/shared/components')
+        ] 
       });
-      // Check console log messages
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('尝试从'));
-       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('已从tsconfig.json加载别名配置'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`尝试从${tsconfigPath}加载别名配置`));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`tsconfig.json的baseUrl: ./src, 解析为: ${actualPath.resolve(projectRoot, 'src')}`));
     });
 
     it('should find and load aliases from tsconfig.json in parent directory', () => {
@@ -157,7 +159,7 @@ describe('AliasResolver', () => {
       expect(fs.existsSync).toHaveBeenCalledWith(tsconfigPathInParent);
       expect(fs.readFileSync).toHaveBeenCalledWith(tsconfigPathInParent, 'utf-8');
       expect(resolver.getAliases()).toEqual({
-        'lib': ['../libs'] // Path relative to projectRoot
+        'lib': [actualPath.resolve(path.dirname(projectRoot), 'libs')] // Resolved relative to tsconfig's dir, then made absolute
       });
        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`尝试从${tsconfigPathInParent}加载别名配置`));
     });
@@ -231,9 +233,9 @@ describe('AliasResolver', () => {
 
       expect(initialized).toBe(true);
       expect(resolver.getAliases()).toEqual({
-        '@': ['source'], // Overridden by custom config
-        'common': ['src/common'], // From tsconfig (relative path)
-        '$lib': ['lib'] // From custom config
+        '@': ['source'], // Overridden by custom config (still relative/as-is from custom)
+        'common': [actualPath.resolve(projectRoot, 'src/common')], 
+        '$lib': ['lib'] // From custom config (still relative/as-is from custom)
       });
        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('已从tsconfig.json加载别名配置'));
        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('已从mp-analyzer.config.json加载别名配置'));

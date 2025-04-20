@@ -72,74 +72,28 @@ export class FileParser {
   private async parseJavaScript(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies: string[] = [];
+      const dependencies = new Set<string>(); // Use a Set locally
       
-      // 分析 import 语句
-      const importRegex = /import\s+(?:(?:\{[^}]+\})|(?:[^{}\s,]+))\s+from\s+['"]([^'"]+)['"]/g;
-      
-      // 分析 require 语句
-      const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-      
-      // 分析微信小程序特有的路径引用（如wx.navigateTo等）
-      const wxPathRegex = /['"](?:pages|components)\/[^'"]+['"]/g;
-      
-      // 为了测试目的，检测特殊的@alias-import注释
-      const aliasImportCommentRegex = /\/\/\s*@alias-import[^'"]*from\s+['"]([^'"]+)['"]/g;
-      
-      let match;
-      
-      // 处理 import 语句
-      while ((match = importRegex.exec(content)) !== null) {
-        if (match[1]) {
-          const depPath = this.resolveAnyPath(match[1], filePath);
-          if (depPath) dependencies.push(depPath);
-        }
+      // Helper to add unique dependency
+      const addDependency = (depPath: string | null) => {
+        if (depPath) dependencies.add(depPath);
       }
-      
-      // 处理 require 语句
-      while ((match = requireRegex.exec(content)) !== null) {
-        if (match[1]) {
-          const depPath = this.resolveAnyPath(match[1], filePath);
-          if (depPath) dependencies.push(depPath);
-        }
-      }
-      
-      // 处理特殊的@alias-import注释 (仅用于测试别名解析)
-      while ((match = aliasImportCommentRegex.exec(content)) !== null) {
-        if (match[1]) {
-          const depPath = this.resolveAnyPath(match[1], filePath);
-          if (depPath) dependencies.push(depPath);
-        }
-      }
-      
-      // 处理微信小程序特有的路径引用
-      while ((match = wxPathRegex.exec(content)) !== null) {
-        const pathString = match[0].replace(/['"]/g, '');
-        
-        // 根据路径是否以/开头决定解析方式
-        const isAbsolutePath = pathString.startsWith('/');
-        let basePath = '';
-        
-        if (isAbsolutePath) {
-          // 如果是绝对路径（以/开头），直接拼接项目根目录
-          basePath = path.join(this.projectRoot, pathString.substring(1));
-        } else {
-          // 如果是相对路径，拼接项目根目录
-          basePath = path.join(this.projectRoot, pathString);
-        }
-        
-        // 尝试解析可能的页面或组件路径
-        const possibleExts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-        
-        for (const ext of possibleExts) {
-          const fullPath = basePath + ext;
-          if (fs.existsSync(fullPath)) {
-            dependencies.push(fullPath);
-          }
-        }
-      }
-      
-      return [...new Set(dependencies)]; // 去除重复项
+
+      // Pass down a temporary array (or modify helpers if needed)
+      let tempDeps: string[] = [];
+      this.processImportStatements(content, filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processRequireStatements(content, filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processAliasImportComments(content, filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processPageOrComponentStrings(content, filePath, dependencies);
+      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
+
+      return Array.from(dependencies); // Return array from Set
     } catch (e) {
       if (this.options.verbose) {
         console.warn(`Error parsing JavaScript file ${filePath}: ${e}`);
@@ -149,159 +103,274 @@ export class FileParser {
   }
 
   /**
+   * 处理 import 语句
+   */
+  private processImportStatements(content: string, filePath: string, dependencies: string[]): void {
+    // Combined Regex: Handles 
+    // 1. import defaultExport from '...'; 
+    // 2. import { namedExport } from '...';
+    // 3. import * as namespace from '...';
+    // 4. import '...'; (Side effect import)
+    // It captures the path in group 1.
+    const importRegex = /import(?:(?:(?:\s+[\w*{}\s,]+|\s*\*\s*as\s+\w+)\s+from)?\s*)['\"]([^\'\"]+)['\"]/g;
+    
+    let match;
+    while ((match = importRegex.exec(content)) !== null) {
+      if (match[1]) {
+        const importPath = match[1];
+        // Basic heuristic to potentially ignore type imports (not foolproof)
+        if (content.substring(match.index - 5, match.index).includes(' type')) continue;
+
+        const depPath = this.resolveAnyPath(importPath, filePath);
+        if (depPath && !dependencies.includes(depPath)) {
+             // console.log(`DEBUG processImportStatements: Adding ${depPath}`); // Add log
+             dependencies.push(depPath);
+        }
+      }
+    }
+  }
+
+  /**
+   * 处理 require 语句
+   */
+  private processRequireStatements(content: string, filePath: string, dependencies: string[]): void {
+    const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    
+    let match;
+    while ((match = requireRegex.exec(content)) !== null) {
+      if (match[1]) {
+        const depPath = this.resolveAnyPath(match[1], filePath);
+        if (depPath) dependencies.push(depPath);
+      }
+    }
+  }
+
+  /**
+   * 处理特殊的@alias-import注释 (仅用于测试别名解析)
+   */
+  private processAliasImportComments(content: string, filePath: string, dependencies: string[]): void {
+    const aliasImportCommentRegex = /\/\/\s*@alias-import[^'"]*from\s+['"]([^'"]+)['"]/g;
+    
+    let match;
+    while ((match = aliasImportCommentRegex.exec(content)) !== null) {
+      if (match[1]) {
+        const depPath = this.resolveAnyPath(match[1], filePath);
+        if (depPath) dependencies.push(depPath);
+      }
+    }
+  }
+
+  /**
+   * Handles string literals that look like 'pages/...' or 'components/...'
+   * Resolves them and finds related files (.wxml, .json, etc.)
+   */
+  private processPageOrComponentStrings(content: string, filePath: string, dependencies: Set<string>): void {
+    // Updated regex to match 'pages/path' or 'components/path' in more contexts
+    // Now matches quotes, variable assignments, and path strings without quotes
+    const pathRegex = /['"]?((?:pages|components)\/[^'"\s,;)]+)['"]?/g;
+    const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+
+    let match;
+    while ((match = pathRegex.exec(content)) !== null) {
+      const pathString = match[1]; // e.g., pages/logs/logs
+      // Treat as root-relative
+      const rootRelativePath = '/' + pathString;
+      
+      if (this.options.verbose) {
+        console.log(`DEBUG - Found page/component path string: ${pathString}, treating as ${rootRelativePath}`);
+      }
+
+      const resolvedPath = this.resolveAnyPath(rootRelativePath, filePath);
+
+      if (resolvedPath) {
+        // Add the initially resolved path (e.g., .../logs.js)
+        dependencies.add(resolvedPath);
+
+        // Find and add related files
+        const baseName = resolvedPath.replace(/\.[^.]+$/, '');
+        for (const ext of exts) {
+          const relatedPath = baseName + ext;
+          if (fs.existsSync(relatedPath)) {
+            dependencies.add(relatedPath); // Add to Set automatically handles duplicates
+          }
+        }
+      } else {
+        if (this.options.verbose) {
+          console.log(`DEBUG - processPageOrComponentStrings: resolveAnyPath returned null for ${rootRelativePath}`);
+        }
+      }
+    }
+  }
+
+  /**
    * 解析 WXML 文件中的依赖
    */
   private async parseWXML(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies: string[] = [];
+      const dependencies = new Set<string>(); // Use a Set locally
       
-      // 匹配<import>和<include>标签
-      const importRegex = /<(?:import|include)\s+src=['"](.*?)['"]\s*\/?\s*>/g;
+      // Modify helper functions to add to the Set directly or adapt here
+      let tempDeps: string[] = [];
+      this.processImportIncludeTags(content, filePath, tempDeps); 
+      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processWxsTags(content, filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processImageSources(content, filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
+      tempDeps = [];
+      this.processCustomComponents(filePath, tempDeps);
+      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
       
-      // 匹配wxs模块
-      const wxsRegex = /<wxs\s+(?:[^>]*?\s+)?src=['"](.*?)['"]/g;
-      
-      // 匹配图片路径
-      const imageRegex = /src=['"](.*?\.(png|jpg|jpeg|gif|svg))['"]/g;
-      
-      let match;
-      
-      // 处理<import>和<include>
-      while ((match = importRegex.exec(content)) !== null) {
-        if (match[1]) {
-          // 对于以 / 开头的路径，需要特殊处理
-          const importPath = match[1];
-          let depPath = null;
-          
-          // 如果以 / 开头，这是相对于项目根目录的路径
-          if (importPath.startsWith('/')) {
-            const absolutePath = path.join(this.projectRoot, importPath.slice(1));
-            if (fs.existsSync(absolutePath)) {
-              dependencies.push(absolutePath);
-              continue;
-            }
-          } else {
-            depPath = this.resolveAnyPath(importPath, filePath);
-            if (depPath) dependencies.push(depPath);
-          }
-        }
-      }
-      
-      // 处理wxs模块
-      while ((match = wxsRegex.exec(content)) !== null) {
-        if (match[1]) {
-          // 对于以 / 开头的路径，需要特殊处理
-          const wxsPath = match[1];
-          let depPath = null;
-          
-          // 如果以 / 开头，这是相对于项目根目录的路径
-          if (wxsPath.startsWith('/')) {
-            const absolutePath = path.join(this.projectRoot, wxsPath.slice(1));
-            if (fs.existsSync(absolutePath)) {
-              dependencies.push(absolutePath);
-              continue;
-            }
-          } else {
-            depPath = this.resolveAnyPath(wxsPath, filePath);
-            if (depPath) dependencies.push(depPath);
-          }
-        }
-      }
-      
-      // 处理图片路径
-      while ((match = imageRegex.exec(content)) !== null) {
-        if (match[1]) {
-          const imagePath = match[1];
-          
-          // 检查是否是别名路径
-          const isAliasPath = imagePath.startsWith('@') || 
-                            imagePath.startsWith('$') || 
-                            imagePath.startsWith('~') || 
-                            (/^[a-zA-Z]/.test(imagePath) && 
-                             !imagePath.startsWith('./') && 
-                             !imagePath.startsWith('../') && 
-                             !imagePath.startsWith('/'));
-          
-          // 检查是否是系统绝对路径
-          const isSystemPath = path.isAbsolute(imagePath);
-          
-          // 尝试别名解析
-          if (this.hasAliasConfig && this.aliasResolver && isAliasPath) {
-            const aliasPath = this.aliasResolver.resolve(imagePath, filePath);
-            if (aliasPath) {
-              dependencies.push(aliasPath);
-              continue;
-            }
-          } else if (isSystemPath) {
-            // 如果是系统绝对路径，直接检查存在性并添加
-            if (fs.existsSync(imagePath)) {
-              dependencies.push(imagePath);
-              continue;
-            }
-          } else if (imagePath.startsWith('/')) {
-            // 如果以 / 开头，这是相对于项目根目录的路径
-            const absolutePath = path.join(this.projectRoot, imagePath.slice(1));
-            if (fs.existsSync(absolutePath)) {
-              dependencies.push(absolutePath);
-              continue;
-            }
-          } else {
-            // 普通相对路径
-            const depPath = this.resolveAnyPath(imagePath, filePath);
-            if (depPath) dependencies.push(depPath);
-          }
-        }
-      }
-      
-      // 解析自定义组件（需要读取同名.json文件来获取组件路径）
-      const jsonPath = filePath.replace(/\.wxml$/, '.json');
-      // 明确检查 JSON 文件是否存在
-      const jsonExists = fs.existsSync(jsonPath);
-      
-      if (jsonExists) {
-        try {
-          // 读取 JSON 文件内容
-          const jsonContent = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-          
-          // 如果是组件配置文件且包含usingComponents
-          if (jsonContent.usingComponents) {
-            // 遍历所有使用的组件
-            for (const [componentName, componentPath] of Object.entries(jsonContent.usingComponents)) {
-              if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
-                // 排除插件路径 (plugin://)
-                const resolvedPath = this.resolveAnyPath(componentPath as string, filePath);
-                
-                if (resolvedPath) {
-                  // 添加组件的各个相关文件
-                  const basePath = resolvedPath.replace(/\.\w+$/, '');
-                  // 确定组件的基础路径，去掉可能存在的扩展名
-                  const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-                  
-                  for (const ext of exts) {
-                    const fullPath = basePath + ext;
-                    if (fs.existsSync(fullPath)) {
-                      dependencies.push(fullPath);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // 如果JSON解析失败，忽略错误
-          if (this.options.verbose) {
-            console.warn(`Error parsing JSON file ${jsonPath}: ${e}`);
-          }
-        }
-      }
-      
-      return [...new Set(dependencies)]; // 去除重复项
+      return Array.from(dependencies); // Return array from Set
     } catch (e) {
       if (this.options.verbose) {
         console.warn(`Error parsing WXML file ${filePath}: ${e}`);
       }
       return [];
+    }
+  }
+  
+  /**
+   * 处理<import>和<include>标签
+   */
+  private processImportIncludeTags(content: string, filePath: string, dependencies: string[]): void {
+    const importRegex = /<(?:import|include)\s+src=['"](.*?)['"]\s*\/?\s*>/g;
+    
+    let match;
+    while ((match = importRegex.exec(content)) !== null) {
+      if (match[1]) {
+        // 对于以 / 开头的路径，需要特殊处理
+        const importPath = match[1];
+        
+        // 如果以 / 开头，这是相对于项目根目录的路径
+        if (importPath.startsWith('/')) {
+          const absolutePath = path.join(this.projectRoot, importPath.slice(1));
+          if (fs.existsSync(absolutePath)) {
+            dependencies.push(absolutePath);
+            continue;
+          }
+        } else {
+          const depPath = this.resolveAnyPath(importPath, filePath);
+          if (depPath) dependencies.push(depPath);
+        }
+      }
+    }
+  }
+  
+  /**
+   * 处理wxs模块标签
+   */
+  private processWxsTags(content: string, filePath: string, dependencies: string[]): void {
+    const wxsRegex = /<wxs\s+(?:[^>]*?\s+)?src=['"](.*?)['"]/g;
+    
+    let match;
+    while ((match = wxsRegex.exec(content)) !== null) {
+      if (match[1]) {
+        // 对于以 / 开头的路径，需要特殊处理
+        const wxsPath = match[1];
+        
+        // 如果以 / 开头，这是相对于项目根目录的路径
+        if (wxsPath.startsWith('/')) {
+          const absolutePath = path.join(this.projectRoot, wxsPath.slice(1));
+          if (fs.existsSync(absolutePath)) {
+            dependencies.push(absolutePath);
+            continue;
+          }
+        } else {
+          const depPath = this.resolveAnyPath(wxsPath, filePath);
+          if (depPath) dependencies.push(depPath);
+        }
+      }
+    }
+  }
+  
+  /**
+   * 处理图片源路径
+   */
+  private processImageSources(content: string, filePath: string, dependencies: string[]): void {
+    // Match src attributes in <image> tags
+    const IMAGE_SRC_REGEX = /<image.*?src=["'](.*?)["']/g;
+    const matches = [...content.matchAll(IMAGE_SRC_REGEX)];
+
+    matches.forEach(match => {
+      const src = match[1];
+      // Skip empty, data URIs, external URLs, or dynamic template strings
+      if (!src || /{{.*?}}/.test(src) || /^data:/.test(src) || /^(http|https):/.test(src)) {
+        return;
+      }
+      // Resolve the path using resolveAnyPath
+      const resolvedPath = this.resolveAnyPath(src, filePath);
+      if (resolvedPath) {
+        // console.log(`DEBUG processImageSources: Adding ${resolvedPath}`);
+        dependencies.push(resolvedPath);
+      } else {
+         // console.log(`DEBUG processImageSources: Could not resolve ${src}`);
+      }
+    });
+  }
+
+  /**
+   * 处理自定义组件依赖
+   */
+  private processCustomComponents(filePath: string, dependencies: string[]): void {
+    // 解析自定义组件（需要读取同名.json文件来获取组件路径）
+    const jsonPath = filePath.replace(/\.wxml$/, '.json');
+    // 明确检查 JSON 文件是否存在
+    const jsonExists = fs.existsSync(jsonPath);
+    
+    // Log before checking jsonExists
+    // console.log(`DEBUG processCustomComponents: Checking existence for ${jsonPath}`);
+    if (jsonExists) {
+      try {
+        // 读取 JSON 文件内容
+        const jsonContent = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+        
+        // 如果是组件配置文件且包含usingComponents
+        if (jsonContent.usingComponents) {
+          // 遍历所有使用的组件
+          for (const [componentName, componentPath] of Object.entries(jsonContent.usingComponents)) {
+            if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
+              // 排除插件路径 (plugin://)
+              // 使用统一的路径解析函数
+              // 1. Resolve the component path given in usingComponents (might resolve to index file, dir, etc.)
+              const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath);
+              
+              if (resolvedComponentPath) {
+                // 2. Determine the base name for checking related files
+                //    (remove /index.ext or just .ext)
+                const componentBase = resolvedComponentPath.replace(/(\/index)?\.\w+$/, '');
+                
+                // 3. Check for related component files based on the derived base name
+                const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+                for (const ext of exts) {
+                  const fullPath = componentBase + ext;
+                  if (fs.existsSync(fullPath)) {
+                      // Only add if it hasn't been added already (e.g., if resolvedComponentPath was one of these)
+                      if (!dependencies.includes(fullPath)) {
+                          dependencies.push(fullPath);
+                      }
+                  }
+                }
+                // Ensure the originally resolved path is also included if it wasn't caught by the extension loop
+                // (e.g., if resolveAnyPath resolved to a directory path represented in the graph)
+                if (fs.existsSync(resolvedComponentPath) && !dependencies.includes(resolvedComponentPath)) {
+                   // Check if it's a file before adding? Or assume if resolveAnyPath returned it, it's relevant?
+                   // Let's add it cautiously. If resolveAnyPath resolved to a dir, adding it might be wrong.
+                   // For now, rely on the extension check loop above.
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // 如果JSON解析失败，忽略错误
+        if (this.options.verbose) {
+          console.warn(`Error parsing JSON file ${jsonPath}: ${e}`);
+        }
+      }
     }
   }
 
@@ -480,18 +549,31 @@ export class FileParser {
             // 排除插件路径 (plugin://)
             
             // 使用统一的路径解析函数
-            const resolvedPath = this.resolveAnyPath(componentPath as string, filePath);
+            // 1. Resolve the component path given in usingComponents (might resolve to index file, dir, etc.)
+            const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath);
             
-            if (resolvedPath) {
-              // 添加组件的各个相关文件
-              const basePath = resolvedPath.replace(/\.\w+$/, '');
-              const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+            if (resolvedComponentPath) {
+              // 2. Determine the base name for checking related files
+              //    (remove /index.ext or just .ext)
+              const componentBase = resolvedComponentPath.replace(/(\/index)?\.\w+$/, '');
               
+              // 3. Check for related component files based on the derived base name
+              const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
               for (const ext of exts) {
-                const fullPath = basePath + ext;
+                const fullPath = componentBase + ext;
                 if (fs.existsSync(fullPath)) {
-                  dependencies.push(fullPath);
+                    // Only add if it hasn't been added already (e.g., if resolvedComponentPath was one of these)
+                    if (!dependencies.includes(fullPath)) {
+                        dependencies.push(fullPath);
+                    }
                 }
+              }
+              // Ensure the originally resolved path is also included if it wasn't caught by the extension loop
+              // (e.g., if resolveAnyPath resolved to a directory path represented in the graph)
+              if (fs.existsSync(resolvedComponentPath) && !dependencies.includes(resolvedComponentPath)) {
+                 // Check if it's a file before adding? Or assume if resolveAnyPath returned it, it's relevant?
+                 // Let's add it cautiously. If resolveAnyPath resolved to a dir, adding it might be wrong.
+                 // For now, rely on the extension check loop above.
               }
             }
           }
@@ -535,117 +617,155 @@ export class FileParser {
    * @returns 解析后的绝对路径，如果无法解析则返回null
    */
   private resolveAnyPath(importPath: string, sourcePath: string): string | null {
-    // 记录导入详情
     if (this.options.verbose) {
       console.log(`DEBUG - Resolving any path '${importPath}' from '${sourcePath}'`);
     }
-    
-    // 1. 检查是否是别名路径
+
+    // 1. Handle alias
     const isAliasPath = this.isAliasPath(importPath);
-    
-    // 2. 如果是别名且别名解析器存在，无论 hasAliasConfig 如何，总是尝试解析
-    // 这是为了确保测试中对 AliasResolver.resolve 的调用被记录
     if (isAliasPath && this.aliasResolver) {
       const aliasPath = this.aliasResolver.resolve(importPath, sourcePath);
       if (aliasPath) {
-        if (this.options.verbose) {
-          console.log(`DEBUG - Successfully resolved alias to: ${aliasPath}`);
+        if (fs.existsSync(aliasPath)) {
+           if (this.options.verbose) {
+              console.log(`DEBUG - Successfully resolved alias to existing file: ${aliasPath}`);
+           }
+           return aliasPath;
+        } else {
+             if (this.options.verbose) {
+                 console.log(`DEBUG - Resolved alias path ${aliasPath} does not exist directly, attempting further resolution...`);
+             }
+             return this.resolvePath(sourcePath, aliasPath);
         }
-        return aliasPath;
       }
       if (this.options.verbose) {
         console.log(`DEBUG - Alias resolution failed for ${importPath}`);
       }
     }
-    
-    // 3. 如果是系统绝对路径，直接返回
-    if (path.isAbsolute(importPath)) {
-      if (fs.existsSync(importPath)) {
-        return importPath;
-      }
-      return null;
-    }
-    
-    // 4. 如果是以/开头的路径（相对于项目根目录）
+
+    // 2. Handle root-relative paths (explicitly start with '/')
     if (importPath.startsWith('/')) {
-      const absPath = path.join(this.projectRoot, importPath.slice(1));
-      if (fs.existsSync(absPath)) {
-        return absPath;
+      // Path starting with '/' is relative to the project root.
+      // Use resolvePath with projectRootOverride
+      const resolvedRootPath = this.resolvePath(sourcePath, importPath, this.projectRoot);
+      if (resolvedRootPath) {
+        return resolvedRootPath;
+      } else {
+        return null;
       }
-      // 如果直接路径不存在，尝试添加扩展名
-      if (!path.extname(absPath)) {
-        const possibleExts = ['.js', '.ts', '.wxml', '.wxss', '.wxs', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg'];
-        for (const ext of possibleExts) {
-          const pathWithExt = absPath + ext;
-          if (fs.existsSync(pathWithExt)) {
-            return pathWithExt;
-          }
-        }
-      }
-      return null;
     }
-    
-    // 5. 作为最后手段，使用常规相对路径解析
-    return this.resolvePath(sourcePath, importPath);
+
+    // 3. Handle relative paths (explicitly start with './' or '../')
+    if (importPath.startsWith('.')) {
+      const resolvedRelative = this.resolvePath(sourcePath, importPath);
+      return resolvedRelative;
+    }
+
+    // 4. Handle implicit project root paths (e.g., 'components/button' in usingComponents)
+    //    These don't start with '/', './', or '../', and are not aliases.
+    //    Assume they are relative to the project root.
+    const implicitRootPath = '/' + importPath; // Treat as root-relative
+    const resolvedImplicitRoot = this.resolvePath(sourcePath, implicitRootPath, this.projectRoot);
+    if (this.options.verbose) {
+      console.log(`DEBUG - Treating '${importPath}' as implicit root path -> '${implicitRootPath}', Resolved: ${resolvedImplicitRoot}`);
+    }
+    return resolvedImplicitRoot; // Return result (or null)
   }
 
   /**
-   * 根据当前文件和相对路径，解析出完整的依赖文件路径
-   * 注意: 此方法只处理标准的相对路径，不处理别名或前导斜杠路径
+   * Resolves a relative path against a source file path, checking for various extensions and index files.
+   * @param sourcePath The absolute path of the source file containing the import.
+   * @param relativePath The relative path string to resolve.
+   * @param projectRootOverride Optional override for the project root, used for resolving absolute paths starting with '/'.
+   * @returns The absolute path of the resolved dependency, or null if not found.
    */
-  private resolvePath(sourcePath: string, relativePath: string): string | null {
-    try {
-      // 基于源文件目录解析相对路径
-      const sourceDir = path.dirname(sourcePath);
-      const targetPath = path.join(sourceDir, relativePath);
-      
-      // 如果路径已有扩展名且文件存在，直接返回
-      if (path.extname(targetPath) && fs.existsSync(targetPath)) {
-        return targetPath;
+  private resolvePath(sourcePath: string, relativePath: string, projectRootOverride?: string): string | null {
+    const sourceDir = path.dirname(sourcePath);
+
+    // --- Determine the base path for resolution --- 
+    let effectiveBasePath: string;
+
+    if (relativePath.startsWith('/') && projectRootOverride) {
+      // Path starts with '/' and we have a project root context.
+      // Could be project-relative ('/pages/...') or an absolute system path containing the root.
+      if (path.isAbsolute(relativePath) && relativePath.startsWith(projectRootOverride)) {
+          // It's an absolute system path that already includes the project root override.
+          // Use it directly to avoid doubling the root.
+          effectiveBasePath = relativePath;
+          if (this.options.verbose) console.log(`  DEBUG: Absolute path '${relativePath}' contains project root override '${projectRootOverride}', using directly.`);
+      } else {
+          // It's a project-root-relative path like '/pages/...' (or potentially absolute but *not* containing the override)
+          effectiveBasePath = path.resolve(projectRootOverride, relativePath.substring(1));
+          if (this.options.verbose) console.log(`  DEBUG: Root-relative path '${relativePath}', resolving from override '${projectRootOverride}'. Base: ${effectiveBasePath}`);
       }
-      
-      // 如果路径不包含扩展名，尝试常见的扩展名
-      if (!path.extname(targetPath)) {
-        const possibleExts = ['.js', '.ts', '.wxml', '.wxss', '.wxs', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg'];
-        
-        for (const ext of possibleExts) {
-          const pathWithExt = targetPath + ext;
-          if (fs.existsSync(pathWithExt)) {
-            return pathWithExt;
-          }
-        }
-        
-        // 尝试作为目录处理（可能是组件或页面目录）
-        try {
-          if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
-            const possibleFiles = [
-              path.join(targetPath, 'index.js'),
-              path.join(targetPath, 'index.ts'),
-              path.join(targetPath, 'index.wxml'),
-              path.join(targetPath, 'index.json')
-            ];
-            
-            for (const file of possibleFiles) {
-              if (fs.existsSync(file)) {
-                return file;
-              }
-            }
-          }
-        } catch (e) {
-          // 忽略目录检查的错误
-          if (this.options.verbose) {
-            console.warn(`Failed to check directory: ${e}`);
-          }
-        }
-      }
-      
-      // 如果找不到匹配的文件，返回null
-      return null;
-    } catch (e) {
-      if (this.options.verbose) {
-        console.warn(`Error resolving path: ${e}`);
-      }
-      return null;
+    } else {
+        // Standard relative path (./ ../) or potentially an absolute system path without override context.
+        // path.resolve handles both cases correctly relative to sourceDir.
+        effectiveBasePath = path.resolve(sourceDir, relativePath);
+        if (this.options.verbose) console.log(`  DEBUG: Standard relative/absolute path '${relativePath}', resolving from source dir '${sourceDir}'. Base: ${effectiveBasePath}`);
     }
+
+    // console.log(`\n--- Resolving Path ---`);
+    // console.log(`  Source: ${sourcePath}`);
+    // console.log(`  Relative: ${relativePath}`);
+    // console.log(`  Base Path Input: ${basePath}`); // Log the base path calculated
+
+    // If the path doesn't have an extension, try adding common ones.
+    const possibleExts = path.extname(effectiveBasePath) === ''
+      ? ['.js', '.ts', '.wxml', '.wxss', '.json', '.wxs']
+      : [path.extname(effectiveBasePath)];
+
+    // 1. Check direct path existence (as file)
+    try {
+        const existsDirect = fs.existsSync(effectiveBasePath);
+        const isFileDirect = existsDirect && fs.statSync(effectiveBasePath).isFile();
+        if (this.options.verbose) console.log(`  1. Direct Check: Exists=${existsDirect}, IsFile=${isFileDirect} -> ${effectiveBasePath}`);
+        if (isFileDirect) {
+            if (this.options.verbose) console.log(`DEBUG - resolvePath: Found direct file: ${effectiveBasePath}`);
+            return effectiveBasePath;
+        }
+    } catch (e) { /* ignore */ }
+
+    // 2. Check with extensions appended (as file)
+    if (this.options.verbose) console.log(`  2. Extension Check:`);
+    for (const ext of possibleExts) {
+      const pathWithExt = effectiveBasePath + ext;
+      try {
+          const existsExt = fs.existsSync(pathWithExt);
+          const isFileExt = existsExt && fs.statSync(pathWithExt).isFile();
+          if (this.options.verbose) console.log(`     - Try ${ext}: Exists=${existsExt}, IsFile=${isFileExt} -> ${pathWithExt}`);
+          if (isFileExt) {
+              if (this.options.verbose) console.log(`DEBUG - resolvePath: Found with extension: ${pathWithExt}`);
+              return pathWithExt;
+          }
+      } catch (e) { /* ignore */ }
+    }
+    
+    // 3. Check if it's a directory, then look for an index file.
+    try {
+      if (fs.statSync(effectiveBasePath).isDirectory()) {
+        // console.log(`  3. Directory Check: IsDirectory=true -> ${effectiveBasePath}`);
+        for (const indexExt of possibleExts) {
+          const indexFile = path.join(effectiveBasePath, `index${indexExt}`);
+          if (fs.existsSync(indexFile) && fs.statSync(indexFile).isFile()) {
+            // console.log(`     - Found index${indexExt}: ${indexFile}`);
+            // console.log(`DEBUG - resolvePath: Found directory index: ${indexFile}`);
+            // console.log(`--- End Resolving Path ---\n`);
+            return indexFile;
+          } else {
+            // console.log(`     - Try index${indexExt}: Not found or not file.`);
+          }
+        }
+      } else {
+        // console.log(`  3. Directory Check: IsDirectory=false -> ${effectiveBasePath}`);
+      }
+    } catch (e) {
+      // Ignore errors (e.g., path doesn't exist)
+      // console.log(`  3. Directory Check: Error checking directory -> ${effectiveBasePath}`);
+    }
+
+    // console.log(`=> Path Not Resolved.`);
+    // console.log(`--- End Resolving Path ---\n`);
+    return null; // Not found
   }
 } 
