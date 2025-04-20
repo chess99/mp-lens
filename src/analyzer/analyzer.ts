@@ -225,20 +225,33 @@ function parseEntryContent(
     try {
         // Helper to add a potential file if it exists and is in the graph
         const addIfExists = (filePath: string) => {
+            // Normalize the path format
+            filePath = filePath.replace(/\\/g, '/');
+            
+            // First try the exact path as given
             const absolutePath = path.resolve(projectRoot, filePath); // Ensure absolute
             if (fs.existsSync(absolutePath) && graph.hasNode(absolutePath)) {
                 entryFiles.add(absolutePath);
                 return true; // Indicate success
             }
-            // Try adding common extensions if the base path doesn't exist directly
+            
+            // Next try with extensions if the base path doesn't exist directly
+            // This covers cases where filePath might be a "base path" without extension
             const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-            for (const ext of extensions) {
-                const pathWithExt = absolutePath + ext;
-                if (fs.existsSync(pathWithExt) && graph.hasNode(pathWithExt)) {
-                    entryFiles.add(pathWithExt);
-                    return true; // Indicate success
+            const hasExtension = path.extname(filePath) !== '';
+            
+            // Only try adding extensions if the path doesn't already have one
+            if (!hasExtension) {
+                for (const ext of extensions) {
+                    const pathWithExt = absolutePath + ext;
+                    if (fs.existsSync(pathWithExt) && graph.hasNode(pathWithExt)) {
+                        entryFiles.add(pathWithExt);
+                        return true; // Indicate success
+                    }
                 }
             }
+            
+            // If we get here, we couldn't find the file either directly or with extensions
             return false; // Indicate failure
         };
 
@@ -289,9 +302,46 @@ function parseEntryContent(
         
         // Handle usingComponents in app.json (global components)
         if (content.usingComponents && typeof content.usingComponents === 'object') {
-            Object.values(content.usingComponents).forEach((componentPath: any) => {
+            Object.entries(content.usingComponents).forEach(([componentName, componentPath]) => {
                 if (typeof componentPath === 'string') {
-                   addIfExists(componentPath);
+                    // First try the exact path as given
+                    let success = addIfExists(componentPath as string);
+                    
+                    // If we couldn't add it directly, try to normalize the path further
+                    if (!success) {
+                        const pathStr = componentPath as string;
+                        // Remove leading slash if present for consistency when resolving
+                        const normalizedPath = pathStr.startsWith('/') ? pathStr.substring(1) : pathStr;
+                        
+                        // Try adding the normalized path
+                        success = addIfExists(normalizedPath);
+                        
+                        // If still unsuccessful, try with various extensions
+                        if (!success) {
+                            // Sometimes component paths in JSON don't include extensions
+                            // Try common component extensions
+                            const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+                            
+                            // Try with the original path
+                            for (const ext of extensions) {
+                                if (addIfExists(`${pathStr}${ext}`)) {
+                                    console.log(`成功添加组件依赖(原始路径): ${pathStr}${ext}`);
+                                    success = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Try with the normalized path if still not successful
+                            if (!success) {
+                                for (const ext of extensions) {
+                                    if (addIfExists(`${normalizedPath}${ext}`)) {
+                                        console.log(`成功添加组件依赖(标准化路径): ${normalizedPath}${ext}`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             });
         }

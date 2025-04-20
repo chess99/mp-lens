@@ -96,7 +96,7 @@ export class ConfigLoader {
       }
       
       // 处理ES模块导出（有default属性）
-      if (config.default) {
+      if (config && config.default) {
         if (typeof config.default === 'function') {
           return await config.default();
         }
@@ -118,14 +118,19 @@ export class ConfigLoader {
     try {
       // 尝试注册ts-node
       try {
-        require('ts-node').register({
+        // 直接引用ts-node模块
+        const tsNode = require('ts-node');
+        
+        tsNode.register({
           transpileOnly: true,
           compilerOptions: {
             module: 'commonjs'
           }
         });
       } catch (e) {
-        throw new Error(`加载TypeScript配置需要安装ts-node: npm install --save-dev ts-node`);
+        const tsNodeError = e as Error;
+        console.error(`加载TypeScript配置需要安装ts-node: ${tsNodeError.message}`);
+        return null;
       }
       
       // 使用与JavaScript相同的加载逻辑

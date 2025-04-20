@@ -72,26 +72,13 @@ export class FileParser {
   private async parseJavaScript(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies = new Set<string>(); // Use a Set locally
+      const dependencies = new Set<string>(); // Use a Set directly
       
-      // Helper to add unique dependency
-      const addDependency = (depPath: string | null) => {
-        if (depPath) dependencies.add(depPath);
-      }
-
-      // Pass down a temporary array (or modify helpers if needed)
-      let tempDeps: string[] = [];
-      this.processImportStatements(content, filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
-      tempDeps = [];
-      this.processRequireStatements(content, filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
-      tempDeps = [];
-      this.processAliasImportComments(content, filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
-      tempDeps = [];
+      // Pass the Set to helper functions
+      this.processImportStatements(content, filePath, dependencies);
+      this.processRequireStatements(content, filePath, dependencies);
+      this.processAliasImportComments(content, filePath, dependencies); // Keep for tests if needed
       this.processPageOrComponentStrings(content, filePath, dependencies);
-      tempDeps.forEach(d => { console.log('JS Add:',d); dependencies.add(d); });
 
       return Array.from(dependencies); // Return array from Set
     } catch (e) {
@@ -105,7 +92,7 @@ export class FileParser {
   /**
    * 处理 import 语句
    */
-  private processImportStatements(content: string, filePath: string, dependencies: string[]): void {
+  private processImportStatements(content: string, filePath: string, dependencies: Set<string>): void {
     // Combined Regex: Handles 
     // 1. import defaultExport from '...'; 
     // 2. import { namedExport } from '...';
@@ -122,9 +109,9 @@ export class FileParser {
         if (content.substring(match.index - 5, match.index).includes(' type')) continue;
 
         const depPath = this.resolveAnyPath(importPath, filePath);
-        if (depPath && !dependencies.includes(depPath)) {
-             // console.log(`DEBUG processImportStatements: Adding ${depPath}`); // Add log
-             dependencies.push(depPath);
+        if (depPath) {
+             // if (this.options.verbose) console.log(`DEBUG processImportStatements: Adding ${depPath} from ${filePath}`);
+             dependencies.add(depPath);
         }
       }
     }
@@ -133,14 +120,14 @@ export class FileParser {
   /**
    * 处理 require 语句
    */
-  private processRequireStatements(content: string, filePath: string, dependencies: string[]): void {
+  private processRequireStatements(content: string, filePath: string, dependencies: Set<string>): void {
     const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
     
     let match;
     while ((match = requireRegex.exec(content)) !== null) {
       if (match[1]) {
         const depPath = this.resolveAnyPath(match[1], filePath);
-        if (depPath) dependencies.push(depPath);
+        if (depPath) dependencies.add(depPath);
       }
     }
   }
@@ -148,14 +135,14 @@ export class FileParser {
   /**
    * 处理特殊的@alias-import注释 (仅用于测试别名解析)
    */
-  private processAliasImportComments(content: string, filePath: string, dependencies: string[]): void {
+  private processAliasImportComments(content: string, filePath: string, dependencies: Set<string>): void {
     const aliasImportCommentRegex = /\/\/\s*@alias-import[^'"]*from\s+['"]([^'"]+)['"]/g;
     
     let match;
     while ((match = aliasImportCommentRegex.exec(content)) !== null) {
       if (match[1]) {
         const depPath = this.resolveAnyPath(match[1], filePath);
-        if (depPath) dependencies.push(depPath);
+        if (depPath) dependencies.add(depPath);
       }
     }
   }
@@ -208,21 +195,13 @@ export class FileParser {
   private async parseWXML(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies = new Set<string>(); // Use a Set locally
+      const dependencies = new Set<string>(); // Use a Set directly
       
-      // Modify helper functions to add to the Set directly or adapt here
-      let tempDeps: string[] = [];
-      this.processImportIncludeTags(content, filePath, tempDeps); 
-      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
-      tempDeps = [];
-      this.processWxsTags(content, filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
-      tempDeps = [];
-      this.processImageSources(content, filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
-      tempDeps = [];
-      this.processCustomComponents(filePath, tempDeps);
-      tempDeps.forEach(d => { console.log('WXML Add:',d); dependencies.add(d); });
+      // Pass the Set to helper functions
+      this.processImportIncludeTags(content, filePath, dependencies); 
+      this.processWxsTags(content, filePath, dependencies);
+      this.processImageSources(content, filePath, dependencies);
+      this.processCustomComponents(filePath, dependencies); // Needs checking if it uses the Set correctly
       
       return Array.from(dependencies); // Return array from Set
     } catch (e) {
@@ -236,7 +215,7 @@ export class FileParser {
   /**
    * 处理<import>和<include>标签
    */
-  private processImportIncludeTags(content: string, filePath: string, dependencies: string[]): void {
+  private processImportIncludeTags(content: string, filePath: string, dependencies: Set<string>): void {
     const importRegex = /<(?:import|include)\s+src=['"](.*?)['"]\s*\/?\s*>/g;
     
     let match;
@@ -248,13 +227,28 @@ export class FileParser {
         // 如果以 / 开头，这是相对于项目根目录的路径
         if (importPath.startsWith('/')) {
           const absolutePath = path.join(this.projectRoot, importPath.slice(1));
-          if (fs.existsSync(absolutePath)) {
-            dependencies.push(absolutePath);
-            continue;
+          
+          // 尝试解析不同后缀名，因为 WXML import 可能不带后缀
+          const possibleExtensions = ['.wxml', '']; // Check .wxml first, then original
+          let resolvedPath: string | null = null;
+          for (const ext of possibleExtensions) {
+            const testPath = absolutePath + ext;
+            if (fs.existsSync(testPath) && fs.statSync(testPath).isFile()) {
+              resolvedPath = testPath;
+              break;
+            }
           }
+          
+          if (resolvedPath) {
+              dependencies.add(resolvedPath);
+          } else if(this.options.verbose) {
+              console.log(`DEBUG - processImportIncludeTags: Could not resolve root path ${importPath} from ${filePath}`);
+          }
+
         } else {
+          // 处理相对路径
           const depPath = this.resolveAnyPath(importPath, filePath);
-          if (depPath) dependencies.push(depPath);
+          if (depPath) dependencies.add(depPath);
         }
       }
     }
@@ -263,7 +257,7 @@ export class FileParser {
   /**
    * 处理wxs模块标签
    */
-  private processWxsTags(content: string, filePath: string, dependencies: string[]): void {
+  private processWxsTags(content: string, filePath: string, dependencies: Set<string>): void {
     const wxsRegex = /<wxs\s+(?:[^>]*?\s+)?src=['"](.*?)['"]/g;
     
     let match;
@@ -276,12 +270,12 @@ export class FileParser {
         if (wxsPath.startsWith('/')) {
           const absolutePath = path.join(this.projectRoot, wxsPath.slice(1));
           if (fs.existsSync(absolutePath)) {
-            dependencies.push(absolutePath);
+            dependencies.add(absolutePath);
             continue;
           }
         } else {
           const depPath = this.resolveAnyPath(wxsPath, filePath);
-          if (depPath) dependencies.push(depPath);
+          if (depPath) dependencies.add(depPath);
         }
       }
     }
@@ -290,7 +284,7 @@ export class FileParser {
   /**
    * 处理图片源路径
    */
-  private processImageSources(content: string, filePath: string, dependencies: string[]): void {
+  private processImageSources(content: string, filePath: string, dependencies: Set<string>): void {
     // Match src attributes in <image> tags
     const IMAGE_SRC_REGEX = /<image.*?src=["'](.*?)["']/g;
     const matches = [...content.matchAll(IMAGE_SRC_REGEX)];
@@ -305,7 +299,7 @@ export class FileParser {
       const resolvedPath = this.resolveAnyPath(src, filePath);
       if (resolvedPath) {
         // console.log(`DEBUG processImageSources: Adding ${resolvedPath}`);
-        dependencies.push(resolvedPath);
+        dependencies.add(resolvedPath);
       } else {
          // console.log(`DEBUG processImageSources: Could not resolve ${src}`);
       }
@@ -315,7 +309,7 @@ export class FileParser {
   /**
    * 处理自定义组件依赖
    */
-  private processCustomComponents(filePath: string, dependencies: string[]): void {
+  private processCustomComponents(filePath: string, dependencies: Set<string>): void {
     // 解析自定义组件（需要读取同名.json文件来获取组件路径）
     const jsonPath = filePath.replace(/\.wxml$/, '.json');
     // 明确检查 JSON 文件是否存在
@@ -349,14 +343,14 @@ export class FileParser {
                   const fullPath = componentBase + ext;
                   if (fs.existsSync(fullPath)) {
                       // Only add if it hasn't been added already (e.g., if resolvedComponentPath was one of these)
-                      if (!dependencies.includes(fullPath)) {
-                          dependencies.push(fullPath);
+                      if (!dependencies.has(fullPath)) {
+                          dependencies.add(fullPath);
                       }
                   }
                 }
                 // Ensure the originally resolved path is also included if it wasn't caught by the extension loop
                 // (e.g., if resolveAnyPath resolved to a directory path represented in the graph)
-                if (fs.existsSync(resolvedComponentPath) && !dependencies.includes(resolvedComponentPath)) {
+                if (fs.existsSync(resolvedComponentPath) && !dependencies.has(resolvedComponentPath)) {
                    // Check if it's a file before adding? Or assume if resolveAnyPath returned it, it's relevant?
                    // Let's add it cautiously. If resolveAnyPath resolved to a dir, adding it might be wrong.
                    // For now, rely on the extension check loop above.
