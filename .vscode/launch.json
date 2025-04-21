@@ -28,9 +28,8 @@
       "type": "node",
       "request": "launch",
       "name": "Debug list-unused command",
-      "runtimeArgs": ["-r", "ts-node/register"],
       "args": [
-        "${workspaceFolder}/src/cli.ts",
+        "${workspaceFolder}/dist/cli.js",
         "-p",
         "/Users/zcs/code/mmbb/mt-address-msc",
         "list-unused"
@@ -39,7 +38,8 @@
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "internalConsoleOptions": "openOnSessionStart",
       "console": "integratedTerminal",
-      "sourceMaps": true
+      "sourceMaps": true,
+      "preLaunchTask": "tsc: build - tsconfig.json"
     }
   ]
 }

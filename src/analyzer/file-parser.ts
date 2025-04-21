@@ -78,7 +78,9 @@ export class FileParser {
       // Pass the Set to helper functions
       this.processImportStatements(content, filePath, dependencies);
       this.processRequireStatements(content, filePath, dependencies);
+      // FIXME: 为什么需要处理这个?
       this.processAliasImportComments(content, filePath, dependencies); // Keep for tests if needed
+      // FIXME: 小程序里不支持这种形式的引用吧?
       this.processPageOrComponentStrings(content, filePath, dependencies);
 
       return Array.from(dependencies); // Return array from Set
@@ -103,12 +105,13 @@ export class FileParser {
     // 4. import '...'; (Side effect import)
     // It captures the path in group 1.
     const importRegex =
-      /import(?:(?:(?:\s+[\w*{}\s,]+|\s*\*\s*as\s+\w+)\s+from)?\s*)['\"]([^\'\"]+)['\"]/g;
+      /import(?:(?:(?:\s+[\w*{}\s,]+|\s*\*\s*as\s+\w+)\s+from)?\s*)['"]([^'"]+)['"]/g;
 
     let match;
     while ((match = importRegex.exec(content)) !== null) {
       if (match[1]) {
         const importPath = match[1];
+        // FIXME: 这是在干嘛?
         // Basic heuristic to potentially ignore type imports (not foolproof)
         if (content.substring(match.index - 5, match.index).includes(' type')) continue;
 
@@ -216,6 +219,7 @@ export class FileParser {
       this.processImportIncludeTags(content, filePath, dependencies);
       this.processWxsTags(content, filePath, dependencies);
       this.processImageSources(content, filePath, dependencies);
+      // FIXME: 小程序不支持这种方式使用自定义组件, 组件必须在json里有申明
       this.processCustomComponents(filePath, dependencies); // Needs checking if it uses the Set correctly
 
       return Array.from(dependencies); // Return array from Set
@@ -571,13 +575,23 @@ export class FileParser {
             const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath);
 
             if (resolvedComponentPath) {
+              // FIXME: 这里假设不对, 组件不一定 index.json, 也可能 /components/button/button.json
+              // FIXME: 为什么 resolvedComponentPath 会带后缀
+              // FIXME: 这里也导致了第三步的错误
+              // FIXME: 目前的状态:
+              // resolvedComponentPath: /Users/zcs/code/mmbb/mt-address-msc/src/common/view/location-view/index.ts
+              // componentPath: "/common/view/location-view/index"
+              // filePath: '/Users/zcs/code/mmbb/mt-address-msc/src/components/address-home-v2/__r-list/address-list/index.json'
+
               // 2. Determine the base name for checking related files
               //    (remove /index.ext or just .ext)
               const componentBase = resolvedComponentPath.replace(/(\/index)?\.\w+$/, '');
+              // FIXME: current: /Users/zcs/code/mmbb/mt-address-msc/src/common/view/location-view
 
               // 3. Check for related component files based on the derived base name
               const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
               for (const ext of exts) {
+                // FIXME: 这里怎么
                 const fullPath = componentBase + ext;
                 if (fs.existsSync(fullPath)) {
                   // Only add if it hasn't been added already (e.g., if resolvedComponentPath was one of these)
@@ -618,6 +632,7 @@ export class FileParser {
     return this.parseJavaScript(filePath);
   }
 
+  // FIXME: 判断方式不严谨
   /**
    * 判断是否是别名路径
    */

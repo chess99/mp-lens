@@ -115,6 +115,8 @@ export class AliasResolver {
             return absolutePath;
           }
 
+          // FIXME: 1. 特定的文件类型只能匹配特定的扩展名
+          // FIXME: 2. 假如文件夹下有 index.js 和 index.ts 怎么办?
           // 处理没有扩展名的情况，尝试添加常见的扩展名
           const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
           for (const ext of possibleExts) {

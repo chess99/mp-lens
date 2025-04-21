@@ -142,6 +142,7 @@ function findUnusedFiles(
   // 1. Resolve all potential entry points
   const entryPoints = resolveEntryPoints(graph, projectRoot, entryFileUser, entryContent);
 
+  // FIXME: projectRoot 和 miniappRoot 的处理, essentialFiles 有些应该是在真正的项目根目录下
   // 2. Resolve all essential files (always considered reachable)
   const essentialFiles = resolveEssentialFiles(projectRoot, essentialFilesUser);
 
@@ -380,6 +381,8 @@ function findDefaultMiniprogramEntries(
  * Resolves essential files that are always considered reachable.
  */
 function resolveEssentialFiles(projectRoot: string, essentialFilesUser: string[]): Set<string> {
+  // FIXME: 小程序的默认文件不全, reachability 能处理到 app.js / app.ts / app.wxss 吗?
+  // FIXME: projectRoot 和 miniappRoot 的处理, essentialFiles 有些应该是在真正的项目根目录下
   const defaultEssentialFiles = [
     // Configuration files are essential even if not directly imported
     'app.json', // Often implicitly needed
