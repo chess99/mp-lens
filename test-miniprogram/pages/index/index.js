@@ -13,15 +13,21 @@ const app = getApp();
 
 Page({
   data: {
-    message: 'Hello World'
+    message: 'Hello World',
   },
-  onLoad: function() {
+  onLoad: function () {
     console.log('Page loaded');
     // Simulate use of the imported functions
     // this.setData({ message: capitalize('hello world') });
     // console.log('Using aliasTest:', aliasTest);
-    
+
     // Call the API service
     // fetchData().then(res => console.log('API response:', res));
-  }
-}) 
+
+    // Import utils
+    const utils = require('../../utils/util.js');
+    this.setData({
+      formattedTime: utils.formatTime(new Date()),
+    });
+  },
+});

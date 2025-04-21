@@ -6,6 +6,8 @@ import { CommandOptions } from '../types/command-options';
 import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
 import { isString, mergeOptions } from '../utils/options-merger';
+import { DotGenerator } from '../visualizer/dot-generator';
+import { HtmlGenerator } from '../visualizer/html-generator';
 
 // Define the shape of the raw options passed from cli.ts
 interface RawGraphOptions {
@@ -41,62 +43,12 @@ export interface GraphOptions extends CommandOptions {
   [key: string]: any;
 }
 
-// Restore renderHTML function (basic implementation)
-function renderHTML(graphData: {
+// Function to render JSON format
+function renderJSON(graphData: {
   nodes: { id: string }[];
   links: { source: string; target: string }[];
 }): string {
-  // Simplified HTML template - consider using a proper library like D3 or vis.js for robust rendering
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Dependency Graph</title>
-  <meta charset="utf-8">
-  <style>
-    body { margin: 20px; font-family: sans-serif; }
-    .node { fill: #add8e6; stroke: #666; }
-    .link { stroke: #999; stroke-opacity: 0.6; }
-    text { font-size: 10px; pointer-events: none; }
-    svg { border: 1px solid #ccc; }
-  </style>
-</head>
-<body>
-  <h1>Dependency Graph (JSON Data)</h1>
-  <p>Interactive HTML rendering requires a JS library (e.g., D3.js). Showing raw JSON data instead.</p>
-  <pre id="graph-data">${JSON.stringify(graphData, null, 2)}</pre>
-</body>
-</html>
-  `;
-}
-
-// Restore renderDOT function (basic implementation)
-function renderDOT(graphData: {
-  nodes: { id: string }[];
-  links: { source: string; target: string }[];
-}): string {
-  let dot = 'digraph DependencyGraph {\n';
-  dot += '  node [shape=box, style=rounded, fontname="sans-serif", fontsize=10];\n';
-  dot += '  edge [fontname="sans-serif", fontsize=9];\n';
-  dot += '  graph [fontname="sans-serif", fontsize=10];\n\n';
-
-  // Add nodes
-  for (const node of graphData.nodes) {
-    // Use relative paths for labels if possible, otherwise full ID
-    // This assumes node.id is an absolute path
-    const label = node.id.includes(path.sep) ? path.basename(node.id) : node.id;
-    dot += `  "${node.id}" [label="${label}"];\n`;
-  }
-
-  dot += '\n';
-
-  // Add edges
-  for (const link of graphData.links) {
-    dot += `  "${link.source}" -> "${link.target}";\n`;
-  }
-
-  dot += '}\n';
-  return dot;
+  return JSON.stringify(graphData, null, 2);
 }
 
 /**
@@ -163,26 +115,71 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     });
 
     logger.info('Rendering graph...');
-    // Convert graph to simple JSON structure for renderers
-    // TODO: Add depth and focus filtering here if needed before rendering
-    const graphData = dependencyGraph.toJSON();
 
-    // Call local rendering functions based on format
+    // Initialize generators for HTML and DOT formats
+    const htmlGenerator = new HtmlGenerator(dependencyGraph);
+    const dotGenerator = new DotGenerator(dependencyGraph);
+
+    // Call appropriate renderer with depth and focus parameters
     let outputContent: string | Buffer = ''; // Use Buffer for potential binary formats
     switch (format) {
       case 'html':
-        outputContent = renderHTML(graphData);
+        outputContent = htmlGenerator.generate({
+          title: 'Project Dependency Graph',
+          projectRoot,
+          maxDepth: depth,
+          focusNode: focus,
+        });
         break;
       case 'dot':
-        outputContent = renderDOT(graphData);
+        outputContent = dotGenerator.generate({
+          title: 'Project Dependency Graph',
+          projectRoot,
+          maxDepth: depth,
+          focusNode: focus,
+        });
         break;
       case 'json':
-        outputContent = JSON.stringify(graphData, null, 2);
+        // For JSON, we still need to filter the graph based on depth and focus
+        // We can use the same filtering logic from the HTML generator's prepareGraphData
+        // but output JSON instead
+        if (focus && depth !== undefined) {
+          // Use the filtered graph data from HTML generator
+          const htmlOutput = htmlGenerator.generate({
+            title: 'Project Dependency Graph',
+            projectRoot,
+            maxDepth: depth,
+            focusNode: focus,
+          });
+
+          // Extract the graph data from the HTML output
+          const graphDataMatch = /const graphData = (.*?);/s.exec(htmlOutput);
+          if (graphDataMatch && graphDataMatch[1]) {
+            try {
+              const graphData = JSON.parse(graphDataMatch[1]);
+              outputContent = renderJSON(graphData);
+            } catch (e) {
+              // Fallback to unfiltered data if parsing fails
+              outputContent = renderJSON(dependencyGraph.toJSON());
+            }
+          } else {
+            // Fallback to unfiltered data
+            outputContent = renderJSON(dependencyGraph.toJSON());
+          }
+        } else {
+          // No filtering needed
+          outputContent = renderJSON(dependencyGraph.toJSON());
+        }
         break;
       case 'svg':
       case 'png':
-        // Basic DOT output for these formats, requires external tool (Graphviz) to convert
-        outputContent = renderDOT(graphData);
+        // Use the DOT generator with depth and focus filtering
+        outputContent = dotGenerator.generate({
+          title: 'Project Dependency Graph',
+          projectRoot,
+          maxDepth: depth,
+          focusNode: focus,
+        });
         logger.warn(
           chalk.yellow(
             `Format '${format}' requires Graphviz installed to convert DOT output. Saving DOT content.`,
