@@ -175,13 +175,31 @@ function resolveEntryPoints(
   entryContent?: any,
 ): string[] {
   const entryFiles: Set<string> = new Set();
+  let appJsonPath: string | null = null;
+  let appJsonContent: any | null = entryContent || null;
 
-  // Attempt 1: User-provided entry file (relative to miniapp root)
+  // --- Step 1: Identify app.json (location and content) ---
+
+  // Attempt 1a: User-provided entry file might BE app.json
   if (entryFileUser) {
     const customEntryPath = path.resolve(miniappRoot, entryFileUser);
     if (fs.existsSync(customEntryPath) && graph.hasNode(customEntryPath)) {
-      entryFiles.add(customEntryPath);
-      logger.info(`Using custom entry file: ${customEntryPath}`);
+      if (path.basename(customEntryPath) === 'app.json') {
+        appJsonPath = customEntryPath;
+        logger.info(`Using custom entry file as app.json: ${appJsonPath}`);
+        // Try reading content if not already provided
+        if (!appJsonContent) {
+          try {
+            appJsonContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+          } catch (e) {
+            logger.warn(`Failed to read or parse content from custom app.json: ${appJsonPath}`);
+          }
+        }
+      } else {
+        // If user specified a non-app.json file, treat it as a direct entry point
+        entryFiles.add(customEntryPath);
+        logger.info(`Using custom entry file (non-app.json): ${customEntryPath}`);
+      }
     } else {
       logger.warn(
         `Warning: Custom entry file does not exist or not found in graph: ${customEntryPath}`,
@@ -189,21 +207,59 @@ function resolveEntryPoints(
     }
   }
 
-  // Attempt 2: User-provided entry content (like app.json)
-  if (entryFiles.size === 0 && entryContent) {
-    logger.debug('Attempting to parse entry points from provided entry content...');
-    parseEntryContent(entryContent, miniappRoot, graph, entryFiles);
+  // Attempt 1b: Use provided entryContent if available and app.json path not found yet
+  if (appJsonContent && !appJsonPath) {
+    logger.debug('Using provided entry content (likely app.json structure).');
+    // We have content, but might not know the exact path if not passed via entryFileUser
+    // Try finding the default app.json path to associate with this content
+    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
+    if (fs.existsSync(defaultAppJsonPath) && graph.hasNode(defaultAppJsonPath)) {
+      appJsonPath = defaultAppJsonPath;
+    }
   }
 
-  // Attempt 3: Default Mini Program entry points (relative to miniapp root)
-  if (entryFiles.size === 0) {
-    logger.info('No custom entry points found, using default entry files...');
-    findDefaultMiniprogramEntries(miniappRoot, graph, entryFiles);
+  // Attempt 1c: Find default app.json if no specific one was identified yet
+  if (!appJsonPath) {
+    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
+    if (fs.existsSync(defaultAppJsonPath) && graph.hasNode(defaultAppJsonPath)) {
+      appJsonPath = defaultAppJsonPath;
+      logger.info(`Found default app.json: ${appJsonPath}`);
+      // Try reading content if not already provided
+      if (!appJsonContent) {
+        try {
+          appJsonContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+        } catch (e) {
+          logger.warn(`Failed to read or parse content from default app.json: ${appJsonPath}`);
+        }
+      }
+    }
   }
 
+  // --- Step 2: Add Runtime Entry Points (app.js/ts) ---
+  // Always look for app.js/app.ts relative to the miniapp root, as the runtime does.
+  findImplicitGlobalFiles(miniappRoot, graph, entryFiles);
+
+  // --- Step 3: Add Entry Points from app.json Content ---
+  // If we have identified app.json content (from any source), parse it for pages, components etc.
+  if (appJsonContent) {
+    logger.debug('Parsing app.json content for pages, components, etc...');
+    parseEntryContent(appJsonContent, miniappRoot, graph, entryFiles);
+    // Also add the app.json file itself as an entry/essential node if found
+    if (appJsonPath && graph.hasNode(appJsonPath)) {
+      entryFiles.add(appJsonPath);
+    }
+  } else {
+    logger.warn(
+      'Could not find or parse app.json content. Analysis might miss pages/components defined there.',
+    );
+  }
+
+  // --- Step 4: Validate ---
   if (entryFiles.size === 0) {
-    const errorMsg = '未能确定任何有效的入口文件。';
-    logger.warn(`${errorMsg} 分析可能不准确。`);
+    const errorMsg =
+      'Failed to determine any valid entry points (app.js/ts, app.json pages/components).';
+    logger.warn(`${errorMsg} Analysis might be incomplete.`);
+    // Only throw error if absolutely nothing could be found
     throw new Error(errorMsg);
   }
 
@@ -317,20 +373,30 @@ function parseEntryContent(
 }
 
 /**
- * Finds default Mini Program entry points like app.js, app.json.
+ * Finds implicitly loaded global files (app.js, app.ts, app.wxss).
+ * These are loaded automatically by the runtime if they exist.
  */
-function findDefaultMiniprogramEntries(
+function findImplicitGlobalFiles(
   miniappRoot: string,
   graph: DependencyGraph,
-  entryFiles: Set<string>,
+  entryFiles: Set<string>, // Modified in place
 ): void {
-  const possibleEntryFiles = ['app.js', 'app.ts', 'app.json'];
+  const possibleImplicitFiles = [
+    'app.js', // Global script
+    'app.ts', // Global script (TypeScript)
+    'app.wxss', // Global stylesheet
+  ];
 
-  for (const entryFileName of possibleEntryFiles) {
+  logger.debug('Searching for implicit global files (app.js/ts/wxss)...');
+  for (const entryFileName of possibleImplicitFiles) {
     const entryFilePath = path.resolve(miniappRoot, entryFileName);
     if (fs.existsSync(entryFilePath) && graph.hasNode(entryFilePath)) {
-      entryFiles.add(entryFilePath);
-      logger.info(`Found and using default entry file: ${entryFilePath}`);
+      if (entryFiles.has(entryFilePath)) {
+        logger.trace(`Implicit global file already added: ${entryFilePath}`);
+      } else {
+        entryFiles.add(entryFilePath);
+        logger.info(`Found and added implicit global file: ${entryFilePath}`);
+      }
     }
   }
 }

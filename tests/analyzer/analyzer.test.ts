@@ -34,6 +34,7 @@ jest.mock('path', () => {
     extname: jest.fn((p) => actual.extname(p)),
     isAbsolute: jest.fn((p) => actual.isAbsolute(p)),
     normalize: jest.fn((p) => actual.normalize(p)),
+    basename: jest.fn((p, ext) => actual.basename(p, ext)),
   };
 });
 
@@ -193,7 +194,7 @@ describe('analyzeProject', () => {
 
     // Expect the specific error to be thrown
     await expect(analyzeProject(trueProjectRoot, defaultOptions)).rejects.toThrow(
-      '未能确定任何有效的入口文件。',
+      'Failed to determine any valid entry points (app.js/ts, app.json pages/components).',
     );
   });
 
@@ -418,10 +419,13 @@ describe('analyzeProject', () => {
 
       // Expected Reachable: customEntry, dep1 (plus essentials like app.json if mocked)
       // Expected Unused: unused1, appJs (as custom entry overrides default)
-      expect(unusedFiles).toContain(unused1);
-      expect(unusedFiles).toContain(appJs);
+      // --- Updated Assertion based on refactored resolveEntryPoints ---
+      // app.js is now *always* added as a runtime entry if it exists.
+      // So, only unused1 should be unused here.
+      expect(unusedFiles).toEqual([unused1]);
       expect(unusedFiles).not.toContain(customEntry);
       expect(unusedFiles).not.toContain(dep1);
+      expect(unusedFiles).not.toContain(appJs); // Verify app.js is now treated as reachable
     });
 
     it('should handle user-defined essentialFiles', async () => {
@@ -491,6 +495,78 @@ describe('analyzeProject', () => {
 
       // Verify that only the 'unused1' file is marked as unused
       expect(unusedFiles).toEqual([unused1]);
+    });
+
+    // --- Test specific scenario: --entry-file app.json used ---
+    it('should include app.js/ts as entry points even when app.json is explicitly provided', async () => {
+      const currentProjectRoot = trueProjectRoot;
+      const currentMiniappRoot = defaultMiniappRoot; // Standard case
+      const appJs = actualPath.resolve(currentMiniappRoot, 'app.js');
+      const appJson = actualPath.resolve(currentMiniappRoot, 'app.json');
+      const pageA = actualPath.resolve(currentMiniappRoot, 'pages/a.js'); // Defined in app.json
+      const utilB = actualPath.resolve(currentMiniappRoot, 'utils/b.js'); // Imported by app.js
+      const unusedC = actualPath.resolve(currentMiniappRoot, 'unused.js');
+
+      const allFiles = [currentProjectRoot, appJs, appJson, pageA, utilB, unusedC];
+
+      const appJsonContentData = {
+        pages: ['pages/a'], // Defines pageA
+      };
+
+      // --- Mock Setup for this specific test ---
+      jest.clearAllMocks();
+      mockPath.resolve.mockImplementation((...args) => actualPath.resolve(...args));
+
+      // Mock existsSync for the files involved
+      mockFs.existsSync.mockImplementation((p) =>
+        allFiles.includes(actualPath.resolve(p as string)),
+      );
+
+      // Mock reading app.json when analyzer requests it
+      mockFs.readFileSync.mockImplementation((p) => {
+        if (actualPath.resolve(p as string) === appJson) {
+          return JSON.stringify(appJsonContentData);
+        }
+        throw new Error(`Unexpected readFileSync call: ${p}`);
+      });
+
+      // Mock glob to return relevant files
+      const filesFoundByGlob = [appJs, appJson, pageA, utilB, unusedC];
+      mockGlob.sync.mockReturnValue(filesFoundByGlob);
+
+      // Mock parsing: app.js imports utilB
+      mockParseFile.mockImplementation(async (filePath) => {
+        if (actualPath.resolve(filePath) === appJs) return [utilB];
+        return [];
+      });
+
+      // Mock graph state methods
+      const graphNodes = [...new Set([...filesFoundByGlob, appJson])]; // Essentials/Entries added
+      mockHasNode.mockImplementation((node) => graphNodes.includes(actualPath.resolve(node)));
+      mockNodes.mockImplementation(() => graphNodes);
+      mockOutEdges.mockImplementation((node) => {
+        if (actualPath.resolve(node) === appJs) return [utilB];
+        return [];
+      });
+      // --- End Mock Setup ---
+
+      const options: AnalyzerOptions = {
+        ...defaultOptions,
+        entryFile: 'app.json', // Explicitly provide app.json as the entry file
+      };
+
+      const { unusedFiles } = await analyzeProject(currentProjectRoot, options);
+
+      // Assertions:
+      // Entry points should be: app.json (explicit), app.js (runtime default), pageA (from app.json content)
+      // Reachable should be: app.json, app.js, pageA, utilB (from app.js)
+      // Unused should be: unusedC
+
+      expect(unusedFiles).toEqual([unusedC]);
+      expect(unusedFiles).not.toContain(appJs);
+      expect(unusedFiles).not.toContain(utilB);
+      expect(unusedFiles).not.toContain(pageA);
+      expect(unusedFiles).not.toContain(appJson);
     });
   }); // End describe 'when projectRoot is miniappRoot'
 
