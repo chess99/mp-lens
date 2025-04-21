@@ -1,91 +1,43 @@
 #!/usr/bin/env node
-import chalk from 'chalk';
 import { Command } from 'commander';
-import * as fs from 'fs';
-import * as path from 'path';
 
-// Import package.json using require instead of ES6 import
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { version } = require('../package.json');
 
+// Import command functions
 import { clean } from './commands/clean';
 import { graph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
-import { ConfigFileOptions } from './types/command-options';
-import { ConfigLoader } from './utils/config-loader';
 import { logger, LogLevel } from './utils/debug-logger';
 
-// Define a simpler options merging function
+// Remove the local mergeOptions function from cli.ts
+/*
 async function mergeOptions(cmdOptions: any, globalOptions: any) {
-  // Set up logger first with project root and verbosity
-  const projectPath = globalOptions.project || process.cwd();
-  const resolvedProjectPath = path.resolve(projectPath);
+  // ... removed implementation ...
+}
+*/
 
-  // Configure logger with verbosity level and project root
+// Helper to setup logger based on global options
+function setupLogger(globalOptions: any) {
+  // Remove unused variable
+  // const projectPath = globalOptions.project || process.cwd();
+  // const resolvedProjectPath = path.resolve(projectPath);
+
+  // Configure logger verbosity
   if (globalOptions.trace) {
     logger.setLevel(LogLevel.TRACE);
   } else if (globalOptions.verboseLevel > 0) {
-    logger.setLevel(globalOptions.verboseLevel);
+    // Ensure level is within bounds
+    const level = Math.max(0, Math.min(3, globalOptions.verboseLevel));
+    logger.setLevel(level as LogLevel);
   } else if (globalOptions.verbose) {
-    logger.setLevel(LogLevel.NORMAL);
+    logger.setLevel(LogLevel.NORMAL); // or DEBUG? Let's use NORMAL
   } else {
     logger.setLevel(LogLevel.ESSENTIAL);
   }
-  logger.setProjectRoot(resolvedProjectPath);
-
-  // Log basic information
-  logger.info('Original project path:', projectPath);
-  logger.info('Resolved project path:', resolvedProjectPath);
-  logger.debug('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
-
-  // 处理小程序根目录选项
-  const miniappRoot = globalOptions.miniappRoot || '';
-  let resolvedMiniappRoot = resolvedProjectPath;
-
-  if (miniappRoot) {
-    resolvedMiniappRoot = path.resolve(resolvedProjectPath, miniappRoot);
-    logger.debug('Miniapp root path:', resolvedMiniappRoot);
-    logger.debug('Miniapp root exists?', fs.existsSync(resolvedMiniappRoot) ? 'Yes' : 'No');
-  }
-
-  // 加载配置文件
-  let configOptions: ConfigFileOptions = {};
-  if (globalOptions.config || logger.getLevel() > LogLevel.ESSENTIAL) {
-    try {
-      const configResult = await ConfigLoader.loadConfig(globalOptions.config, resolvedProjectPath);
-      if (configResult) {
-        configOptions = configResult;
-
-        logger.debug('Loaded configuration:', configOptions);
-      }
-    } catch (error) {
-      logger.warn(`Warning: Failed to load config file: ${(error as Error).message}`);
-    }
-  }
-
-  // Create merged options with all properties
-  const mergedOptions = {
-    ...configOptions, // 配置文件中的选项（最低优先级）
-    ...cmdOptions, // 命令行命令特定选项
-    project: resolvedProjectPath,
-    miniappRoot: resolvedMiniappRoot !== resolvedProjectPath ? resolvedMiniappRoot : undefined,
-    verbose: globalOptions.verbose || false,
-    verboseLevel: globalOptions.verboseLevel || 0,
-    config: globalOptions.config,
-    entryFile: globalOptions.entryFile || configOptions.entryFile,
-  };
-
-  // Make sure project field is set
-  logger.debug('Merged options project path:', mergedOptions.project);
-  if (mergedOptions.miniappRoot) {
-    logger.debug('Merged options miniapp root:', mergedOptions.miniappRoot);
-  }
-  if (mergedOptions.entryFile) {
-    logger.debug('Merged options entry file:', mergedOptions.entryFile);
-  }
-
-  logger.info('Final merged options:', mergedOptions);
-  return mergedOptions;
+  // Setting project root will happen within command handlers now
+  // logger.setProjectRoot(resolvedProjectPath);
+  logger.info(`Logger level set to: ${logger.getLevel()}`);
 }
 
 const program = new Command();
@@ -96,8 +48,11 @@ program
   .description('微信小程序依赖分析与清理工具')
   .option('-p, --project <path>', '指定项目的根目录', process.cwd())
   .option('-v, --verbose', '显示更详细的日志输出')
-  .option('--verbose-level <level>', '详细日志级别 (0=基本, 1=正常, 2=详细, 3=追踪)', (val) =>
-    parseInt(val, 10),
+  .option(
+    '--verbose-level <level>',
+    '详细日志级别 (0=基本, 1=正常, 2=详细, 3=追踪)',
+    (val) => parseInt(val, 10),
+    0, // Default verboseLevel to 0
   )
   .option('--trace', '启用最详细的日志输出 (等同于 --verbose-level 3)')
   .option('--config <path>', '指定配置文件的路径')
@@ -108,46 +63,26 @@ program
 program
   .command('list-unused')
   .description('分析项目并列出检测到的未使用文件')
-  .option(
-    '--types <types>',
-    '指定要检查的文件扩展名，用逗号分隔',
-    'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs',
-  )
+  .option('--types <types>', '指定要检查的文件扩展名，用逗号分隔') // No default here, let command handle it
   .option(
     '--exclude <pattern>',
     '用于排除文件/目录的 Glob 模式',
     (value: string, previous: string[]) => previous.concat([value]),
-    [
-      '**/output/dependency-graph.*',
-      '**/output/unused-files.*',
-      'dependency-graph.*',
-      'unused-files.*',
-      '**/dist/**',
-    ] as string[],
+    [],
   )
-  .option(
-    '--essential-files <files>',
-    '指定视为必要的文件（永远不会被标记为未使用），用逗号分隔',
-    '',
-  )
-  .option('--output-format <format>', '输出格式 (text|json)', 'text')
-  .option('-o, --output <file>', '将列表保存到文件，而非打印到控制台')
-  .option('--use-aliases', '启用路径别名（tsconfig.json中paths）解析')
+  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔')
+  .option('--output-format <format>', '输出格式 (text|json)')
+  .option('-o, --output <file>', '将列表保存到文件')
+  // .option('--use-aliases', '启用路径别名解析') // Alias handled automatically by loader
   .action(async (cmdOptions) => {
+    const globalOptions = program.opts();
+    setupLogger(globalOptions);
     try {
-      // Get global options explicitly
-      const globalOptions = program.opts();
-
-      // Merge with command options
-      const options = await mergeOptions(cmdOptions, globalOptions);
-
-      // Execute the command
-      await listUnused(options);
+      // Pass both command and global options to the handler
+      await listUnused({ ...globalOptions, ...cmdOptions });
     } catch (error) {
-      logger.error(`Command execution failed: ${(error as Error).message}`);
-      if (error instanceof Error && error.stack) {
-        console.error(error.stack);
-      }
+      logger.error(`Command failed: ${(error as Error).message}`);
+      // Stack trace logged within command handlers now
       process.exit(1);
     }
   });
@@ -157,25 +92,20 @@ program
   .command('graph')
   .alias('visualize')
   .description('生成依赖关系图的可视化文件')
-  .option('-f, --format <format>', '输出格式 (html|dot|json|png|svg)', 'html')
+  .option('-f, --format <format>', '输出格式 (html|dot|json|png|svg)')
   .option('-o, --output <file>', '保存图文件的路径')
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
-  .option('--no-npm', '在图中排除 node_modules 或 miniprogram_npm 中的依赖')
-  .option('--miniapp-root <path>', '指定小程序代码所在的子目录')
-  .option('--entry-file <path>', '指定入口文件路径')
+  .option('--npm', 'Include node_modules / miniprogram_npm in graph', false) // Default to false if flag exists
+  // Remove --no-npm, use --npm presence (default false)
   .action(async (cmdOptions) => {
+    const globalOptions = program.opts();
+    setupLogger(globalOptions);
     try {
-      // Get global options explicitly
-      const globalOptions = program.opts();
-
-      // Merge with command options
-      const options = await mergeOptions(cmdOptions, globalOptions);
-
-      // Execute the command
-      await graph(options);
+      // Pass both command and global options to the handler
+      await graph({ ...globalOptions, ...cmdOptions });
     } catch (error) {
-      logger.error(`Command execution failed: ${(error as Error).message}`);
+      logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
     }
   });
@@ -184,48 +114,28 @@ program
 program
   .command('clean')
   .description('分析项目并删除未使用的文件 (⚠️ 使用此命令务必谨慎！)')
-  .option(
-    '--types <types>',
-    '指定要删除的文件类型',
-    'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs',
-  )
+  .option('--types <types>', '指定要删除的文件类型')
   .option(
     '--exclude <pattern>',
     '排除某些文件/目录不被删除',
     (value: string, previous: string[]) => previous.concat([value]),
-    [
-      '**/output/dependency-graph.*',
-      '**/output/unused-files.*',
-      'dependency-graph.*',
-      'unused-files.*',
-      '**/dist/**',
-    ] as string[],
+    [],
   )
-  .option('--essential-files <files>', '指定视为必要的文件（永远不会被删除），用逗号分隔', '')
-  .option('--dry-run', '模拟删除过程，不实际改动文件', false)
-  .option('--backup <dir>', '将删除的文件移动到备份目录，而不是永久删除')
-  .option('-y, --yes, --force', '跳过交互式确认环节', false)
+  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔')
+  .option('--dry-run', '只显示会被删除的文件，不实际执行', false)
+  .option('--backup <dir>', '将文件移动到备份目录而不是删除')
+  .option('--yes', '跳过删除确认提示', false)
   .action(async (cmdOptions) => {
+    const globalOptions = program.opts();
+    setupLogger(globalOptions);
     try {
-      // Get global options explicitly
-      const globalOptions = program.opts();
-
-      // Merge with command options
-      const options = await mergeOptions(cmdOptions, globalOptions);
-
-      // Execute the command
-      await clean(options);
+      // Pass both command and global options to the handler
+      await clean({ ...globalOptions, ...cmdOptions });
     } catch (error) {
-      logger.error(`Command execution failed: ${(error as Error).message}`);
+      logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
     }
   });
 
-// Handle invalid commands
-program.on('command:*', () => {
-  logger.error(`Invalid command: ${program.args.join(' ')}`);
-  console.log(`使用 ${chalk.cyan('--help')} 查看可用命令列表.`);
-  process.exit(1);
-});
-
+// Parse arguments
 program.parse(process.argv);

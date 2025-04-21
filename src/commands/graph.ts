@@ -7,6 +7,27 @@ import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
 import { isString, mergeOptions } from '../utils/options-merger';
 
+// Define the shape of the raw options passed from cli.ts
+interface RawGraphOptions {
+  // Global
+  project: string;
+  verbose?: boolean;
+  verboseLevel?: number;
+  config?: string;
+  miniappRoot?: string;
+  entryFile?: string;
+  trace?: boolean;
+
+  // Command specific
+  format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
+  output?: string;
+  depth?: number;
+  focus?: string;
+  npm?: boolean;
+
+  [key: string]: any;
+}
+
 // Define GraphOptions
 export interface GraphOptions extends CommandOptions {
   format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
@@ -81,33 +102,44 @@ function renderDOT(graphData: {
 /**
  * 生成项目依赖图
  */
-export async function graph(options: GraphOptions): Promise<void> {
-  // 1. Load config
-  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
+export async function graph(rawOptions: RawGraphOptions): Promise<void> {
+  // 1. Resolve Project Path and Set Logger Root
+  const projectRoot = path.resolve(rawOptions.project);
+  logger.setProjectRoot(projectRoot);
+  logger.info(`Resolved project root: ${projectRoot}`);
+  if (!fs.existsSync(projectRoot)) {
+    throw new Error(`Project directory does not exist: ${projectRoot}`);
+  }
+
+  // 2. Load config file
+  const fileConfig = await ConfigLoader.loadConfig(rawOptions.config, projectRoot);
   logger.debug('Loaded config file content for graph:', fileConfig);
 
-  // 2. Merge options
-  const mergedConfig = mergeOptions(options, fileConfig, options.project);
+  // 3. Merge options
+  const mergedConfig = mergeOptions(rawOptions, fileConfig, projectRoot);
   logger.debug('Final merged options for graph:', mergedConfig);
 
-  // 3. Extract and type options for this command
-  const project = mergedConfig.project;
+  // 4. Extract and type final options for this command
   const verbose = mergedConfig.verbose ?? false;
   const verboseLevel = mergedConfig.verboseLevel;
   const miniappRoot = mergedConfig.miniappRoot;
   const entryFile = mergedConfig.entryFile;
   const format = mergedConfig.format ?? 'html';
-  const output = mergedConfig.output;
+  const output = mergedConfig.output; // Resolved path or undefined
   const depth = mergedConfig.depth;
-  const focus = mergedConfig.focus;
+  const focus = mergedConfig.focus; // Resolved path or undefined
   const npm = mergedConfig.npm ?? false;
+  // Graph-specific options from merged config
+  const types = mergedConfig.types ?? 'js,ts,json,wxml,wxss'; // Default types for graph
+  const exclude = mergedConfig.exclude ?? [];
+  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
 
-  logger.debug('graph processing with final options:', mergedConfig);
+  // Log final options
+  logger.info(`Output format: ${format}`);
   logger.info('Generating project dependency graph...');
-  logger.info(`Project path: ${project}`);
+  logger.info(`Project path: ${projectRoot}`);
   if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
   if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
-  logger.info(`Output format: ${format}`);
   if (output) logger.info(`Output file: ${output}`);
   if (depth !== undefined) logger.info(`Max depth: ${depth}`);
   if (focus) logger.info(`Focusing on file: ${focus}`);
@@ -115,18 +147,11 @@ export async function graph(options: GraphOptions): Promise<void> {
 
   try {
     logger.info('Analyzing project dependencies...');
-    // Analyze project - use sensible defaults or get from config if available
-    const fileTypes = mergedConfig.types?.split(',').map((t) => t.trim()) ?? [
-      '.js',
-      '.ts',
-      '.json',
-      '.wxml',
-      '.wxss',
-    ];
-    const exclude = mergedConfig.exclude ?? [];
-    const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
+    const fileTypes = types.split(',').map((t) => t.trim());
 
-    const { dependencyGraph } = await analyzeProject(project, {
+    // Call analyzeProject with final options
+    const { dependencyGraph } = await analyzeProject(projectRoot, {
+      // Use projectRoot
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
@@ -134,6 +159,7 @@ export async function graph(options: GraphOptions): Promise<void> {
       verboseLevel,
       miniappRoot,
       entryFile,
+      entryContent: mergedConfig.entryContent,
     });
 
     logger.info('Rendering graph...');

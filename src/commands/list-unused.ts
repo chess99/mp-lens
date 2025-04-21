@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { CommandOptions, OutputOptions as FormatterOutputOptions } from '../types/command-options';
 import { ConfigLoader } from '../utils/config-loader';
@@ -21,44 +22,64 @@ export interface ListUnusedOptions extends CommandOptions {
   [key: string]: any;
 }
 
+// Define the shape of the raw options passed from cli.ts
+// Includes global options and command-specific options
+interface RawListUnusedOptions {
+  // Global
+  project: string;
+  verbose?: boolean;
+  verboseLevel?: number;
+  config?: string;
+  miniappRoot?: string;
+  entryFile?: string;
+  trace?: boolean;
+
+  // Command specific
+  types?: string;
+  exclude?: string[];
+  essentialFiles?: string;
+  outputFormat?: 'text' | 'json';
+  output?: string;
+
+  [key: string]: any; // Allow other properties from commander
+}
+
 /**
  * 列出未使用的文件
  */
-export async function listUnused(options: ListUnusedOptions): Promise<void> {
-  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
-  logger.debug('Loaded config file content:', fileConfig);
-
-  const mergedConfig = mergeOptions(options, fileConfig, options.project);
-  logger.debug('Merged config from file and CLI:', mergedConfig);
-
-  const project = mergedConfig.project;
-  const verbose = mergedConfig.verbose ?? false;
-  const verboseLevel = mergedConfig.verboseLevel;
-  const types = mergedConfig.types;
-  const exclude = mergedConfig.exclude ?? [];
-  const outputFormat = mergedConfig.outputFormat ?? 'text';
-  const output = mergedConfig.output;
-  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
-  const miniappRoot = mergedConfig.miniappRoot;
-  const entryFile = mergedConfig.entryFile;
-
-  if (!types) {
-    throw new Error('Missing required option: --types must be provided via CLI or config file.');
+export async function listUnused(rawOptions: RawListUnusedOptions): Promise<void> {
+  // 1. Resolve Project Path and Set Logger Root
+  const projectRoot = path.resolve(rawOptions.project);
+  logger.setProjectRoot(projectRoot); // Set root for logger context
+  logger.info(`Resolved project root: ${projectRoot}`);
+  if (!fs.existsSync(projectRoot)) {
+    throw new Error(`Project directory does not exist: ${projectRoot}`);
   }
 
-  logger.debug('list-unused processing with final options:', {
-    project,
-    verbose,
-    types,
-    exclude,
-    outputFormat,
-    output,
-    essentialFiles: essentialFilesList,
-    miniappRoot,
-    entryFile,
-    verboseLevel,
-  });
-  logger.info(`Project path: ${project}`);
+  // 2. Load config file (using resolved project root)
+  const fileConfig = await ConfigLoader.loadConfig(rawOptions.config, projectRoot);
+  logger.debug('Loaded config file content:', fileConfig);
+
+  // 3. Merge options using shared utility
+  // Pass rawOptions which contains both global and command flags
+  const mergedConfig = mergeOptions(rawOptions, fileConfig, projectRoot);
+  logger.debug('Merged config from file and CLI:', mergedConfig);
+
+  // 4. Extract and type final options for this command from mergedConfig
+  const verbose = mergedConfig.verbose ?? false; // Already set by logger setup, but good to have
+  const verboseLevel = mergedConfig.verboseLevel;
+  // Provide default types if not specified anywhere
+  const types = mergedConfig.types ?? 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs';
+  const exclude = mergedConfig.exclude ?? [];
+  const outputFormat = mergedConfig.outputFormat ?? 'text';
+  const output = mergedConfig.output; // Path resolved in mergeOptions
+  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? []; // string[] | undefined from mergeOptions
+  const miniappRoot = mergedConfig.miniappRoot; // Path resolved in mergeOptions
+  const entryFile = mergedConfig.entryFile; // Path resolved in mergeOptions
+
+  // Log final options
+  logger.info(`Analyzing file types: ${types}`);
+  logger.info(`Project path: ${projectRoot}`);
 
   if (miniappRoot) {
     logger.info(`Using Miniapp root directory: ${miniappRoot}`);
@@ -80,23 +101,28 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
   try {
     const fileTypes = types.split(',').map((t) => t.trim());
 
-    const { unusedFiles } = await analyzeProject(project, {
+    // Call analyzeProject with final options
+    // Pass projectRoot (absolute path), not mergedConfig.project
+    const { unusedFiles } = await analyzeProject(projectRoot, {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
       verbose,
       verboseLevel: verboseLevel,
-      miniappRoot,
-      entryFile,
+      miniappRoot, // Pass resolved path
+      entryFile, // Pass resolved path
+      entryContent: mergedConfig.entryContent, // Pass if present in config
     });
 
+    // Format output
     const formatterOptions: FormatterOutputOptions = {
       format: outputFormat,
-      projectRoot: project,
-      miniappRoot: miniappRoot,
+      projectRoot: projectRoot, // Use absolute path
+      miniappRoot: miniappRoot, // Use resolved path
     };
     const formattedOutput = formatOutput(unusedFiles, formatterOptions);
 
+    // Handle output
     if (isString(output)) {
       fs.writeFileSync(output, formattedOutput);
       logger.info(`✅ Unused files list saved to: ${output}`);
@@ -111,6 +137,6 @@ export async function listUnused(options: ListUnusedOptions): Promise<void> {
     if (stack) {
       logger.debug(stack);
     }
-    throw error;
+    throw error; // Re-throw for cli.ts handler
   }
 }

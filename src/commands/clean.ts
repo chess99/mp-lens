@@ -3,62 +3,76 @@ import * as fs from 'fs';
 import * as inquirer from 'inquirer';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { CommandOptions } from '../types/command-options';
 import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
 import { isString, mergeOptions } from '../utils/options-merger';
 
-// Define CleanOptions based on CommandOptions and specific clean args
-export interface CleanOptions extends CommandOptions {
-  types: string;
-  exclude?: string[];
-  essentialFiles?: string | string[]; // Allow array from config
-  dryRun?: boolean; // Allow undefined initially
-  backup?: string;
-  yes?: boolean; // Allow undefined initially
+// Define the shape of the raw options passed from cli.ts
+interface RawCleanOptions {
+  // Global
+  project: string;
+  verbose?: boolean;
+  verboseLevel?: number;
+  config?: string;
   miniappRoot?: string;
   entryFile?: string;
-  // Allow any config file options to be present after merge
+  trace?: boolean;
+
+  // Command specific
+  types?: string;
+  exclude?: string[];
+  essentialFiles?: string;
+  dryRun?: boolean;
+  backup?: string;
+  yes?: boolean;
+
   [key: string]: any;
 }
 
 /**
  * 删除未使用的文件
  */
-export async function clean(options: CleanOptions): Promise<void> {
-  // 1. Load config
-  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
+export async function clean(rawOptions: RawCleanOptions): Promise<void> {
+  // 1. Resolve Project Path and Set Logger Root
+  const projectRoot = path.resolve(rawOptions.project);
+  logger.setProjectRoot(projectRoot);
+  logger.info(`Resolved project root: ${projectRoot}`);
+  if (!fs.existsSync(projectRoot)) {
+    throw new Error(`Project directory does not exist: ${projectRoot}`);
+  }
+
+  // 2. Load config file
+  const fileConfig = await ConfigLoader.loadConfig(rawOptions.config, projectRoot);
   logger.debug('Loaded config file content for clean:', fileConfig);
 
-  // 2. Merge options
-  const mergedConfig = mergeOptions(options, fileConfig, options.project);
+  // 3. Merge options
+  const mergedConfig = mergeOptions(rawOptions, fileConfig, projectRoot);
   logger.debug('Final merged options for clean:', mergedConfig);
 
-  // 3. Extract and type options for this command
-  const project = mergedConfig.project;
+  // 4. Extract and type final options for this command
   const verbose = mergedConfig.verbose ?? false;
   const verboseLevel = mergedConfig.verboseLevel;
-  const types = mergedConfig.types;
+  const types = mergedConfig.types ?? 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs'; // Default types
   const exclude = mergedConfig.exclude ?? [];
-  // Essential files are already resolved to string[] | undefined
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
   const miniappRoot = mergedConfig.miniappRoot;
   const entryFile = mergedConfig.entryFile;
-  const dryRun = mergedConfig.dryRun ?? false; // Default to false
-  const backup = mergedConfig.backup; // Already resolved path or undefined
-  const yes = mergedConfig.yes ?? false; // Default to false
+  const dryRun = mergedConfig.dryRun ?? false;
+  const backup = mergedConfig.backup; // Resolved path or undefined
+  const yes = mergedConfig.yes ?? false;
 
   // Validate required options
   if (!types) {
     throw new Error('Missing required option: --types must be provided via CLI or config file.');
   }
 
-  logger.debug('clean processing with final options:', mergedConfig);
+  // Log final options
+  logger.info(`File types to clean: ${types}`);
+  if (dryRun) logger.info(chalk.yellow('Dry Run Mode Enabled'));
   logger.info('🧹 Starting unused file cleanup...');
-  logger.info(`Project path: ${project}`);
+  logger.info(`Project path: ${projectRoot}`);
   if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
   if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
-  logger.info(`File types to analyze: ${types}`);
   if (exclude.length > 0) logger.debug(`Exclude patterns: ${exclude.join(', ')}`);
 
   if (dryRun) {
@@ -90,7 +104,7 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Analyze project using final options
     const fileTypes = types.split(',').map((t) => t.trim());
     logger.info('Analyzing project to find unused files...');
-    const { unusedFiles } = await analyzeProject(project, {
+    const { unusedFiles } = await analyzeProject(projectRoot, {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
@@ -98,6 +112,7 @@ export async function clean(options: CleanOptions): Promise<void> {
       verboseLevel,
       miniappRoot,
       entryFile,
+      entryContent: mergedConfig.entryContent,
     });
 
     if (unusedFiles.length === 0) {
@@ -108,7 +123,7 @@ export async function clean(options: CleanOptions): Promise<void> {
     // Log files to be processed
     logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files to process:`));
     unusedFiles.forEach((file) => {
-      const relativePath = path.relative(project, file);
+      const relativePath = path.relative(projectRoot, file);
       logger.info(`  ${dryRun ? '[Dry Run] ' : backup ? '[Backup] ' : '[Delete] '}${relativePath}`);
     });
     console.log(); // Add spacing
@@ -153,7 +168,7 @@ export async function clean(options: CleanOptions): Promise<void> {
 
     for (const file of unusedFiles) {
       try {
-        const relativePath = path.relative(project, file);
+        const relativePath = path.relative(projectRoot, file);
         if (isString(backup)) {
           const backupPath = path.join(backup, relativePath);
           const backupDir = path.dirname(backupPath);
