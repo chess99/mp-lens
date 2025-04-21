@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import { analyzeProject } from '../analyzer/analyzer';
-import { CommandOptions } from '../types/command-options';
+import { CommandOptions, OutputOptions as FormatterOutputOptions } from '../types/command-options';
+import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
+import { isString, mergeOptions } from '../utils/options-merger';
 import { formatOutput } from '../utils/output-formatter';
 
 /**
@@ -9,102 +11,106 @@ import { formatOutput } from '../utils/output-formatter';
  */
 export interface ListUnusedOptions extends CommandOptions {
   types: string;
-  exclude: string[];
-  outputFormat: 'text' | 'json';
+  exclude?: string[];
+  outputFormat?: 'text' | 'json';
   output?: string;
-  essentialFiles?: string;
+  essentialFiles?: string | string[];
   miniappRoot?: string;
   entryFile?: string;
   verboseLevel?: number;
+  [key: string]: any;
 }
 
 /**
  * 列出未使用的文件
  */
 export async function listUnused(options: ListUnusedOptions): Promise<void> {
-  const {
+  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
+  logger.debug('Loaded config file content:', fileConfig);
+
+  const mergedConfig = mergeOptions(options, fileConfig, options.project);
+  logger.debug('Merged config from file and CLI:', mergedConfig);
+
+  const project = mergedConfig.project;
+  const verbose = mergedConfig.verbose ?? false;
+  const verboseLevel = mergedConfig.verboseLevel;
+  const types = mergedConfig.types;
+  const exclude = mergedConfig.exclude ?? [];
+  const outputFormat = mergedConfig.outputFormat ?? 'text';
+  const output = mergedConfig.output;
+  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
+  const miniappRoot = mergedConfig.miniappRoot;
+  const entryFile = mergedConfig.entryFile;
+
+  if (!types) {
+    throw new Error('Missing required option: --types must be provided via CLI or config file.');
+  }
+
+  logger.debug('list-unused processing with final options:', {
     project,
     verbose,
     types,
     exclude,
     outputFormat,
     output,
-    essentialFiles,
+    essentialFiles: essentialFilesList,
     miniappRoot,
     entryFile,
-  } = options;
-
-  // Log passed options at debug level
-  logger.debug('list-unused received options:', options);
-  logger.debug('Project path:', project);
-  logger.debug('File types:', types);
-
-  if (miniappRoot) {
-    logger.debug('Miniapp root:', miniappRoot);
-  }
-
-  if (entryFile) {
-    logger.debug('Entry file:', entryFile);
-  }
-
-  logger.info('🔍 Starting project dependency analysis...');
+    verboseLevel,
+  });
   logger.info(`Project path: ${project}`);
 
   if (miniappRoot) {
-    logger.info(`Miniapp root directory: ${miniappRoot}`);
+    logger.info(`Using Miniapp root directory: ${miniappRoot}`);
+  }
+  if (entryFile) {
+    logger.info(`Using specific entry file: ${entryFile}`);
   }
 
   logger.info(`File types to analyze: ${types}`);
 
-  if (exclude && exclude.length > 0) {
+  if (exclude.length > 0) {
     logger.debug(`Exclude patterns: ${exclude.join(', ')}`);
   }
 
-  if (essentialFiles) {
-    logger.debug(`Essential files: ${essentialFiles}`);
-  }
-
-  if (entryFile) {
-    logger.debug(`Entry file: ${entryFile}`);
+  if (essentialFilesList.length > 0) {
+    logger.debug(`Essential files: ${essentialFilesList.join(', ')}`);
   }
 
   try {
-    // 分析项目获取未使用文件列表
     const fileTypes = types.split(',').map((t) => t.trim());
 
-    // 处理必要文件选项
-    const essentialFilesList = essentialFiles ? essentialFiles.split(',').map((f) => f.trim()) : [];
-
-    // 使用analyzer模块分析项目
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
-      excludePatterns: exclude || [],
+      excludePatterns: exclude,
       essentialFiles: essentialFilesList,
       verbose,
-      verboseLevel: options.verboseLevel,
+      verboseLevel: verboseLevel,
       miniappRoot,
       entryFile,
     });
 
-    // 格式化输出
-    const formattedOutput = formatOutput(unusedFiles, {
+    const formatterOptions: FormatterOutputOptions = {
       format: outputFormat,
       projectRoot: project,
-    });
+      miniappRoot: miniappRoot,
+    };
+    const formattedOutput = formatOutput(unusedFiles, formatterOptions);
 
-    // 判断是否需要输出到文件
-    if (output) {
+    if (isString(output)) {
       fs.writeFileSync(output, formattedOutput);
       logger.info(`✅ Unused files list saved to: ${output}`);
     } else {
-      // 输出到控制台
       console.log(formattedOutput);
     }
 
-    // 输出统计信息
     logger.info(`Found ${unusedFiles.length} unused files`);
   } catch (error) {
     logger.error(`Analysis failed: ${(error as Error).message}`);
+    const stack = (error as Error).stack;
+    if (stack) {
+      logger.debug(stack);
+    }
     throw error;
   }
 }

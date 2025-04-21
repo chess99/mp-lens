@@ -20,4 +20,16 @@ module.exports = {
     ],
     'no-console': 'off',
   },
+  overrides: [
+    {
+      files: ['tests/**/*.ts', '**/*.test.ts'],
+      parserOptions: {
+        project: null,
+      },
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unused-vars': 'warn',
+      },
+    },
+  ],
 };

@@ -3,7 +3,10 @@ import * as path from 'path';
 import { OutputOptions } from '../types/command-options';
 
 /**
- * 格式化未使用文件的输出
+ * 格式化输出结果
+ * @param unusedFiles 未使用文件列表
+ * @param options 格式化选项
+ * @returns 格式化后的字符串
  */
 export function formatOutput(unusedFiles: string[], options: OutputOptions): string {
   const { format, projectRoot } = options;

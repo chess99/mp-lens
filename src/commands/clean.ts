@@ -3,253 +3,194 @@ import * as fs from 'fs';
 import * as inquirer from 'inquirer';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { CleanOptions } from '../types/command-options';
+import { CommandOptions } from '../types/command-options';
+import { ConfigLoader } from '../utils/config-loader';
+import { logger } from '../utils/debug-logger';
+import { isString, mergeOptions } from '../utils/options-merger';
 
-export async function cleanUnused(options: CleanOptions) {
-  const {
-    project,
-    verbose,
-    types,
-    exclude,
-    dryRun,
-    backup,
-    yes,
-    essentialFiles,
-    miniappRoot,
-    entryFile,
-  } = options;
+// Define CleanOptions based on CommandOptions and specific clean args
+export interface CleanOptions extends CommandOptions {
+  types: string;
+  exclude?: string[];
+  essentialFiles?: string | string[]; // Allow array from config
+  dryRun?: boolean; // Allow undefined initially
+  backup?: string;
+  yes?: boolean; // Allow undefined initially
+  miniappRoot?: string;
+  entryFile?: string;
+  // Allow any config file options to be present after merge
+  [key: string]: any;
+}
 
-  if (verbose) {
-    console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
-    console.log(`项目路径: ${project}`);
-    if (miniappRoot) {
-      console.log(`小程序根目录: ${miniappRoot}`);
-    }
-    console.log(`要删除的文件类型: ${types}`);
+/**
+ * 删除未使用的文件
+ */
+export async function clean(options: CleanOptions): Promise<void> {
+  // 1. Load config
+  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
+  logger.debug('Loaded config file content for clean:', fileConfig);
 
-    if (exclude.length > 0) {
-      console.log(`排除模式: ${exclude.join(', ')}`);
-    }
+  // 2. Merge options
+  const mergedConfig = mergeOptions(options, fileConfig, options.project);
+  logger.debug('Final merged options for clean:', mergedConfig);
 
-    if (essentialFiles) {
-      console.log(`必要文件: ${essentialFiles}`);
-    }
+  // 3. Extract and type options for this command
+  const project = mergedConfig.project;
+  const verbose = mergedConfig.verbose ?? false;
+  const verboseLevel = mergedConfig.verboseLevel;
+  const types = mergedConfig.types;
+  const exclude = mergedConfig.exclude ?? [];
+  // Essential files are already resolved to string[] | undefined
+  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
+  const miniappRoot = mergedConfig.miniappRoot;
+  const entryFile = mergedConfig.entryFile;
+  const dryRun = mergedConfig.dryRun ?? false; // Default to false
+  const backup = mergedConfig.backup; // Already resolved path or undefined
+  const yes = mergedConfig.yes ?? false; // Default to false
 
-    if (entryFile) {
-      console.log(`入口文件: ${entryFile}`);
-    }
+  // Validate required options
+  if (!types) {
+    throw new Error('Missing required option: --types must be provided via CLI or config file.');
+  }
 
-    if (dryRun) {
-      console.log(chalk.yellow('⚠️ 干运行模式：只会显示将被删除的文件，不会实际删除'));
-    }
+  logger.debug('clean processing with final options:', mergedConfig);
+  logger.info('🧹 Starting unused file cleanup...');
+  logger.info(`Project path: ${project}`);
+  if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
+  if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
+  logger.info(`File types to analyze: ${types}`);
+  if (exclude.length > 0) logger.debug(`Exclude patterns: ${exclude.join(', ')}`);
 
-    if (backup) {
-      console.log(`备份目录: ${backup}`);
-    }
+  if (dryRun) {
+    logger.info(chalk.yellow('⚠️ Dry Run Mode: Files will be listed but NOT deleted or moved.'));
+  }
+  if (backup) {
+    logger.info(`Backup directory: ${backup}`);
   }
 
   try {
-    // 安全检查
+    // Safety Check using final options
     if (!dryRun && !backup && !yes) {
-      console.log(chalk.yellow('⚠️ 警告：此操作将永久删除文件。请确保您有适当的备份或版本控制。'));
-      console.log(
-        chalk.yellow('提示：使用 --dry-run 选项可以预览将被删除的文件而不实际删除它们。'),
-      );
-      console.log(
-        chalk.yellow('      使用 --backup <dir> 选项可以将文件移动到备份目录而不是删除它们。'),
-      );
-
-      const answer = await inquirer.prompt([
+      logger.warn('This operation will permanently delete files.');
+      logger.warn('Use --dry-run to preview, or --backup <dir> to move files instead.');
+      const answers = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'proceed',
-          message: '确定要继续吗？',
+          message: 'Are you sure you want to continue?',
           default: false,
         },
       ]);
-
-      if (!answer.proceed) {
-        console.log(chalk.blue('操作已取消。'));
+      if (!answers.proceed) {
+        logger.info('Operation cancelled.');
         return;
       }
     }
 
-    // 分析项目获取未使用文件列表
+    // Analyze project using final options
     const fileTypes = types.split(',').map((t) => t.trim());
-
-    // 处理必要文件选项
-    const essentialFilesList = essentialFiles ? essentialFiles.split(',').map((f) => f.trim()) : [];
-
+    logger.info('Analyzing project to find unused files...');
     const { unusedFiles } = await analyzeProject(project, {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
       verbose,
+      verboseLevel,
       miniappRoot,
       entryFile,
     });
 
     if (unusedFiles.length === 0) {
-      console.log(chalk.green('✅ 没有发现未使用的文件！项目文件结构很干净。'));
+      logger.info('✨ No unused files found.');
       return;
     }
 
-    // 按照类型对文件进行分组
-    const filesByType: Record<string, string[]> = {};
+    // Log files to be processed
+    logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files to process:`));
+    unusedFiles.forEach((file) => {
+      const relativePath = path.relative(project, file);
+      logger.info(`  ${dryRun ? '[Dry Run] ' : backup ? '[Backup] ' : '[Delete] '}${relativePath}`);
+    });
+    console.log(); // Add spacing
 
-    for (const file of unusedFiles) {
-      const ext = path.extname(file).replace('.', '') || 'unknown';
-
-      if (!filesByType[ext]) {
-        filesByType[ext] = [];
-      }
-
-      filesByType[ext].push(file);
-    }
-
-    // 显示将被删除的文件
-    console.log(chalk.yellow(`找到 ${unusedFiles.length} 个未使用的文件:\n`));
-
-    for (const [type, files] of Object.entries(filesByType)) {
-      console.log(chalk.cyan(`${type.toUpperCase()} 文件 (${files.length}):`));
-
-      for (const file of files) {
-        const relativePath = path.relative(project, file);
-        console.log(`  ${dryRun ? '' : backup ? '📦 ' : '❌ '}${chalk.white(relativePath)}`);
-      }
-
-      console.log();
-    }
-
-    // 如果是试运行模式，不实际删除文件
-    if (dryRun) {
-      console.log(chalk.blue('试运行模式: 上述文件不会被实际删除。'));
-      console.log(chalk.blue('如果要实际删除这些文件，请移除 --dry-run 选项并重新运行命令。'));
-      return;
-    }
-
-    // 如果需要备份，确保备份目录存在
-    if (backup) {
-      if (!fs.existsSync(backup)) {
-        fs.mkdirSync(backup, { recursive: true });
-      }
-    } else if (!yes) {
-      // 二次确认
-      const confirmation = await inquirer.prompt([
+    // Confirmation before action (using final options)
+    let proceed = yes || dryRun;
+    if (!proceed && !backup) {
+      // Don't ask again if backing up (already warned)
+      const answers = await inquirer.prompt([
         {
           type: 'confirm',
-          name: 'proceed',
-          message: '确定要删除这些文件吗？这个操作不可撤销！',
+          name: 'proceedConfirm',
+          message: `Proceed with ${backup ? 'backing up' : 'deleting'} ${
+            unusedFiles.length
+          } files?`,
           default: false,
         },
       ]);
-
-      if (!confirmation.proceed) {
-        console.log(chalk.blue('操作已取消。'));
-        return;
-      }
+      proceed = answers.proceedConfirm;
     }
 
-    // 处理文件
+    if (!proceed) {
+      logger.info('Operation cancelled.');
+      return;
+    }
+
+    // Perform actions (using final options)
+    if (dryRun) {
+      logger.info('Dry run complete. No files were changed.');
+      return;
+    }
+
     let processedCount = 0;
     let errorCount = 0;
 
+    if (isString(backup)) {
+      logger.info(`Backing up files to ${backup}...`);
+      if (!fs.existsSync(backup)) {
+        fs.mkdirSync(backup, { recursive: true });
+      }
+    }
+
     for (const file of unusedFiles) {
       try {
-        if (backup) {
-          // 移动到备份目录
-          const relativePath = path.relative(project, file);
+        const relativePath = path.relative(project, file);
+        if (isString(backup)) {
           const backupPath = path.join(backup, relativePath);
-
-          // 确保目标目录存在
           const backupDir = path.dirname(backupPath);
           if (!fs.existsSync(backupDir)) {
             fs.mkdirSync(backupDir, { recursive: true });
           }
-
-          // 移动文件
           fs.renameSync(file, backupPath);
-
-          if (verbose) {
-            console.log(`已移动: ${relativePath} -> ${backupPath}`);
-          }
+          logger.debug(`Backed up: ${relativePath} -> ${backupPath}`);
         } else {
-          // 直接删除
+          // Deletion logic
           fs.unlinkSync(file);
-
-          if (verbose) {
-            console.log(`已删除: ${path.relative(project, file)}`);
-          }
+          logger.debug(`Deleted: ${relativePath}`);
         }
-
         processedCount++;
-      } catch (error) {
-        console.error(chalk.red(`无法处理文件 ${file}: ${(error as Error).message}`));
+      } catch (err) {
+        logger.error(`Failed to process file ${file}: ${(err as Error).message}`);
         errorCount++;
       }
     }
 
-    // 显示处理结果
-    if (backup) {
-      console.log(chalk.green(`✅ 已将 ${processedCount} 个未使用的文件移动到备份目录: ${backup}`));
+    // Final summary (using final options)
+    if (isString(backup)) {
+      logger.info(chalk.green(`✅ Successfully backed up ${processedCount} files to ${backup}.`));
     } else {
-      console.log(chalk.green(`✅ 已删除 ${processedCount} 个未使用的文件`));
+      if (!mergedConfig.backup) {
+        logger.info(chalk.green(`✅ Successfully deleted ${processedCount} files.`));
+      }
     }
-
     if (errorCount > 0) {
-      console.log(chalk.yellow(`⚠️ ${errorCount} 个文件处理失败。`));
+      logger.error(chalk.red(` Encountered errors processing ${errorCount} files.`));
     }
   } catch (error) {
-    console.error(chalk.red(`❌ 分析失败: ${(error as Error).message}`));
-    throw error;
-  }
-}
-
-/**
- * 查找空目录
- */
-async function findEmptyDirectories(rootDir: string, excludePatterns: string[]): Promise<string[]> {
-  const emptyDirs: string[] = [];
-
-  // 判断一个目录是否应该被排除
-  function shouldExclude(dirPath: string): boolean {
-    for (const pattern of excludePatterns) {
-      if (path.relative(rootDir, dirPath).match(pattern)) {
-        return true;
-      }
+    logger.error(`Cleanup failed: ${(error as Error).message}`);
+    const stack = (error as Error).stack;
+    if (stack) {
+      logger.debug(stack);
     }
-    return false;
+    throw error; // Re-throw for CLI handler
   }
-
-  // 判断一个目录是否为空
-  function isDirEmpty(dirPath: string): boolean {
-    const files = fs.readdirSync(dirPath);
-    return files.length === 0;
-  }
-
-  // 递归检查目录
-  function checkDir(dirPath: string) {
-    if (shouldExclude(dirPath)) {
-      return;
-    }
-
-    if (isDirEmpty(dirPath)) {
-      emptyDirs.push(dirPath);
-      return;
-    }
-
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const subDir = path.join(dirPath, entry.name);
-        checkDir(subDir);
-      }
-    }
-  }
-
-  // 从根目录开始检查
-  checkDir(rootDir);
-
-  return emptyDirs;
 }

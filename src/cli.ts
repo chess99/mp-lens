@@ -8,8 +8,8 @@ import * as path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { version } = require('../package.json');
 
-import { cleanUnused } from './commands/clean';
-import { generateGraph } from './commands/graph';
+import { clean } from './commands/clean';
+import { graph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
 import { ConfigFileOptions } from './types/command-options';
 import { ConfigLoader } from './utils/config-loader';
@@ -173,7 +173,7 @@ program
       const options = await mergeOptions(cmdOptions, globalOptions);
 
       // Execute the command
-      await generateGraph(options);
+      await graph(options);
     } catch (error) {
       logger.error(`Command execution failed: ${(error as Error).message}`);
       process.exit(1);
@@ -214,7 +214,7 @@ program
       const options = await mergeOptions(cmdOptions, globalOptions);
 
       // Execute the command
-      await cleanUnused(options);
+      await clean(options);
     } catch (error) {
       logger.error(`Command execution failed: ${(error as Error).message}`);
       process.exit(1);

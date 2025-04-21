@@ -19,6 +19,7 @@ export interface AnalyzerOptions {
 export interface OutputOptions {
   format: 'text' | 'json';
   projectRoot: string;
+  miniappRoot?: string;
 }
 
 export interface GraphOptions extends CommandOptions {

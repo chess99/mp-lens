@@ -201,7 +201,10 @@ function resolveEntryPoints(
   }
 
   if (entryFiles.size === 0) {
-    logger.warn('警告: 未能确定任何有效的入口文件。分析可能不准确。');
+    // Log the warning, but throw an error instead of exiting
+    const errorMsg = '未能确定任何有效的入口文件。';
+    logger.warn(`${errorMsg} 分析可能不准确。`);
+    throw new Error(errorMsg); // Throw error to signal failure
   }
 
   return Array.from(entryFiles);

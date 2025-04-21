@@ -2,90 +2,147 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { GraphOptions } from '../types/command-options';
+import { CommandOptions } from '../types/command-options';
+import { ConfigLoader } from '../utils/config-loader';
+import { logger } from '../utils/debug-logger';
+import { isString, mergeOptions } from '../utils/options-merger';
 
-/**
- * 生成依赖关系图
- */
-export async function generateGraph(options: GraphOptions): Promise<void> {
-  const { project, verbose, format, output, depth, focus, npm, miniappRoot, entryFile } = options;
+// Define GraphOptions
+export interface GraphOptions extends CommandOptions {
+  format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
+  output?: string;
+  depth?: number;
+  focus?: string;
+  npm?: boolean;
+  miniappRoot?: string;
+  entryFile?: string;
+  // Allow any config file options to be present after merge
+  [key: string]: any;
+}
 
-  if (verbose) {
-    console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
-    console.log(`项目路径: ${project}`);
-    if (miniappRoot) {
-      console.log(`小程序根目录: ${miniappRoot}`);
-    }
-    console.log(`输出格式: ${format}`);
+// Restore renderHTML function (basic implementation)
+function renderHTML(graphData: {
+  nodes: { id: string }[];
+  links: { source: string; target: string }[];
+}): string {
+  // Simplified HTML template - consider using a proper library like D3 or vis.js for robust rendering
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dependency Graph</title>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 20px; font-family: sans-serif; }
+    .node { fill: #add8e6; stroke: #666; }
+    .link { stroke: #999; stroke-opacity: 0.6; }
+    text { font-size: 10px; pointer-events: none; }
+    svg { border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>Dependency Graph (JSON Data)</h1>
+  <p>Interactive HTML rendering requires a JS library (e.g., D3.js). Showing raw JSON data instead.</p>
+  <pre id="graph-data">${JSON.stringify(graphData, null, 2)}</pre>
+</body>
+</html>
+  `;
+}
 
-    if (output) {
-      console.log(`输出文件: ${output}`);
-    }
+// Restore renderDOT function (basic implementation)
+function renderDOT(graphData: {
+  nodes: { id: string }[];
+  links: { source: string; target: string }[];
+}): string {
+  let dot = 'digraph DependencyGraph {\n';
+  dot += '  node [shape=box, style=rounded, fontname="sans-serif", fontsize=10];\n';
+  dot += '  edge [fontname="sans-serif", fontsize=9];\n';
+  dot += '  graph [fontname="sans-serif", fontsize=10];\n\n';
 
-    if (depth !== undefined) {
-      console.log(`依赖深度限制: ${depth}`);
-    }
-
-    if (focus) {
-      console.log(`聚焦文件: ${focus}`);
-    }
-
-    if (entryFile) {
-      console.log(`入口文件: ${entryFile}`);
-    }
-
-    console.log(`包含npm依赖: ${npm ? '是' : '否'}`);
+  // Add nodes
+  for (const node of graphData.nodes) {
+    // Use relative paths for labels if possible, otherwise full ID
+    // This assumes node.id is an absolute path
+    const label = node.id.includes(path.sep) ? path.basename(node.id) : node.id;
+    dot += `  "${node.id}" [label="${label}"];\n`;
   }
 
+  dot += '\n';
+
+  // Add edges
+  for (const link of graphData.links) {
+    dot += `  "${link.source}" -> "${link.target}";\n`;
+  }
+
+  dot += '}\n';
+  return dot;
+}
+
+/**
+ * 生成项目依赖图
+ */
+export async function graph(options: GraphOptions): Promise<void> {
+  // 1. Load config
+  const fileConfig = await ConfigLoader.loadConfig(undefined, options.project);
+  logger.debug('Loaded config file content for graph:', fileConfig);
+
+  // 2. Merge options
+  const mergedConfig = mergeOptions(options, fileConfig, options.project);
+  logger.debug('Final merged options for graph:', mergedConfig);
+
+  // 3. Extract and type options for this command
+  const project = mergedConfig.project;
+  const verbose = mergedConfig.verbose ?? false;
+  const verboseLevel = mergedConfig.verboseLevel;
+  const miniappRoot = mergedConfig.miniappRoot;
+  const entryFile = mergedConfig.entryFile;
+  const format = mergedConfig.format ?? 'html';
+  const output = mergedConfig.output;
+  const depth = mergedConfig.depth;
+  const focus = mergedConfig.focus;
+  const npm = mergedConfig.npm ?? false;
+
+  logger.debug('graph processing with final options:', mergedConfig);
+  logger.info('Generating project dependency graph...');
+  logger.info(`Project path: ${project}`);
+  if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
+  if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
+  logger.info(`Output format: ${format}`);
+  if (output) logger.info(`Output file: ${output}`);
+  if (depth !== undefined) logger.info(`Max depth: ${depth}`);
+  if (focus) logger.info(`Focusing on file: ${focus}`);
+  if (npm) logger.info('Including npm dependencies');
+
   try {
-    // 获取所有支持的文件类型
-    const fileTypes = [
-      'js',
-      'ts',
-      'wxml',
-      'wxss',
-      'json',
-      'wxs',
-      'png',
-      'jpg',
-      'jpeg',
-      'gif',
-      'svg',
+    logger.info('Analyzing project dependencies...');
+    // Analyze project - use sensible defaults or get from config if available
+    const fileTypes = mergedConfig.types?.split(',').map((t) => t.trim()) ?? [
+      '.js',
+      '.ts',
+      '.json',
+      '.wxml',
+      '.wxss',
     ];
+    const exclude = mergedConfig.exclude ?? [];
+    const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
 
-    // 设置排除规则
-    const excludePatterns: string[] = [];
-    if (!npm) {
-      excludePatterns.push('**/node_modules/**', '**/miniprogram_npm/**');
-    }
-
-    // 分析项目依赖
     const { dependencyGraph } = await analyzeProject(project, {
       fileTypes,
-      excludePatterns,
+      excludePatterns: exclude,
+      essentialFiles: essentialFilesList,
       verbose,
+      verboseLevel,
       miniappRoot,
       entryFile,
     });
 
-    // 获取图数据
+    logger.info('Rendering graph...');
+    // Convert graph to simple JSON structure for renderers
+    // TODO: Add depth and focus filtering here if needed before rendering
     const graphData = dependencyGraph.toJSON();
 
-    // 处理聚焦
-    if (focus) {
-      const focusPath = path.resolve(project, focus);
-      // 处理聚焦逻辑...
-      console.log(`聚焦于文件: ${focusPath}`);
-    }
-
-    // 处理深度限制
-    if (depth !== undefined && depth >= 0) {
-      // 实现深度限制逻辑...
-      console.log(`限制依赖深度为: ${depth}`);
-    }
-
-    // 渲染可视化
-    let outputContent = '';
+    // Call local rendering functions based on format
+    let outputContent: string | Buffer = ''; // Use Buffer for potential binary formats
     switch (format) {
       case 'html':
         outputContent = renderHTML(graphData);
@@ -98,90 +155,58 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
         break;
       case 'svg':
       case 'png':
+        // Basic DOT output for these formats, requires external tool (Graphviz) to convert
         outputContent = renderDOT(graphData);
-        // 这里应该调用Graphviz将DOT转换为SVG或PNG
-        // 简化版本不实现该功能
-        console.log(chalk.yellow('⚠️ SVG/PNG格式需要安装Graphviz，本版本不支持直接导出。'));
+        logger.warn(
+          chalk.yellow(
+            `Format '${format}' requires Graphviz installed to convert DOT output. Saving DOT content.`,
+          ),
+        );
+        if (isString(output) && (output.endsWith('.png') || output.endsWith('.svg'))) {
+          logger.warn(`Output file will contain DOT content, not a ${format.toUpperCase()} image.`);
+        }
         break;
       default:
-        throw new Error(`不支持的输出格式: ${format}`);
+        throw new Error(`Unsupported output format: ${format}`);
     }
 
-    // 写入文件或输出到控制台
-    if (output) {
-      fs.writeFileSync(output, outputContent);
-      console.log(chalk.green(`✅ 依赖图已保存到: ${output}`));
-    } else {
-      // 如果是HTML，我们应该将其保存到临时文件并打开浏览器
-      if (format === 'html') {
-        const tempFile = path.join(process.cwd(), 'dependency-graph.html');
-        fs.writeFileSync(tempFile, outputContent);
-        console.log(chalk.green(`✅ 依赖图已保存到: ${tempFile}`));
-        console.log(chalk.blue('请在浏览器中打开此文件查看交互式依赖图。'));
-      } else {
-        // 其他格式直接输出到控制台
-        console.log(outputContent);
+    // Handle output using the type guard
+    if (isString(output)) {
+      const outputDir = path.dirname(output);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
       }
+      // Write the generated content (string or buffer)
+      fs.writeFileSync(output, outputContent);
+      logger.info(`✅ Graph saved to: ${output}`);
+    } else {
+      // Output to console
+      if (
+        format === 'json' ||
+        format === 'dot' ||
+        format === 'html' ||
+        format === 'svg' ||
+        format === 'png'
+      ) {
+        // Only log string content to console
+        if (typeof outputContent === 'string') {
+          console.log(outputContent);
+        } else {
+          logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
+        }
+      } else {
+        logger.warn(`Console output for format '${format}' might not be meaningful. Use --output.`);
+      }
+      // Remove automatic saving for binary formats when no output is specified
+      // if (format === 'png' || format === 'svg') { ... }
     }
   } catch (error) {
-    console.error(chalk.red(`❌ 生成依赖图失败: ${(error as Error).message}`));
+    logger.error(`Graph generation failed: ${(error as Error).message}`);
+    // Add stack check here too
+    const stack = (error as Error).stack;
+    if (stack) {
+      logger.debug(stack);
+    }
     throw error;
   }
-}
-
-/**
- * 渲染HTML格式的依赖图
- */
-function renderHTML(graphData: any): string {
-  // 简化的HTML模板
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>微信小程序依赖图</title>
-  <meta charset="utf-8">
-  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    .node { fill: #69b3a2; stroke: #fff; stroke-width: 2px; }
-    .link { stroke: #999; stroke-opacity: 0.6; }
-    .node text { font-size: 10px; }
-  </style>
-</head>
-<body>
-  <div id="graph"></div>
-  <script>
-    const data = ${JSON.stringify(graphData)};
-    // 这里应该有D3.js代码来渲染力导向图
-    console.log('依赖图数据:', data);
-    document.body.innerHTML += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-  </script>
-</body>
-</html>
-  `;
-}
-
-/**
- * 渲染DOT格式的依赖图
- */
-function renderDOT(graphData: any): string {
-  // 简化的DOT语言模板
-  let dot = 'digraph DependencyGraph {\n';
-  dot += '  node [shape=box];\n\n';
-
-  // 添加节点
-  for (const node of graphData.nodes) {
-    const label = path.basename(node.id);
-    dot += `  "${node.id}" [label="${label}"];\n`;
-  }
-
-  dot += '\n';
-
-  // 添加边
-  for (const link of graphData.links) {
-    dot += `  "${link.source}" -> "${link.target}";\n`;
-  }
-
-  dot += '}\n';
-  return dot;
 }
