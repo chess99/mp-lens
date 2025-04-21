@@ -469,9 +469,6 @@ describe('analyzeProject', () => {
     // Expected Unused: file1
     expect(unusedFiles).toHaveLength(1);
     expect(unusedFiles).toEqual([file1]);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('未能确定任何有效的入口文件'),
-    );
   });
 
   // Add more tests for edge cases:

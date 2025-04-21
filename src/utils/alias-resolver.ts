@@ -34,12 +34,10 @@ export class AliasResolver {
 
     if (foundTsConfig && this.projectRoot) {
       logger.info(`已从tsconfig.json加载别名配置，项目路径: ${this.projectRoot}`);
-      console.log(`已从tsconfig.json加载别名配置，项目路径: ${this.projectRoot}`);
     }
 
     if (foundCustomConfig && this.projectRoot) {
       logger.info(`已从mp-analyzer.config.json加载别名配置，项目路径: ${this.projectRoot}`);
-      console.log(`已从mp-analyzer.config.json加载别名配置，项目路径: ${this.projectRoot}`);
     }
 
     this.initialized = true;
@@ -170,7 +168,6 @@ export class AliasResolver {
 
     try {
       logger.debug(`尝试从${tsconfigPath}加载别名配置`);
-      console.log(`尝试从${tsconfigPath}加载别名配置`);
 
       const tsconfig = JSON.parse(fs.readFileSync(tsconfigPath, 'utf-8'));
       if (tsconfig.compilerOptions && tsconfig.compilerOptions.paths) {
@@ -180,7 +177,6 @@ export class AliasResolver {
         const baseDir = path.resolve(tsconfigDir, baseUrl);
 
         logger.debug(`tsconfig.json的baseUrl: ${baseUrl}, 解析为: ${baseDir}`);
-        console.log(`tsconfig.json的baseUrl: ${baseUrl}, 解析为: ${baseDir}`);
 
         for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
           // 处理 paths 中的通配符模式 (如 "@/*" => ["src/*"])
@@ -199,12 +195,10 @@ export class AliasResolver {
         }
 
         logger.debug('从tsconfig.json加载的别名:', this.aliases);
-        console.log('从tsconfig.json加载的别名:', JSON.stringify(this.aliases, null, 2));
         return Object.keys(this.aliases).length > 0;
       }
     } catch (error) {
       logger.warn(`无法解析 tsconfig.json: ${(error as Error).message}`);
-      console.warn(`无法解析 tsconfig.json: ${(error as Error).message}`);
     }
 
     return false;

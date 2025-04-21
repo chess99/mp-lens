@@ -202,8 +202,6 @@ function resolveEntryPoints(
 
   if (entryFiles.size === 0) {
     logger.warn('警告: 未能确定任何有效的入口文件。分析可能不准确。');
-    // Keep original console.warn for backward compatibility with tests
-    console.warn('警告: 未能确定任何有效的入口文件。分析可能不准确。');
   }
 
   return Array.from(entryFiles);
