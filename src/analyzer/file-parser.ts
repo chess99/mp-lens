@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { AliasResolver } from '../utils/alias-resolver';
+import { logger } from '../utils/debug-logger';
 
 /**
  * 文件解析器：负责解析不同类型的文件，提取其中的依赖关系
@@ -9,7 +10,7 @@ import { AliasResolver } from '../utils/alias-resolver';
 export class FileParser {
   private projectRoot: string;
   private aliasResolver: AliasResolver | null = null;
-  private hasAliasConfig: boolean = false;
+  private hasAliasConfig = false;
   private options: AnalyzerOptions;
 
   constructor(projectRoot: string, options: AnalyzerOptions = { fileTypes: [] }) {
@@ -20,8 +21,8 @@ export class FileParser {
     // 注意，miniappRoot应该已经是绝对路径了，不需要再处理
     const actualRoot = options.miniappRoot || projectRoot;
 
-    if (options.miniappRoot && options.verbose) {
-      console.log(`DEBUG - FileParser using custom miniapp root: ${options.miniappRoot}`);
+    if (options.miniappRoot) {
+      logger.debug(`FileParser using custom miniapp root: ${options.miniappRoot}`);
     }
 
     // 总是初始化别名解析器，检查是否有有效的别名配置
@@ -30,9 +31,9 @@ export class FileParser {
     // 注意：为了测试，确保初始化方法被显式调用
     this.hasAliasConfig = this.aliasResolver.initialize();
 
-    if (this.hasAliasConfig && this.options.verbose) {
-      console.log('DEBUG - 检测到别名配置，自动启用别名解析');
-      console.log('DEBUG - 别名配置:', JSON.stringify(this.aliasResolver.getAliases(), null, 2));
+    if (this.hasAliasConfig) {
+      logger.debug('Alias configuration detected, automatically enabling alias resolution');
+      logger.debug('Alias configuration:', this.aliasResolver.getAliases());
     }
   }
 
@@ -82,9 +83,7 @@ export class FileParser {
 
       return Array.from(dependencies); // Return array from Set
     } catch (e) {
-      if (this.options.verbose) {
-        console.warn(`Error parsing JavaScript file ${filePath}: ${e}`);
-      }
+      logger.warn(`Error parsing JavaScript file ${filePath}: ${e}`);
       return [];
     }
   }
@@ -172,7 +171,6 @@ export class FileParser {
     // Updated regex to match 'pages/path' or 'components/path' in more contexts
     // Now matches quotes, variable assignments, and path strings without quotes
     const pathRegex = /['"]?((?:pages|components)\/[^'"\s,;)]+)['"]?/g;
-    const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
 
     let match;
     while ((match = pathRegex.exec(content)) !== null) {
@@ -180,11 +178,9 @@ export class FileParser {
       // Treat as root-relative
       const rootRelativePath = '/' + pathString;
 
-      if (this.options.verbose) {
-        console.log(
-          `DEBUG - Found page/component path string: ${pathString}, treating as ${rootRelativePath}`,
-        );
-      }
+      logger.trace(
+        `Found page/component path string: ${pathString}, treating as ${rootRelativePath}`,
+      );
 
       const resolvedPath = this.resolveAnyPath(rootRelativePath, filePath);
 
@@ -194,18 +190,16 @@ export class FileParser {
 
         // Find and add related files
         const baseName = resolvedPath.replace(/\.[^.]+$/, '');
-        for (const ext of exts) {
+        for (const ext of ['.js', '.ts', '.wxml', '.wxss', '.json']) {
           const relatedPath = baseName + ext;
           if (fs.existsSync(relatedPath)) {
             dependencies.add(relatedPath); // Add to Set automatically handles duplicates
           }
         }
       } else {
-        if (this.options.verbose) {
-          console.log(
-            `DEBUG - processPageOrComponentStrings: resolveAnyPath returned null for ${rootRelativePath}`,
-          );
-        }
+        logger.trace(
+          `processPageOrComponentStrings: resolveAnyPath returned null for ${rootRelativePath}`,
+        );
       }
     }
   }
@@ -226,9 +220,7 @@ export class FileParser {
 
       return Array.from(dependencies); // Return array from Set
     } catch (e) {
-      if (this.options.verbose) {
-        console.warn(`Error parsing WXML file ${filePath}: ${e}`);
-      }
+      logger.warn(`Error parsing WXML file ${filePath}: ${e}`);
       return [];
     }
   }
@@ -267,8 +259,8 @@ export class FileParser {
           if (resolvedPath) {
             dependencies.add(resolvedPath);
           } else if (this.options.verbose) {
-            console.log(
-              `DEBUG - processImportIncludeTags: Could not resolve root path ${importPath} from ${filePath}`,
+            logger.trace(
+              `processImportIncludeTags: Could not resolve root path ${importPath} from ${filePath}`,
             );
           }
         } else {
@@ -351,7 +343,7 @@ export class FileParser {
         // 如果是组件配置文件且包含usingComponents
         if (jsonContent.usingComponents) {
           // 遍历所有使用的组件
-          for (const [componentName, componentPath] of Object.entries(
+          for (const [_componentName, componentPath] of Object.entries(
             jsonContent.usingComponents,
           )) {
             if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
@@ -393,7 +385,7 @@ export class FileParser {
       } catch (e) {
         // 如果JSON解析失败，忽略错误
         if (this.options.verbose) {
-          console.warn(`Error parsing JSON file ${jsonPath}: ${e}`);
+          logger.warn(`Error parsing JSON file ${jsonPath}: ${e}`);
         }
       }
     }
@@ -463,7 +455,7 @@ export class FileParser {
 
           // 检查 url 路径
           if (this.options.verbose) {
-            console.log(`DEBUG - Processing url path: ${urlPath}`);
+            logger.trace(`Processing url path: ${urlPath}`);
           }
 
           // 尝试别名解析
@@ -510,7 +502,7 @@ export class FileParser {
       return [...new Set(dependencies)]; // 去除重复项
     } catch (e) {
       if (this.options.verbose) {
-        console.warn(`Error parsing WXSS file ${filePath}: ${e}`);
+        logger.warn(`Error parsing WXSS file ${filePath}: ${e}`);
       }
       return [];
     }
@@ -570,7 +562,7 @@ export class FileParser {
 
       // 处理组件配置中的 usingComponents
       if (content.usingComponents && typeof content.usingComponents === 'object') {
-        for (const [componentName, componentPath] of Object.entries(content.usingComponents)) {
+        for (const [_componentName, componentPath] of Object.entries(content.usingComponents)) {
           if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
             // 排除插件路径 (plugin://)
 
@@ -612,7 +604,7 @@ export class FileParser {
       return [...new Set(dependencies)]; // 去除重复项
     } catch (e) {
       if (this.options.verbose) {
-        console.warn(`Error parsing JSON file ${filePath}: ${e}`);
+        logger.warn(`Error parsing JSON file ${filePath}: ${e}`);
       }
       return [];
     }
@@ -648,9 +640,7 @@ export class FileParser {
    * @returns 解析后的绝对路径，如果无法解析则返回null
    */
   private resolveAnyPath(importPath: string, sourcePath: string): string | null {
-    if (this.options.verbose) {
-      console.log(`DEBUG - Resolving any path '${importPath}' from '${sourcePath}'`);
-    }
+    logger.trace(`Resolving any path '${importPath}' from '${sourcePath}'`);
 
     // 1. Handle alias
     const isAliasPath = this.isAliasPath(importPath);
@@ -658,22 +648,16 @@ export class FileParser {
       const aliasPath = this.aliasResolver.resolve(importPath, sourcePath);
       if (aliasPath) {
         if (fs.existsSync(aliasPath)) {
-          if (this.options.verbose) {
-            console.log(`DEBUG - Successfully resolved alias to existing file: ${aliasPath}`);
-          }
+          logger.trace(`Successfully resolved alias to existing file: ${aliasPath}`);
           return aliasPath;
         } else {
-          if (this.options.verbose) {
-            console.log(
-              `DEBUG - Resolved alias path ${aliasPath} does not exist directly, attempting further resolution...`,
-            );
-          }
+          logger.trace(
+            `Resolved alias path ${aliasPath} does not exist directly, attempting further resolution...`,
+          );
           return this.resolvePath(sourcePath, aliasPath);
         }
       }
-      if (this.options.verbose) {
-        console.log(`DEBUG - Alias resolution failed for ${importPath}`);
-      }
+      logger.trace(`Alias resolution failed for ${importPath}`);
     }
 
     // 2. Handle root-relative paths (explicitly start with '/')
@@ -699,11 +683,9 @@ export class FileParser {
     //    Assume they are relative to the project root.
     const implicitRootPath = '/' + importPath; // Treat as root-relative
     const resolvedImplicitRoot = this.resolvePath(sourcePath, implicitRootPath, this.projectRoot);
-    if (this.options.verbose) {
-      console.log(
-        `DEBUG - Treating '${importPath}' as implicit root path -> '${implicitRootPath}', Resolved: ${resolvedImplicitRoot}`,
-      );
-    }
+    logger.trace(
+      `Treating '${importPath}' as implicit root path -> '${implicitRootPath}', Resolved: ${resolvedImplicitRoot}`,
+    );
     return resolvedImplicitRoot; // Return result (or null)
   }
 
@@ -731,32 +713,24 @@ export class FileParser {
         // It's an absolute system path that already includes the project root override.
         // Use it directly to avoid doubling the root.
         effectiveBasePath = relativePath;
-        if (this.options.verbose)
-          console.log(
-            `  DEBUG: Absolute path '${relativePath}' contains project root override '${projectRootOverride}', using directly.`,
-          );
+        logger.trace(
+          `Absolute path '${relativePath}' contains project root override '${projectRootOverride}', using directly.`,
+        );
       } else {
         // It's a project-root-relative path like '/pages/...' (or potentially absolute but *not* containing the override)
         effectiveBasePath = path.resolve(projectRootOverride, relativePath.substring(1));
-        if (this.options.verbose)
-          console.log(
-            `  DEBUG: Root-relative path '${relativePath}', resolving from override '${projectRootOverride}'. Base: ${effectiveBasePath}`,
-          );
+        logger.trace(
+          `Root-relative path '${relativePath}', resolving from override '${projectRootOverride}'. Base: ${effectiveBasePath}`,
+        );
       }
     } else {
       // Standard relative path (./ ../) or potentially an absolute system path without override context.
       // path.resolve handles both cases correctly relative to sourceDir.
       effectiveBasePath = path.resolve(sourceDir, relativePath);
-      if (this.options.verbose)
-        console.log(
-          `  DEBUG: Standard relative/absolute path '${relativePath}', resolving from source dir '${sourceDir}'. Base: ${effectiveBasePath}`,
-        );
+      logger.trace(
+        `Standard relative/absolute path '${relativePath}', resolving from source dir '${sourceDir}'. Base: ${effectiveBasePath}`,
+      );
     }
-
-    // console.log(`\n--- Resolving Path ---`);
-    // console.log(`  Source: ${sourcePath}`);
-    // console.log(`  Relative: ${relativePath}`);
-    // console.log(`  Base Path Input: ${basePath}`); // Log the base path calculated
 
     // If the path doesn't have an extension, try adding common ones.
     const possibleExts =
@@ -768,13 +742,11 @@ export class FileParser {
     try {
       const existsDirect = fs.existsSync(effectiveBasePath);
       const isFileDirect = existsDirect && fs.statSync(effectiveBasePath).isFile();
-      if (this.options.verbose)
-        console.log(
-          `  1. Direct Check: Exists=${existsDirect}, IsFile=${isFileDirect} -> ${effectiveBasePath}`,
-        );
+      logger.trace(
+        `Direct Check: Exists=${existsDirect}, IsFile=${isFileDirect} -> ${effectiveBasePath}`,
+      );
       if (isFileDirect) {
-        if (this.options.verbose)
-          console.log(`DEBUG - resolvePath: Found direct file: ${effectiveBasePath}`);
+        logger.trace(`resolvePath: Found direct file: ${effectiveBasePath}`);
         return effectiveBasePath;
       }
     } catch (e) {
@@ -782,19 +754,15 @@ export class FileParser {
     }
 
     // 2. Check with extensions appended (as file)
-    if (this.options.verbose) console.log(`  2. Extension Check:`);
+    logger.trace(`Extension Check:`);
     for (const ext of possibleExts) {
       const pathWithExt = effectiveBasePath + ext;
       try {
         const existsExt = fs.existsSync(pathWithExt);
         const isFileExt = existsExt && fs.statSync(pathWithExt).isFile();
-        if (this.options.verbose)
-          console.log(
-            `     - Try ${ext}: Exists=${existsExt}, IsFile=${isFileExt} -> ${pathWithExt}`,
-          );
+        logger.trace(`Try ${ext}: Exists=${existsExt}, IsFile=${isFileExt} -> ${pathWithExt}`);
         if (isFileExt) {
-          if (this.options.verbose)
-            console.log(`DEBUG - resolvePath: Found with extension: ${pathWithExt}`);
+          logger.trace(`resolvePath: Found with extension: ${pathWithExt}`);
           return pathWithExt;
         }
       } catch (e) {
@@ -802,31 +770,6 @@ export class FileParser {
       }
     }
 
-    // 3. Check if it's a directory, then look for an index file.
-    try {
-      if (fs.statSync(effectiveBasePath).isDirectory()) {
-        // console.log(`  3. Directory Check: IsDirectory=true -> ${effectiveBasePath}`);
-        for (const indexExt of possibleExts) {
-          const indexFile = path.join(effectiveBasePath, `index${indexExt}`);
-          if (fs.existsSync(indexFile) && fs.statSync(indexFile).isFile()) {
-            // console.log(`     - Found index${indexExt}: ${indexFile}`);
-            // console.log(`DEBUG - resolvePath: Found directory index: ${indexFile}`);
-            // console.log(`--- End Resolving Path ---\n`);
-            return indexFile;
-          } else {
-            // console.log(`     - Try index${indexExt}: Not found or not file.`);
-          }
-        }
-      } else {
-        // console.log(`  3. Directory Check: IsDirectory=false -> ${effectiveBasePath}`);
-      }
-    } catch (e) {
-      // Ignore errors (e.g., path doesn't exist)
-      // console.log(`  3. Directory Check: Error checking directory -> ${effectiveBasePath}`);
-    }
-
-    // console.log(`=> Path Not Resolved.`);
-    // console.log(`--- End Resolving Path ---\n`);
     return null; // Not found
   }
 }

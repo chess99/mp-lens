@@ -1,6 +1,7 @@
 export interface CommandOptions {
   project: string;
   verbose?: boolean;
+  verboseLevel?: number;
   config?: string;
 }
 
@@ -8,6 +9,7 @@ export interface AnalyzerOptions {
   fileTypes: string[];
   excludePatterns?: string[];
   verbose?: boolean;
+  verboseLevel?: number;
   essentialFiles?: string[];
   miniappRoot?: string;
   entryFile?: string;

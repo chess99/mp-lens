@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
+import { logger } from '../utils/debug-logger';
 import { DependencyGraph } from './dependency-graph';
 import { FileParser } from './file-parser';
 
@@ -20,7 +21,6 @@ export async function analyzeProject(
   const {
     fileTypes,
     excludePatterns = [],
-    verbose = false,
     essentialFiles = [],
     miniappRoot,
     entryFile,
@@ -30,25 +30,25 @@ export async function analyzeProject(
   // 确定实际的小程序根目录
   const actualRoot = miniappRoot || projectRoot;
 
-  console.log('DEBUG - Analyzer received project path:', projectRoot);
+  logger.debug('Analyzer received project path:', projectRoot);
   if (miniappRoot) {
-    console.log('DEBUG - Analyzer received miniapp root:', miniappRoot);
+    logger.debug('Analyzer received miniapp root:', miniappRoot);
   }
-  console.log('DEBUG - Using root for analysis:', actualRoot);
-  console.log('DEBUG - Analyzer received options:', JSON.stringify(options, null, 2));
-  console.log('DEBUG - File types:', fileTypes);
-  console.log('DEBUG - Exclude patterns:', excludePatterns);
+  logger.debug('Using root for analysis:', actualRoot);
+  logger.verbose('Analyzer received options:', options);
+  logger.debug('File types:', fileTypes);
+  logger.debug('Exclude patterns:', excludePatterns);
 
-  if (essentialFiles.length > 0 && verbose) {
-    console.log('DEBUG - Essential files:', essentialFiles);
-  }
-
-  if (entryFile && verbose) {
-    console.log('DEBUG - Using custom entry file:', entryFile);
+  if (essentialFiles.length > 0) {
+    logger.debug('Essential files:', essentialFiles);
   }
 
-  if (entryContent && verbose) {
-    console.log('DEBUG - Using provided entry content');
+  if (entryFile) {
+    logger.debug('Using custom entry file:', entryFile);
+  }
+
+  if (entryContent) {
+    logger.debug('Using provided entry content');
   }
 
   // 验证项目路径
@@ -59,9 +59,7 @@ export async function analyzeProject(
   // 获取所有符合条件的文件
   const allFiles = findAllFiles(actualRoot, fileTypes, excludePatterns);
 
-  if (verbose) {
-    console.log(`找到 ${allFiles.length} 个文件用于分析`);
-  }
+  logger.info(`Found ${allFiles.length} files for analysis`);
 
   // 构建依赖图
   const dependencyGraph = new DependencyGraph();
@@ -84,9 +82,7 @@ export async function analyzeProject(
         }
       }
     } catch (error) {
-      if (verbose) {
-        console.warn(`无法解析文件 ${file}: ${(error as Error).message}`);
-      }
+      logger.warn(`Unable to parse file ${file}: ${(error as Error).message}`);
     }
   }
 
@@ -156,12 +152,12 @@ function findUnusedFiles(
   const allProjectFiles = graph.nodes();
   const unusedFiles = allProjectFiles.filter((file) => !reachableFiles.has(file));
 
-  // Debugging output if needed
-  // console.log('DEBUG - All Project Files:', allProjectFiles.length);
-  // console.log('DEBUG - Entry Points:', entryPoints);
-  // console.log('DEBUG - Essential Files:', essentialFiles);
-  // console.log('DEBUG - Reachable Files:', reachableFiles.size);
-  // console.log('DEBUG - Unused Files:', unusedFiles.length);
+  // Debugging output
+  logger.verbose('All Project Files:', allProjectFiles.length);
+  logger.verbose('Entry Points:', entryPoints);
+  logger.verbose('Essential Files:', Array.from(essentialFiles));
+  logger.verbose('Reachable Files:', reachableFiles.size);
+  logger.info('Unused Files:', unusedFiles.length);
 
   return unusedFiles;
 }
@@ -182,9 +178,11 @@ function resolveEntryPoints(
     const customEntryPath = path.resolve(projectRoot, entryFileUser); // Ensure absolute path
     if (fs.existsSync(customEntryPath) && graph.hasNode(customEntryPath)) {
       entryFiles.add(customEntryPath);
-      console.log(`使用自定义入口文件: ${customEntryPath}`);
+      logger.info(`Using custom entry file: ${customEntryPath}`);
     } else {
-      console.warn(`警告: 自定义入口文件不存在或未在图中找到: ${customEntryPath}`);
+      logger.warn(
+        `Warning: Custom entry file does not exist or not found in graph: ${customEntryPath}`,
+      );
     }
   }
 
@@ -192,17 +190,19 @@ function resolveEntryPoints(
   // Only proceed if no valid custom entry file was found OR if we should always parse content
   // Current logic: Use content if custom file not found/valid
   if (entryFiles.size === 0 && entryContent) {
-    console.log('尝试从提供的入口文件内容解析入口点...');
+    logger.debug('Attempting to parse entry points from provided entry content...');
     parseEntryContent(entryContent, projectRoot, graph, entryFiles);
   }
 
   // Attempt 3: Default Mini Program entry points if still no entries found
   if (entryFiles.size === 0) {
-    console.log('未找到有效的自定义入口或内容入口, 尝试使用默认入口文件...');
+    logger.info('No custom entry points found, using default entry files...');
     findDefaultMiniprogramEntries(projectRoot, graph, entryFiles);
   }
 
   if (entryFiles.size === 0) {
+    logger.warn('警告: 未能确定任何有效的入口文件。分析可能不准确。');
+    // Keep original console.warn for backward compatibility with tests
     console.warn('警告: 未能确定任何有效的入口文件。分析可能不准确。');
   }
 
@@ -297,7 +297,7 @@ function parseEntryContent(
 
     // Handle usingComponents in app.json (global components)
     if (content.usingComponents && typeof content.usingComponents === 'object') {
-      Object.entries(content.usingComponents).forEach(([componentName, componentPath]) => {
+      Object.entries(content.usingComponents).forEach(([_componentName, componentPath]) => {
         if (typeof componentPath === 'string') {
           // First try the exact path as given
           let success = addIfExists(componentPath as string);
@@ -320,7 +320,9 @@ function parseEntryContent(
               // Try with the original path
               for (const ext of extensions) {
                 if (addIfExists(`${pathStr}${ext}`)) {
-                  console.log(`成功添加组件依赖(原始路径): ${pathStr}${ext}`);
+                  logger.info(
+                    `Successfully added component dependency (original path): ${pathStr}${ext}`,
+                  );
                   success = true;
                   break;
                 }
@@ -330,7 +332,9 @@ function parseEntryContent(
               if (!success) {
                 for (const ext of extensions) {
                   if (addIfExists(`${normalizedPath}${ext}`)) {
-                    console.log(`成功添加组件依赖(标准化路径): ${normalizedPath}${ext}`);
+                    logger.info(
+                      `Successfully added component dependency (standardized path): ${normalizedPath}${ext}`,
+                    );
                     break;
                   }
                 }
@@ -341,7 +345,7 @@ function parseEntryContent(
       });
     }
   } catch (error) {
-    console.error(`解析入口内容失败: ${(error as Error).message}`);
+    logger.error(`Failed to parse entry content: ${(error as Error).message}`);
   }
 }
 
@@ -366,7 +370,7 @@ function findDefaultMiniprogramEntries(
     const entryFilePath = path.resolve(projectRoot, entryFileName); // Use resolve for consistency
     if (fs.existsSync(entryFilePath) && graph.hasNode(entryFilePath)) {
       entryFiles.add(entryFilePath);
-      console.log(`找到并使用默认入口文件: ${entryFilePath}`);
+      logger.info(`Found and using default entry file: ${entryFilePath}`);
     }
   }
 }

@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Import package.json using require instead of ES6 import
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { version } = require('../package.json');
 
 import { cleanUnused } from './commands/clean';
@@ -12,41 +13,53 @@ import { generateGraph } from './commands/graph';
 import { listUnused } from './commands/list-unused';
 import { ConfigFileOptions } from './types/command-options';
 import { ConfigLoader } from './utils/config-loader';
+import { logger, LogLevel } from './utils/debug-logger';
 
 // Define a simpler options merging function
 async function mergeOptions(cmdOptions: any, globalOptions: any) {
-  // Resolve project path to absolute path
+  // Set up logger first with project root and verbosity
   const projectPath = globalOptions.project || process.cwd();
   const resolvedProjectPath = path.resolve(projectPath);
 
-  console.log('Original project path:', projectPath);
-  console.log('Resolved project path:', resolvedProjectPath);
-  console.log('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
+  // Configure logger with verbosity level and project root
+  if (globalOptions.trace) {
+    logger.setLevel(LogLevel.TRACE);
+  } else if (globalOptions.verboseLevel > 0) {
+    logger.setLevel(globalOptions.verboseLevel);
+  } else if (globalOptions.verbose) {
+    logger.setLevel(LogLevel.NORMAL);
+  } else {
+    logger.setLevel(LogLevel.ESSENTIAL);
+  }
+  logger.setProjectRoot(resolvedProjectPath);
+
+  // Log basic information
+  logger.info('Original project path:', projectPath);
+  logger.info('Resolved project path:', resolvedProjectPath);
+  logger.debug('Path exists?', fs.existsSync(resolvedProjectPath) ? 'Yes' : 'No');
 
   // 处理小程序根目录选项
-  let miniappRoot = globalOptions.miniappRoot || '';
+  const miniappRoot = globalOptions.miniappRoot || '';
   let resolvedMiniappRoot = resolvedProjectPath;
 
   if (miniappRoot) {
     resolvedMiniappRoot = path.resolve(resolvedProjectPath, miniappRoot);
-    console.log('Miniapp root path:', resolvedMiniappRoot);
-    console.log('Miniapp root exists?', fs.existsSync(resolvedMiniappRoot) ? 'Yes' : 'No');
+    logger.debug('Miniapp root path:', resolvedMiniappRoot);
+    logger.debug('Miniapp root exists?', fs.existsSync(resolvedMiniappRoot) ? 'Yes' : 'No');
   }
 
   // 加载配置文件
   let configOptions: ConfigFileOptions = {};
-  if (globalOptions.config || globalOptions.verbose) {
+  if (globalOptions.config || logger.getLevel() > LogLevel.ESSENTIAL) {
     try {
       const configResult = await ConfigLoader.loadConfig(globalOptions.config, resolvedProjectPath);
       if (configResult) {
         configOptions = configResult;
 
-        if (globalOptions.verbose) {
-          console.log('Loaded configuration:', JSON.stringify(configOptions, null, 2));
-        }
+        logger.debug('Loaded configuration:', configOptions);
       }
     } catch (error) {
-      console.error(chalk.yellow(`警告: 加载配置文件失败: ${(error as Error).message}`));
+      logger.warn(`Warning: Failed to load config file: ${(error as Error).message}`);
     }
   }
 
@@ -57,19 +70,21 @@ async function mergeOptions(cmdOptions: any, globalOptions: any) {
     project: resolvedProjectPath,
     miniappRoot: resolvedMiniappRoot !== resolvedProjectPath ? resolvedMiniappRoot : undefined,
     verbose: globalOptions.verbose || false,
+    verboseLevel: globalOptions.verboseLevel || 0,
     config: globalOptions.config,
     entryFile: globalOptions.entryFile || configOptions.entryFile,
   };
 
   // Make sure project field is set
-  console.log('Merged options project path:', mergedOptions.project);
+  logger.debug('Merged options project path:', mergedOptions.project);
   if (mergedOptions.miniappRoot) {
-    console.log('Merged options miniapp root:', mergedOptions.miniappRoot);
+    logger.debug('Merged options miniapp root:', mergedOptions.miniappRoot);
   }
   if (mergedOptions.entryFile) {
-    console.log('Merged options entry file:', mergedOptions.entryFile);
+    logger.debug('Merged options entry file:', mergedOptions.entryFile);
   }
 
+  logger.info('Final merged options:', mergedOptions);
   return mergedOptions;
 }
 
@@ -81,6 +96,10 @@ program
   .description('微信小程序依赖分析与清理工具')
   .option('-p, --project <path>', '指定项目的根目录', process.cwd())
   .option('-v, --verbose', '显示更详细的日志输出')
+  .option('--verbose-level <level>', '详细日志级别 (0=基本, 1=正常, 2=详细, 3=追踪)', (val) =>
+    parseInt(val, 10),
+  )
+  .option('--trace', '启用最详细的日志输出 (等同于 --verbose-level 3)')
   .option('--config <path>', '指定配置文件的路径')
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
@@ -118,23 +137,14 @@ program
     try {
       // Get global options explicitly
       const globalOptions = program.opts();
-      console.log('Global options:', JSON.stringify(globalOptions, null, 2));
-      console.log('Command options:', JSON.stringify(cmdOptions, null, 2));
 
       // Merge with command options
       const options = await mergeOptions(cmdOptions, globalOptions);
-      console.log('Final merged options:', JSON.stringify(options, null, 2));
-
-      // Debug output
-      if (options.verbose) {
-        console.log('项目路径:', options.project);
-        console.log('详细模式:', options.verbose);
-      }
 
       // Execute the command
       await listUnused(options);
     } catch (error) {
-      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      logger.error(`Command execution failed: ${(error as Error).message}`);
       if (error instanceof Error && error.stack) {
         console.error(error.stack);
       }
@@ -165,7 +175,7 @@ program
       // Execute the command
       await generateGraph(options);
     } catch (error) {
-      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      logger.error(`Command execution failed: ${(error as Error).message}`);
       process.exit(1);
     }
   });
@@ -206,14 +216,14 @@ program
       // Execute the command
       await cleanUnused(options);
     } catch (error) {
-      console.error(chalk.red(`❌ 命令执行失败: ${(error as Error).message}`));
+      logger.error(`Command execution failed: ${(error as Error).message}`);
       process.exit(1);
     }
   });
 
 // Handle invalid commands
 program.on('command:*', () => {
-  console.error(chalk.red('❌ 无效的命令: %s'), program.args.join(' '));
+  logger.error(`Invalid command: ${program.args.join(' ')}`);
   console.log(`使用 ${chalk.cyan('--help')} 查看可用命令列表.`);
   process.exit(1);
 });
