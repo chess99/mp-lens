@@ -45,10 +45,13 @@ describe('Output Formatter', () => {
     jest.clearAllMocks();
     // Configure mocks for specific test needs if necessary
     (path.relative as jest.Mock).mockImplementation((from, to) => {
-       // Ensure consistent path separators for snapshot testing
-       return to.replace(from, '').replace(/^[\/\\]/, '').replace(/\\/g, '/');
+      // Ensure consistent path separators for snapshot testing
+      return to
+        .replace(from, '')
+        .replace(/^[\/\\]/, '')
+        .replace(/\\/g, '/');
     });
-     (path.extname as jest.Mock).mockImplementation((p) => jest.requireActual('path').extname(p));
+    (path.extname as jest.Mock).mockImplementation((p) => jest.requireActual('path').extname(p));
   });
 
   describe('formatAsJson', () => {
@@ -57,15 +60,23 @@ describe('Output Formatter', () => {
     it('should return correct JSON format for multiple unused files', () => {
       const output = formatOutput(unusedFiles, options);
       const parsedOutput = JSON.parse(output);
-      
+
       // Fix timestamp before comparison
       expect(parsedOutput.timestamp).toBeDefined();
       delete parsedOutput.timestamp;
-      
+
       expect(parsedOutput).toEqual({
         unusedFiles: [
-          { absolutePath: unusedFiles[0], relativePath: 'src/components/button.wxml', type: 'wxml' },
-          { absolutePath: unusedFiles[1], relativePath: 'src/components/button.wxss', type: 'wxss' },
+          {
+            absolutePath: unusedFiles[0],
+            relativePath: 'src/components/button.wxml',
+            type: 'wxml',
+          },
+          {
+            absolutePath: unusedFiles[1],
+            relativePath: 'src/components/button.wxss',
+            type: 'wxss',
+          },
           { absolutePath: unusedFiles[2], relativePath: 'src/pages/index/index.js', type: 'js' },
           { absolutePath: unusedFiles[3], relativePath: 'src/utils/unused.ts', type: 'ts' },
           { absolutePath: unusedFiles[4], relativePath: 'assets/logo.png', type: 'png' },
@@ -88,7 +99,7 @@ describe('Output Formatter', () => {
         totalCount: 0,
       });
     });
-     
+
     it('should handle files without extensions correctly in JSON', () => {
       const filesWithNoExt = ['/path/to/project/some_file_no_ext'];
       const output = formatOutput(filesWithNoExt, options);
@@ -100,7 +111,7 @@ describe('Output Formatter', () => {
 
       expect(parsedOutput).toEqual({
         unusedFiles: [
-          { absolutePath: filesWithNoExt[0], relativePath: 'some_file_no_ext', type: '' }
+          { absolutePath: filesWithNoExt[0], relativePath: 'some_file_no_ext', type: '' },
         ],
         totalCount: 1,
       });
@@ -117,12 +128,12 @@ describe('Output Formatter', () => {
     });
 
     it('should return specific message for zero unused files', () => {
-       const output = formatOutput(emptyUnusedFiles, options);
-       // Exact match for the specific message (including mocked color tags)
-       expect(output).toBe('[green]未发现未使用的文件。[/green]');
-       expect(chalk.green).toHaveBeenCalledWith('未发现未使用的文件。');
+      const output = formatOutput(emptyUnusedFiles, options);
+      // Exact match for the specific message (including mocked color tags)
+      expect(output).toBe('[green]未发现未使用的文件。[/green]');
+      expect(chalk.green).toHaveBeenCalledWith('未发现未使用的文件。');
     });
-       
+
     it('should group files by type correctly in text output', () => {
       const unusedFiles = [
         '/path/to/project/src/components/button.wxml',
@@ -142,7 +153,7 @@ describe('Output Formatter', () => {
       expect(output).toContain('[cyan]PNG 文件 (1):\n');
       expect(output).toContain('[cyan]UNKNOWN 文件 (1):\n');
     });
-       
+
     it('should handle files without extensions correctly in text output (as UNKNOWN)', () => {
       const projectRoot = '/path/to/project';
       const options: OutputOptions = { format: 'text', projectRoot };
@@ -154,4 +165,4 @@ describe('Output Formatter', () => {
       expect(output).toMatchSnapshot(); // Keep snapshot check
     });
   });
-}); 
+});

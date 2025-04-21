@@ -13,12 +13,12 @@ export class DependencyGraph {
    */
   addNode(node: string): void {
     this._nodes.add(node);
-    
+
     // 确保每个节点都有对应的边集合
     if (!this._outEdges.has(node)) {
       this._outEdges.set(node, new Set());
     }
-    
+
     if (!this._inEdges.has(node)) {
       this._inEdges.set(node, new Set());
     }
@@ -33,7 +33,7 @@ export class DependencyGraph {
     // 确保两个节点都存在
     this.addNode(from);
     this.addNode(to);
-    
+
     // 添加边
     this._outEdges.get(from)!.add(to);
     this._inEdges.get(to)!.add(from);
@@ -133,13 +133,13 @@ export class DependencyGraph {
    */
   toJSON() {
     const nodes = this.nodes();
-    const links = nodes.flatMap(from => 
-      this.outEdges(from).map(to => ({ source: from, target: to }))
+    const links = nodes.flatMap((from) =>
+      this.outEdges(from).map((to) => ({ source: from, target: to })),
     );
-    
+
     return {
-      nodes: nodes.map(id => ({ id })),
-      links
+      nodes: nodes.map((id) => ({ id })),
+      links,
     };
   }
-} 
+}

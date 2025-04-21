@@ -14,20 +14,20 @@ interface HtmlGeneratorOptions {
  */
 export class HtmlGenerator {
   private graph: DependencyGraph;
-  
+
   constructor(graph: DependencyGraph) {
     this.graph = graph;
   }
-  
+
   /**
    * 生成HTML格式的依赖图
    */
   generate(options: HtmlGeneratorOptions): string {
     const { title, projectRoot, maxDepth, focusNode } = options;
-    
+
     // 将依赖图转换为D3可用的格式
     const graphData = this.prepareGraphData(projectRoot, maxDepth, focusNode);
-    
+
     return `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -417,39 +417,35 @@ export class HtmlGenerator {
 </html>
 `;
   }
-  
+
   /**
    * 准备用于可视化的图形数据
    */
-  private prepareGraphData(
-    projectRoot: string,
-    maxDepth?: number,
-    focusNode?: string
-  ) {
+  private prepareGraphData(projectRoot: string, maxDepth?: number, focusNode?: string) {
     // 获取所有节点和边
     const allNodes = this.graph.nodes();
     const graphData = {
       nodes: [] as any[],
-      links: [] as any[]
+      links: [] as any[],
     };
-    
+
     // 如果指定了焦点节点，则根据最大深度筛选
     if (focusNode && maxDepth !== undefined) {
       // 以焦点节点为中心，进行BFS遍历
       const includedNodes = new Set<string>();
-      const queue: Array<{node: string, depth: number}> = [];
-      
+      const queue: Array<{ node: string; depth: number }> = [];
+
       // 添加焦点节点
       includedNodes.add(focusNode);
       queue.push({ node: focusNode, depth: 0 });
-      
+
       // BFS遍历
       while (queue.length > 0) {
         const { node, depth } = queue.shift()!;
-        
+
         // 如果达到最大深度，则不继续遍历
         if (depth >= maxDepth) continue;
-        
+
         // 添加所有出边相连的节点
         for (const target of this.graph.outEdges(node)) {
           if (!includedNodes.has(target)) {
@@ -457,7 +453,7 @@ export class HtmlGenerator {
             queue.push({ node: target, depth: depth + 1 });
           }
         }
-        
+
         // 添加所有入边相连的节点
         for (const source of this.graph.inEdges(node)) {
           if (!includedNodes.has(source)) {
@@ -466,12 +462,12 @@ export class HtmlGenerator {
           }
         }
       }
-      
+
       // 根据筛选结果构建图形数据
       for (const node of includedNodes) {
         graphData.nodes.push(this.createNodeObject(node, projectRoot, node === focusNode));
       }
-      
+
       // 添加边
       for (const node of includedNodes) {
         for (const target of this.graph.outEdges(node)) {
@@ -479,60 +475,54 @@ export class HtmlGenerator {
             graphData.links.push({
               source: node,
               target,
-              highlighted: node === focusNode || target === focusNode
+              highlighted: node === focusNode || target === focusNode,
             });
           }
         }
       }
     } else {
       // 没有焦点节点或深度限制，使用全部图
-      graphData.nodes = allNodes.map(node => 
-        this.createNodeObject(node, projectRoot, focusNode === node)
+      graphData.nodes = allNodes.map((node) =>
+        this.createNodeObject(node, projectRoot, focusNode === node),
       );
-      
+
       for (const source of allNodes) {
         for (const target of this.graph.outEdges(source)) {
           graphData.links.push({
             source,
             target,
-            highlighted: focusNode && (source === focusNode || target === focusNode)
+            highlighted: focusNode && (source === focusNode || target === focusNode),
           });
         }
       }
     }
-    
+
     return graphData;
   }
-  
+
   /**
    * 创建节点对象
    */
-  private createNodeObject(
-    nodePath: string,
-    projectRoot: string,
-    highlighted: boolean
-  ) {
+  private createNodeObject(nodePath: string, projectRoot: string, highlighted: boolean) {
     const relativePath = path.relative(projectRoot, nodePath);
     const ext = path.extname(nodePath);
     const basename = path.basename(nodePath);
-    
+
     // 确定节点类型
     let type = '';
-    if (nodePath.includes('/components/') || 
-        nodePath.includes('\\components\\')) {
+    if (nodePath.includes('/components/') || nodePath.includes('\\components\\')) {
       type = 'component';
-    } else if (nodePath.includes('/pages/') || 
-               nodePath.includes('\\pages\\')) {
+    } else if (nodePath.includes('/pages/') || nodePath.includes('\\pages\\')) {
       type = 'page';
     } else if (ext === '.wxs') {
       type = 'wxs';
     }
-    
+
     return {
       id: nodePath,
       label: relativePath,
       type,
-      highlighted
+      highlighted,
     };
   }
-} 
+}

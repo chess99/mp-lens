@@ -30,17 +30,17 @@ export class AliasResolver {
     // 尝试从不同来源加载别名
     const foundTsConfig = this.loadFromTsConfig();
     const foundCustomConfig = this.loadFromCustomConfig();
-    
+
     if (foundTsConfig && this.projectRoot) {
       console.log(`已从tsconfig.json加载别名配置，项目路径: ${this.projectRoot}`);
     }
-    
+
     if (foundCustomConfig && this.projectRoot) {
       console.log(`已从mp-analyzer.config.json加载别名配置，项目路径: ${this.projectRoot}`);
     }
 
     this.initialized = true;
-    
+
     // 如果至少找到一个来源的别名配置，返回true
     return foundTsConfig || foundCustomConfig;
   }
@@ -63,32 +63,41 @@ export class AliasResolver {
     for (const [alias, targets] of Object.entries(this.aliases)) {
       // 别名必须以 @ 或字母开头，后面跟 / 或没有其他字符
       const aliasPattern = new RegExp(`^${alias}(/|$)`);
-      
+
       if (aliasPattern.test(importPath)) {
         // 找到了匹配的别名
         console.log(`DEBUG - Found matching alias: ${alias} => ${targets.join(' or ')}`);
-        
+
         for (const target of targets) {
           // 替换别名为目标路径
           // target is now potentially an absolute path from tsconfig or relative from custom config
-          const resolvedBase = path.isAbsolute(target) 
-                               ? target 
-                               : path.resolve(this.projectRoot, target);
-                               
+          const resolvedBase = path.isAbsolute(target)
+            ? target
+            : path.resolve(this.projectRoot, target);
+
           const remainingPath = importPath.replace(aliasPattern, '$1').slice(1); // Get the part after alias/, e.g., 'components/button'
           const absolutePath = path.join(resolvedBase, remainingPath);
-          
+
           console.log(`DEBUG - Trying resolved path: ${absolutePath}`);
-          
+
           // 如果路径存在，直接返回
           if (fs.existsSync(absolutePath)) {
             console.log(`DEBUG - Path exists, returning: ${absolutePath}`);
-            
+
             // 检查是否是目录，如果是，尝试查找index文件
             try {
               if (fs.statSync(absolutePath).isDirectory()) {
                 console.log(`DEBUG - Path is a directory, checking for index files`);
-                const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
+                const possibleExts = [
+                  '.js',
+                  '.ts',
+                  '.tsx',
+                  '.jsx',
+                  '.json',
+                  '.wxml',
+                  '.wxss',
+                  '.wxs',
+                ];
                 for (const ext of possibleExts) {
                   const indexPath = path.join(absolutePath, `index${ext}`);
                   console.log(`DEBUG - Trying index file: ${indexPath}`);
@@ -101,11 +110,11 @@ export class AliasResolver {
             } catch (error) {
               console.warn(`Error checking if path is directory: ${(error as Error).message}`);
             }
-            
+
             // 如果不是目录或目录中没有找到index文件，返回路径本身
             return absolutePath;
           }
-          
+
           // 处理没有扩展名的情况，尝试添加常见的扩展名
           const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
           for (const ext of possibleExts) {
@@ -118,7 +127,7 @@ export class AliasResolver {
             }
           }
         }
-        
+
         console.log(`DEBUG - Could not resolve alias ${alias} to a valid file path`);
       }
     }
@@ -134,24 +143,24 @@ export class AliasResolver {
   private loadFromTsConfig(): boolean {
     // 首先尝试在项目根目录查找
     let tsconfigPath = path.join(this.projectRoot, 'tsconfig.json');
-    
+
     // 如果根目录没有，可能在上级目录
     if (!fs.existsSync(tsconfigPath)) {
       // 尝试向上查找，最多向上3级
       let currentDir = this.projectRoot;
       let found = false;
-      
+
       for (let i = 0; i < 3; i++) {
         currentDir = path.dirname(currentDir);
         const testPath = path.join(currentDir, 'tsconfig.json');
-        
+
         if (fs.existsSync(testPath)) {
           tsconfigPath = testPath;
           found = true;
           break;
         }
       }
-      
+
       if (!found) {
         return false;
       }
@@ -165,21 +174,23 @@ export class AliasResolver {
         const tsconfigDir = path.dirname(tsconfigPath);
         const baseUrl = tsconfig.compilerOptions.baseUrl || '.';
         const baseDir = path.resolve(tsconfigDir, baseUrl);
-        
+
         console.log(`tsconfig.json的baseUrl: ${baseUrl}, 解析为: ${baseDir}`);
-        
+
         for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
           // 处理 paths 中的通配符模式 (如 "@/*" => ["src/*"])
           const normalizedAlias = alias.replace(/\/\*$/, ''); // e.g., '@'
-          
-          this.aliases[normalizedAlias] = (targets as string[]).map(target => {
+
+          this.aliases[normalizedAlias] = (targets as string[]).map((target) => {
             const targetPath = target.replace(/\/\*$/, ''); // e.g., 'src'
-            
+
             // 总是解析为绝对路径
             const absoluteTargetPath = path.resolve(baseDir, targetPath);
-            console.log(`DEBUG - Mapping alias '${normalizedAlias}' target '${target}' -> '${absoluteTargetPath}'`);
+            console.log(
+              `DEBUG - Mapping alias '${normalizedAlias}' target '${target}' -> '${absoluteTargetPath}'`,
+            );
             return absoluteTargetPath;
-            
+
             // --- 旧逻辑: 存储相对路径 ---
             // // 如果目标路径是绝对路径，直接使用；否则相对于baseDir解析
             // if (path.isAbsolute(targetPath)) {
@@ -190,14 +201,14 @@ export class AliasResolver {
             // --- 结束旧逻辑 ---
           });
         }
-        
+
         console.log('从tsconfig.json加载的别名:', JSON.stringify(this.aliases, null, 2));
         return Object.keys(this.aliases).length > 0;
       }
     } catch (error) {
       console.warn(`无法解析 tsconfig.json: ${(error as Error).message}`);
     }
-    
+
     return false;
   }
 
@@ -216,18 +227,18 @@ export class AliasResolver {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       if (config.aliases && typeof config.aliases === 'object') {
         const initialAliasCount = Object.keys(this.aliases).length;
-        
+
         for (const [alias, targets] of Object.entries(config.aliases)) {
           this.aliases[alias] = Array.isArray(targets) ? targets : [targets as string];
         }
-        
+
         // 检查是否添加了新的别名
         return Object.keys(this.aliases).length > initialAliasCount;
       }
     } catch (error) {
       console.warn(`无法解析 mp-analyzer.config.json: ${(error as Error).message}`);
     }
-    
+
     return false;
   }
 
@@ -240,4 +251,4 @@ export class AliasResolver {
     }
     return this.aliases;
   }
-} 
+}

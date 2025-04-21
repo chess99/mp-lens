@@ -4,10 +4,7 @@ import { DependencyGraph } from './analyzer/dependency-graph';
 import { DotGenerator } from './visualizer/dot-generator';
 import { HtmlGenerator } from './visualizer/html-generator';
 
-export {
-    analyzeProject,
-    DependencyGraph, DotGenerator, HtmlGenerator
-};
+export { analyzeProject, DependencyGraph, DotGenerator, HtmlGenerator };
 
 // 在直接引入包时提供用法说明
 if (require.main === module) {
@@ -21,4 +18,4 @@ if (require.main === module) {
   console.log('');
   console.log('使用 --help 查看帮助信息:');
   console.log('  npx mp-analyzer --help');
-} 
+}

@@ -60,13 +60,13 @@ jest.mock('../../src/analyzer/dependency-graph', () => ({
     mockGraphOutEdgesStore = {};
     return {
       addNode: jest.fn((node: string) => {
-          mockAddNode(node); // Call spy
-          if (!mockGraphNodesStore.includes(node)) mockGraphNodesStore.push(node);
+        mockAddNode(node); // Call spy
+        if (!mockGraphNodesStore.includes(node)) mockGraphNodesStore.push(node);
       }),
       addEdge: jest.fn((from: string, to: string) => {
-          mockAddEdge(from, to); // Call spy
-          if (!mockGraphOutEdgesStore[from]) mockGraphOutEdgesStore[from] = [];
-          if (!mockGraphOutEdgesStore[from].includes(to)) mockGraphOutEdgesStore[from].push(to);
+        mockAddEdge(from, to); // Call spy
+        if (!mockGraphOutEdgesStore[from]) mockGraphOutEdgesStore[from] = [];
+        if (!mockGraphOutEdgesStore[from].includes(to)) mockGraphOutEdgesStore[from].push(to);
       }),
       // Ensure methods used by findReachableFiles are mocked correctly
       nodes: jest.fn(() => {
@@ -78,8 +78,8 @@ jest.mock('../../src/analyzer/dependency-graph', () => ({
         return mockGraphOutEdgesStore[node] || []; // Return current mock state
       }),
       hasNode: jest.fn((node: string) => {
-          mockHasNode(node); // Call spy
-          return mockGraphNodesStore.includes(node); // Check current mock state
+        mockHasNode(node); // Call spy
+        return mockGraphNodesStore.includes(node); // Check current mock state
       }),
       // Mock other methods if needed
       inDegree: jest.fn().mockReturnValue(0), // Example default mock
@@ -107,17 +107,17 @@ describe('analyzeProject', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Default mocks
     mockFs.existsSync.mockReturnValue(true); // Assume project root exists by default
     mockGlob.sync.mockReturnValue([]); // Default: no files found
     mockParseFile.mockResolvedValue([]); // Default: files have no dependencies
-    
+
     // Reset console spies
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {}); 
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {}); 
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); 
-      
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     // Reset path mocks specifically for resolve to use actual implementation by default
     mockPath.resolve.mockImplementation((...args) => actualPath.resolve(...args));
     // Other path methods are already calling actual implementations via the mock setup
@@ -137,26 +137,26 @@ describe('analyzeProject', () => {
         // Add others if needed by specific tests
       ];
       if (defaultFiles.includes(resolvedP)) {
-          // console.log('DEBUG existsSync TRUE for:', resolvedP);
-          return true;
+        // console.log('DEBUG existsSync TRUE for:', resolvedP);
+        return true;
       }
       // console.log('DEBUG existsSync FALSE for:', resolvedP);
       return false; // Default to false unless explicitly mocked otherwise in a test
     });
   });
-    
-   afterEach(() => {
-     consoleLogSpy.mockRestore();
-     consoleWarnSpy.mockRestore();
-     consoleErrorSpy.mockRestore();
-   });
+
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
 
   it('should throw error if project root does not exist', async () => {
-    mockFs.existsSync.mockImplementation(p => p !== projectRoot); // Project root doesn't exist
-    
-    await expect(analyzeProject(projectRoot, defaultOptions))
-      .rejects
-      .toThrow(`小程序目录不存在: ${projectRoot}`);
+    mockFs.existsSync.mockImplementation((p) => p !== projectRoot); // Project root doesn't exist
+
+    await expect(analyzeProject(projectRoot, defaultOptions)).rejects.toThrow(
+      `小程序目录不存在: ${projectRoot}`,
+    );
     expect(mockFs.existsSync).toHaveBeenCalledWith(projectRoot);
   });
 
@@ -167,16 +167,16 @@ describe('analyzeProject', () => {
     };
     const expectedGlobPattern = `**/*.{.js,.wxss}`;
     const expectedIgnore = [
-        '**/node_modules/**', 
-        '**/miniprogram_npm/**',
-        '**/output/dependency-graph.*',
-        '**/output/unused-files.*',
-        'dependency-graph.*',
-        'unused-files.*',
-        '**/dist/**',
-        '**/ignored/**',
-        'specific-file.js'
-      ];
+      '**/node_modules/**',
+      '**/miniprogram_npm/**',
+      '**/output/dependency-graph.*',
+      '**/output/unused-files.*',
+      'dependency-graph.*',
+      'unused-files.*',
+      '**/dist/**',
+      '**/ignored/**',
+      'specific-file.js',
+    ];
 
     await analyzeProject(projectRoot, options);
 
@@ -196,7 +196,7 @@ describe('analyzeProject', () => {
     const allFiles = [fileA, fileB, fileC];
 
     // Set up existsSync for these specific files + defaults
-    mockFs.existsSync.mockImplementation(p => {
+    mockFs.existsSync.mockImplementation((p) => {
       const resolvedP = actualPath.resolve(p as string);
       if (resolvedP === actualPath.resolve(projectRoot)) return true;
       if (resolvedP === actualPath.resolve(projectRoot, 'app.js')) return true;
@@ -205,18 +205,18 @@ describe('analyzeProject', () => {
     });
 
     mockGlob.sync.mockReturnValue(allFiles);
-    
+
     // Mock dependencies returned by parser
     mockParseFile.mockImplementation(async (filePath) => {
-        const resolvedPath = actualPath.resolve(filePath);
-        if (resolvedPath === fileA) return [fileB]; // A depends on B
-        if (resolvedPath === fileB) return [fileC, fileD]; // B depends on C and D (D is outside allFiles)
-        if (resolvedPath === fileC) return []; // C has no deps
-        return [];
+      const resolvedPath = actualPath.resolve(filePath);
+      if (resolvedPath === fileA) return [fileB]; // A depends on B
+      if (resolvedPath === fileB) return [fileC, fileD]; // B depends on C and D (D is outside allFiles)
+      if (resolvedPath === fileC) return []; // C has no deps
+      return [];
     });
 
     // Mock graph methods to reflect the added nodes/edges
-    mockHasNode.mockImplementation(node => allFiles.includes(actualPath.resolve(node)));
+    mockHasNode.mockImplementation((node) => allFiles.includes(actualPath.resolve(node)));
 
     const { dependencyGraph, unusedFiles } = await analyzeProject(projectRoot, defaultOptions);
 
@@ -234,7 +234,12 @@ describe('analyzeProject', () => {
     expect(mockGraphOutEdgesStore[fileA]).toContain(fileB);
     expect(mockGraphOutEdgesStore[fileB]).toContain(fileC);
     expect(mockGraphOutEdgesStore[fileB]).not.toContain(fileD); // D was not in allFiles
-    expect(Object.keys(mockGraphOutEdgesStore).reduce((sum, key) => sum + mockGraphOutEdgesStore[key].length, 0)).toBe(2);
+    expect(
+      Object.keys(mockGraphOutEdgesStore).reduce(
+        (sum, key) => sum + mockGraphOutEdgesStore[key].length,
+        0,
+      ),
+    ).toBe(2);
 
     // Verify spies on graph methods were called
     expect(mockAddNode).toHaveBeenCalledWith(fileA);
@@ -255,44 +260,44 @@ describe('analyzeProject', () => {
     const allFiles = [appJs, appJson, pageA, pageB, utilC, unusedD, projConf];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    
+
     // Mock existsSync: all files in `allFiles` exist
-    mockFs.existsSync.mockImplementation(p => 
-        p === projectRoot || allFiles.includes(actualPath.resolve(p as string))
+    mockFs.existsSync.mockImplementation(
+      (p) => p === projectRoot || allFiles.includes(actualPath.resolve(p as string)),
     );
 
     // Mock parseFile to setup dependency chain: app.js -> pageA -> utilC
     mockParseFile.mockImplementation(async (filePath) => {
-        const resolvedPath = actualPath.resolve(filePath);
-        if (resolvedPath === appJs) return [pageA];
-        // app.json parsing logic is now in analyzer, not parser, so mock it as having no *code* deps
-        if (resolvedPath === appJson) return []; 
-        if (resolvedPath === pageA) return [utilC];
-        // pageB, utilC, unusedD, projConf have no dependencies
-        return [];
+      const resolvedPath = actualPath.resolve(filePath);
+      if (resolvedPath === appJs) return [pageA];
+      // app.json parsing logic is now in analyzer, not parser, so mock it as having no *code* deps
+      if (resolvedPath === appJson) return [];
+      if (resolvedPath === pageA) return [utilC];
+      // pageB, utilC, unusedD, projConf have no dependencies
+      return [];
     });
 
     // Configure graph mock based on expected state AFTER parsing
     mockGraphNodesStore = [...allFiles]; // All files are nodes
     mockGraphOutEdgesStore = {
-        [appJs]: [pageA],
-        [pageA]: [utilC],
-        // others have no outgoing edges based on mockParseFile
+      [appJs]: [pageA],
+      [pageA]: [utilC],
+      // others have no outgoing edges based on mockParseFile
     };
     // Mock hasNode to reflect the nodes added
     // Ensure paths are resolved consistently for comparison
-    const nodeSet = new Set(mockGraphNodesStore.map(p => actualPath.resolve(p)));
-    mockHasNode.mockImplementation(node => nodeSet.has(actualPath.resolve(node)));
+    const nodeSet = new Set(mockGraphNodesStore.map((p) => actualPath.resolve(p)));
+    mockHasNode.mockImplementation((node) => nodeSet.has(actualPath.resolve(node)));
 
     const { unusedFiles } = await analyzeProject(projectRoot, defaultOptions);
 
-    // Expected Reachable: 
+    // Expected Reachable:
     // - Entries: app.js, app.json (defaults found)
-    // - Essentials: projConf, app.json 
+    // - Essentials: projConf, app.json
     // - Traversed: pageA (from app.js), utilC (from pageA)
     // Set: { appJs, appJson, projConf, pageA, utilC }
     // Expected Unused: pageB, unusedD
-    
+
     expect(unusedFiles).toHaveLength(2);
     expect(unusedFiles).toEqual(expect.arrayContaining([pageB, unusedD]));
     expect(unusedFiles).not.toContain(appJs);
@@ -310,8 +315,8 @@ describe('analyzeProject', () => {
     const allFiles = [customEntry, dep1, unused1, appJs];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    mockFs.existsSync.mockImplementation(p => 
-        p === projectRoot || allFiles.includes(actualPath.resolve(p as string))
+    mockFs.existsSync.mockImplementation(
+      (p) => p === projectRoot || allFiles.includes(actualPath.resolve(p as string)),
     );
     mockParseFile.mockImplementation(async (filePath) => {
       const resolvedPath = actualPath.resolve(filePath);
@@ -324,8 +329,8 @@ describe('analyzeProject', () => {
     mockGraphOutEdgesStore = { [customEntry]: [dep1] };
     // Mock hasNode to reflect the nodes added
     // Ensure paths are resolved consistently for comparison
-    const nodeSetCustom = new Set(mockGraphNodesStore.map(p => actualPath.resolve(p)));
-    mockHasNode.mockImplementation(node => nodeSetCustom.has(actualPath.resolve(node)));
+    const nodeSetCustom = new Set(mockGraphNodesStore.map((p) => actualPath.resolve(p)));
+    mockHasNode.mockImplementation((node) => nodeSetCustom.has(actualPath.resolve(node)));
 
     const options: AnalyzerOptions = { ...defaultOptions, entryFile: 'custom/entry.js' };
     const { unusedFiles } = await analyzeProject(projectRoot, options);
@@ -343,9 +348,11 @@ describe('analyzeProject', () => {
     const allFiles = [appJs, essentialUser, unused1];
 
     mockGlob.sync.mockReturnValue(allFiles);
-    mockFs.existsSync.mockImplementation(p => 
-        p === projectRoot || allFiles.includes(actualPath.resolve(p as string)) 
-        || actualPath.resolve(p as string) === actualPath.resolve(projectRoot, 'app.json') // assume app.json also exists
+    mockFs.existsSync.mockImplementation(
+      (p) =>
+        p === projectRoot ||
+        allFiles.includes(actualPath.resolve(p as string)) ||
+        actualPath.resolve(p as string) === actualPath.resolve(projectRoot, 'app.json'), // assume app.json also exists
     );
     mockParseFile.mockResolvedValue([]); // No dependencies from files
 
@@ -354,8 +361,8 @@ describe('analyzeProject', () => {
     mockGraphOutEdgesStore = {};
     // Mock hasNode to reflect the nodes added
     // Ensure paths are resolved consistently for comparison
-    const nodeSetEssential = new Set(mockGraphNodesStore.map(p => actualPath.resolve(p)));
-    mockHasNode.mockImplementation(node => nodeSetEssential.has(actualPath.resolve(node)));
+    const nodeSetEssential = new Set(mockGraphNodesStore.map((p) => actualPath.resolve(p)));
+    mockHasNode.mockImplementation((node) => nodeSetEssential.has(actualPath.resolve(node)));
 
     const options: AnalyzerOptions = { ...defaultOptions, essentialFiles: ['config/custom.json'] };
     const { unusedFiles } = await analyzeProject(projectRoot, options);
@@ -374,50 +381,50 @@ describe('analyzeProject', () => {
     const unused1 = actualPath.resolve(projectRoot, 'unused.js');
     const tabBarIcon = actualPath.resolve(projectRoot, 'images/icon.png');
     const appJsonPath = actualPath.resolve(projectRoot, 'app.json');
-    
+
     // Define all files for this test
     const allFiles = [page1, page2, comp1, unused1, tabBarIcon, appJsonPath];
-    
+
     // Configure the mock file system
     mockGlob.sync.mockReturnValue(allFiles);
-    
+
     // Setup parseFile mock to return empty deps for simplicity
     mockParseFile.mockResolvedValue([]);
-    
+
     // Configure graph mocks
     mockGraphNodesStore = [...allFiles];
     mockGraphOutEdgesStore = {};
     const nodeSet = new Set(mockGraphNodesStore);
-    mockHasNode.mockImplementation(node => nodeSet.has(node));
-    
+    mockHasNode.mockImplementation((node) => nodeSet.has(node));
+
     // Mock app.json content that makes specific files reachable
     const entryContentData = {
-        pages: ['pages/page1', 'pages/page2'],
-        usingComponents: {
-            'my-comp': '/components/comp1/index' // Needs extension resolution
-        },
-        tabBar: {
-            list: [
-                { pagePath: 'pages/page1', text: 'Page 1', iconPath: 'images/icon.png' },
-                { pagePath: 'pages/page2', text: 'Page 2' }
-            ]
-        }
+      pages: ['pages/page1', 'pages/page2'],
+      usingComponents: {
+        'my-comp': '/components/comp1/index', // Needs extension resolution
+      },
+      tabBar: {
+        list: [
+          { pagePath: 'pages/page1', text: 'Page 1', iconPath: 'images/icon.png' },
+          { pagePath: 'pages/page2', text: 'Page 2' },
+        ],
+      },
     };
 
     const options: AnalyzerOptions = {
-        ...defaultOptions,
-        // Provide an invalid entryFile path so it falls back to entryContent
-        entryFile: 'nonexistent/entry.js',
-        entryContent: entryContentData
+      ...defaultOptions,
+      // Provide an invalid entryFile path so it falls back to entryContent
+      entryFile: 'nonexistent/entry.js',
+      entryContent: entryContentData,
     };
-    
+
     // Make sure the nonexistent entry file doesn't exist but all other files do
-    mockFs.existsSync.mockImplementation(p => {
-        const resolvedP = actualPath.resolve(p as string);
-        // Don't let the entry file exist
-        if (resolvedP === actualPath.resolve(projectRoot, options.entryFile!)) return false;
-        // But let other files in our test exist
-        return p === projectRoot || allFiles.includes(resolvedP);
+    mockFs.existsSync.mockImplementation((p) => {
+      const resolvedP = actualPath.resolve(p as string);
+      // Don't let the entry file exist
+      if (resolvedP === actualPath.resolve(projectRoot, options.entryFile!)) return false;
+      // But let other files in our test exist
+      return p === projectRoot || allFiles.includes(resolvedP);
     });
 
     const { unusedFiles } = await analyzeProject(projectRoot, options);
@@ -438,13 +445,13 @@ describe('analyzeProject', () => {
 
     mockGlob.sync.mockReturnValue(allFiles);
     // No default entries exist, no custom entry, no content
-    mockFs.existsSync.mockImplementation(p => {
-        const resolvedP = actualPath.resolve(p as string);
-        if (resolvedP === actualPath.resolve(projectRoot)) return true;
-        if (resolvedP === file1) return true;
-        // Ensure default entries DON'T exist
-        if (['app.js', 'app.json', 'app.ts'].includes(actualPath.basename(resolvedP))) return false;
-        return false;
+    mockFs.existsSync.mockImplementation((p) => {
+      const resolvedP = actualPath.resolve(p as string);
+      if (resolvedP === actualPath.resolve(projectRoot)) return true;
+      if (resolvedP === file1) return true;
+      // Ensure default entries DON'T exist
+      if (['app.js', 'app.json', 'app.ts'].includes(actualPath.basename(resolvedP))) return false;
+      return false;
     });
     mockParseFile.mockResolvedValue([]);
 
@@ -453,8 +460,8 @@ describe('analyzeProject', () => {
     mockGraphOutEdgesStore = {};
     // Mock hasNode to reflect the nodes added
     // Ensure paths are resolved consistently for comparison
-    const nodeSetNone = new Set(mockGraphNodesStore.map(p => actualPath.resolve(p)));
-    mockHasNode.mockImplementation(node => nodeSetNone.has(actualPath.resolve(node)));
+    const nodeSetNone = new Set(mockGraphNodesStore.map((p) => actualPath.resolve(p)));
+    mockHasNode.mockImplementation((node) => nodeSetNone.has(actualPath.resolve(node)));
 
     const { unusedFiles } = await analyzeProject(projectRoot, defaultOptions);
 
@@ -462,7 +469,9 @@ describe('analyzeProject', () => {
     // Expected Unused: file1
     expect(unusedFiles).toHaveLength(1);
     expect(unusedFiles).toEqual([file1]);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('未能确定任何有效的入口文件'));
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('未能确定任何有效的入口文件'),
+    );
   });
 
   // Add more tests for edge cases:
@@ -471,4 +480,4 @@ describe('analyzeProject', () => {
   // - Complex dependency chains
   // - Aliases (might need more setup for AliasResolver mock)
   // - miniappRoot option usage
-}); 
+});

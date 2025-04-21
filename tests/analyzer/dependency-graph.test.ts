@@ -54,7 +54,7 @@ describe('DependencyGraph', () => {
       expect(graph.hasEdge('d.js', 'a.js')).toBe(true);
       expect(graph.hasEdge('b.js', 'a.js')).toBe(false); // Check non-existent edge
       expect(graph.hasEdge('c.js', 'a.js')).toBe(false);
-      
+
       // Check node was added
       expect(graph.hasNode('d.js')).toBe(true);
       expect(graph.nodeCount).toBe(4);
@@ -72,11 +72,11 @@ describe('DependencyGraph', () => {
     it('should return correct out-edges and out-degree', () => {
       graph.addEdge('a.js', 'b.js');
       graph.addEdge('a.js', 'c.js');
-      
+
       expect(graph.outEdges('a.js')).toEqual(expect.arrayContaining(['b.js', 'c.js']));
       expect(graph.outEdges('b.js')).toEqual([]);
       expect(graph.outEdges('nonexistent.js')).toEqual([]);
-      
+
       expect(graph.outDegree('a.js')).toBe(2);
       expect(graph.outDegree('b.js')).toBe(0);
       expect(graph.outDegree('nonexistent.js')).toBe(0);
@@ -89,7 +89,7 @@ describe('DependencyGraph', () => {
       expect(graph.inEdges('c.js')).toEqual(expect.arrayContaining(['a.js', 'b.js']));
       expect(graph.inEdges('a.js')).toEqual([]);
       expect(graph.inEdges('nonexistent.js')).toEqual([]);
-      
+
       expect(graph.inDegree('c.js')).toBe(2);
       expect(graph.inDegree('a.js')).toBe(0);
       expect(graph.inDegree('nonexistent.js')).toBe(0);
@@ -106,21 +106,20 @@ describe('DependencyGraph', () => {
 
       const json = graph.toJSON();
 
-      expect(json.nodes).toEqual(expect.arrayContaining([
-        { id: 'a.js' },
-        { id: 'b.js' },
-        { id: 'c.js' },
-        { id: 'd.js' }
-      ]));
+      expect(json.nodes).toEqual(
+        expect.arrayContaining([{ id: 'a.js' }, { id: 'b.js' }, { id: 'c.js' }, { id: 'd.js' }]),
+      );
       // Order of nodes might vary, so check length
       expect(json.nodes).toHaveLength(4);
 
-      expect(json.links).toEqual(expect.arrayContaining([
-        { source: 'a.js', target: 'b.js' },
-        { source: 'a.js', target: 'c.js' },
-        { source: 'b.js', target: 'c.js' }
-      ]));
-       // Order of links might vary, so check length
+      expect(json.links).toEqual(
+        expect.arrayContaining([
+          { source: 'a.js', target: 'b.js' },
+          { source: 'a.js', target: 'c.js' },
+          { source: 'b.js', target: 'c.js' },
+        ]),
+      );
+      // Order of links might vary, so check length
       expect(json.links).toHaveLength(3);
     });
 
@@ -130,5 +129,4 @@ describe('DependencyGraph', () => {
       expect(json.links).toEqual([]);
     });
   });
-
-}); 
+});

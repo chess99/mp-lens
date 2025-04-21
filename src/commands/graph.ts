@@ -8,18 +8,8 @@ import { GraphOptions } from '../types/command-options';
  * 生成依赖关系图
  */
 export async function generateGraph(options: GraphOptions): Promise<void> {
-  const { 
-    project, 
-    verbose, 
-    format, 
-    output, 
-    depth, 
-    focus, 
-    npm,
-    miniappRoot,
-    entryFile
-  } = options;
-  
+  const { project, verbose, format, output, depth, focus, npm, miniappRoot, entryFile } = options;
+
   if (verbose) {
     console.log(chalk.blue('🔍 开始分析项目依赖关系...'));
     console.log(`项目路径: ${project}`);
@@ -27,61 +17,73 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
       console.log(`小程序根目录: ${miniappRoot}`);
     }
     console.log(`输出格式: ${format}`);
-    
+
     if (output) {
       console.log(`输出文件: ${output}`);
     }
-    
+
     if (depth !== undefined) {
       console.log(`依赖深度限制: ${depth}`);
     }
-    
+
     if (focus) {
       console.log(`聚焦文件: ${focus}`);
     }
-    
+
     if (entryFile) {
       console.log(`入口文件: ${entryFile}`);
     }
-    
+
     console.log(`包含npm依赖: ${npm ? '是' : '否'}`);
   }
 
   try {
     // 获取所有支持的文件类型
-    const fileTypes = ['js', 'ts', 'wxml', 'wxss', 'json', 'wxs', 'png', 'jpg', 'jpeg', 'gif', 'svg'];
-    
+    const fileTypes = [
+      'js',
+      'ts',
+      'wxml',
+      'wxss',
+      'json',
+      'wxs',
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'svg',
+    ];
+
     // 设置排除规则
     const excludePatterns: string[] = [];
     if (!npm) {
       excludePatterns.push('**/node_modules/**', '**/miniprogram_npm/**');
     }
-    
+
     // 分析项目依赖
     const { dependencyGraph } = await analyzeProject(project, {
       fileTypes,
       excludePatterns,
       verbose,
       miniappRoot,
-      entryFile
+      entryFile,
     });
-    
+
     // 获取图数据
     const graphData = dependencyGraph.toJSON();
-    
+
     // 处理聚焦
     if (focus) {
       const focusPath = path.resolve(project, focus);
       // 处理聚焦逻辑...
       console.log(`聚焦于文件: ${focusPath}`);
     }
-    
+
     // 处理深度限制
     if (depth !== undefined && depth >= 0) {
       // 实现深度限制逻辑...
       console.log(`限制依赖深度为: ${depth}`);
     }
-    
+
     // 渲染可视化
     let outputContent = '';
     switch (format) {
@@ -104,7 +106,7 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
       default:
         throw new Error(`不支持的输出格式: ${format}`);
     }
-    
+
     // 写入文件或输出到控制台
     if (output) {
       fs.writeFileSync(output, outputContent);
@@ -121,7 +123,6 @@ export async function generateGraph(options: GraphOptions): Promise<void> {
         console.log(outputContent);
       }
     }
-    
   } catch (error) {
     console.error(chalk.red(`❌ 生成依赖图失败: ${(error as Error).message}`));
     throw error;
@@ -167,20 +168,20 @@ function renderDOT(graphData: any): string {
   // 简化的DOT语言模板
   let dot = 'digraph DependencyGraph {\n';
   dot += '  node [shape=box];\n\n';
-  
+
   // 添加节点
   for (const node of graphData.nodes) {
     const label = path.basename(node.id);
     dot += `  "${node.id}" [label="${label}"];\n`;
   }
-  
+
   dot += '\n';
-  
+
   // 添加边
   for (const link of graphData.links) {
     dot += `  "${link.source}" -> "${link.target}";\n`;
   }
-  
+
   dot += '}\n';
   return dot;
-} 
+}

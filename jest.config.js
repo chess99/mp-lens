@@ -18,9 +18,9 @@ module.exports = {
       {
         // ts-jest configuration options go here
         // Example: specify tsconfig if not standardly named or located
-        // tsconfig: 'tsconfig.test.json' 
-      }
-    ]
+        // tsconfig: 'tsconfig.test.json'
+      },
+    ],
   },
   // Optional: module name mapper for aliases (if needed and not handled by tsconfig paths)
   // moduleNameMapper: {
@@ -28,4 +28,4 @@ module.exports = {
   // },
   // Optional: setup files to run before each test file
   // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-}; 
+};

@@ -12,7 +12,10 @@ export class ConfigLoader {
    * @param projectRoot 项目根目录
    * @returns 配置对象或null（未找到配置文件）
    */
-  static async loadConfig(configPath?: string, projectRoot: string = process.cwd()): Promise<ConfigFileOptions | null> {
+  static async loadConfig(
+    configPath?: string,
+    projectRoot: string = process.cwd(),
+  ): Promise<ConfigFileOptions | null> {
     // 如果提供了具体的配置文件路径，直接尝试加载
     if (configPath) {
       return this.loadConfigFile(path.resolve(projectRoot, configPath));
@@ -22,7 +25,7 @@ export class ConfigLoader {
     const possibleConfigs = [
       'mp-analyzer.config.js',
       'mp-analyzer.config.ts',
-      'mp-analyzer.config.json'
+      'mp-analyzer.config.json',
     ];
 
     // 从项目根目录查找配置文件
@@ -89,12 +92,12 @@ export class ConfigLoader {
 
       // 动态导入JavaScript配置文件
       const config = require(absolutePath);
-      
+
       // 如果配置导出为函数，则执行它
       if (typeof config === 'function') {
         return await config();
       }
-      
+
       // 处理ES模块导出（有default属性）
       if (config && config.default) {
         if (typeof config.default === 'function') {
@@ -102,7 +105,7 @@ export class ConfigLoader {
         }
         return config.default;
       }
-      
+
       return config;
     } catch (error) {
       console.error(`加载JavaScript配置文件失败: ${(error as Error).message}`);
@@ -120,19 +123,19 @@ export class ConfigLoader {
       try {
         // 直接引用ts-node模块
         const tsNode = require('ts-node');
-        
+
         tsNode.register({
           transpileOnly: true,
           compilerOptions: {
-            module: 'commonjs'
-          }
+            module: 'commonjs',
+          },
         });
       } catch (e) {
         const tsNodeError = e as Error;
         console.error(`加载TypeScript配置需要安装ts-node: ${tsNodeError.message}`);
         return null;
       }
-      
+
       // 使用与JavaScript相同的加载逻辑
       return this.loadJavaScriptConfig(filePath);
     } catch (error) {
@@ -140,4 +143,4 @@ export class ConfigLoader {
       return null;
     }
   }
-} 
+}

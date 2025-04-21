@@ -19,7 +19,7 @@ coverage/
 
 # IDE / Editor directories
 .idea/
-.vscode/
+# .vscode/
 *.swp
 *.swo
 .DS_Store
