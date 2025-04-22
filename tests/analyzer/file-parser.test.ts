@@ -29,10 +29,17 @@ const mockAliasInitialize = jest.fn();
 jest.mock('../../src/utils/alias-resolver', () => {
   return {
     AliasResolver: jest.fn().mockImplementation((projectRoot) => {
-      // console.log(`Mock AliasResolver instantiated with root: ${projectRoot}`);
       return {
-        initialize: mockAliasInitialize.mockReturnValue(false), // Default: no alias config found
-        resolve: mockAliasResolve,
+        // Default mocks can be overridden in tests
+        initialize: mockAliasInitialize.mockReturnValue(false),
+        // mockAliasResolve should now return the potential base path, NOT the final resolved file
+        resolve: mockAliasResolve.mockImplementation((importPath: string, sourceFile: string) => {
+          // Default mock implementation returns null
+          // Tests should override this mock to return a potential base path
+          // e.g., if importPath is '@/utils/helper' and alias is '@' => 'src',
+          // this mock (when overridden) should return '/workspace/test-project/src/utils/helper'
+          return null;
+        }),
         getAliases: mockGetAliases.mockReturnValue({}),
       };
     }),
@@ -420,413 +427,553 @@ describe('FileParser', () => {
         actualPath.resolve(projectRoot, 'pages/nonexistent.js'),
       ); // WX path check
     });
+
+    it('should resolve aliases correctly for JS/TS imports', async () => {
+      const filePath = 'src/pages/home.js';
+      const fileContent = `
+        import Helper from '@/utils/helper'; // Expect .js or .ts
+        const config = require('~config/settings'); // Expect .json
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // --- Mock Alias Setup ---
+      const aliasMap = {
+        '@': [actualPath.resolve(projectRoot, 'src')], // Absolute path for @
+        '~config': ['configs'], // Relative path for ~config
+      };
+      mockAliasInitialize.mockReturnValue(true); // Indicate alias config exists
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      // Configure mockAliasResolve to return potential BASE paths
+      mockAliasResolve.mockImplementation((importPath: string, _sourceFile: string) => {
+        if (importPath === '@/utils/helper') {
+          // AliasResolver should return the base path without extension
+          return actualPath.resolve(projectRoot, 'src/utils/helper');
+        }
+        if (importPath === '~config/settings') {
+          // AliasResolver should return the base path without extension
+          return actualPath.resolve(projectRoot, 'configs/settings');
+        }
+        return null;
+      });
+      // --- End Alias Mock Setup ---
+
+      // --- Mock File System Setup ---
+      // Define the files that actually exist
+      const helperPath = 'src/utils/helper.ts'; // The actual file for the first import
+      const helperWxmlPath = 'src/utils/helper.wxml'; // A competing file type
+      const settingsPath = 'configs/settings.json'; // The actual file for the second import
+
+      mockPathExists([helperPath, helperWxmlPath, settingsPath]);
+      // --- End File System Mock Setup ---
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // --- Assertions ---
+      expect(dependencies).toHaveLength(2);
+      // Check that the *correct* files were resolved based on allowed extensions for JS
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, helperPath)); // Should resolve to .ts
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, settingsPath)); // Should resolve to .json
+      // Verify that the competing .wxml file was NOT included
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, helperWxmlPath));
+
+      // Verify AliasResolver.resolve was called correctly
+      expect(mockAliasResolve).toHaveBeenCalledWith(
+        '@/utils/helper',
+        actualPath.resolve(projectRoot, filePath),
+      );
+      expect(mockAliasResolve).toHaveBeenCalledWith(
+        '~config/settings',
+        actualPath.resolve(projectRoot, filePath),
+      );
+    });
+
+    it('should handle index file resolution for aliases in JS', async () => {
+      const filePath = 'src/app.js';
+      const fileContent = `import Button from '@/components/button';`;
+      mockFileContent(filePath, fileContent);
+
+      const aliasMap = { '@': [actualPath.resolve(projectRoot, 'src')] };
+      mockAliasInitialize.mockReturnValue(true);
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      // mockAliasResolve returns the base directory path from the alias
+      const buttonBaseDir = actualPath.resolve(projectRoot, 'src/components/button');
+      mockAliasResolve.mockImplementation((importPath: string) => {
+        if (importPath === '@/components/button') return buttonBaseDir;
+        return null;
+      });
+
+      // Mock the directory and the index file existence
+      const buttonIndexFile = 'src/components/button/index.js';
+      mockPathExists(buttonBaseDir, 'dir'); // Mock the directory itself
+      mockPathExists(buttonIndexFile); // Mock the index.js file within it
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, buttonIndexFile));
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/components/button', expect.any(String));
+    });
+
+    // Add more JS tests: non-existent paths, type imports, etc.
   });
 
   // --- WXML Parsing Tests ---
   describe('parseWXML', () => {
-    it('should parse <import>, <include>, <wxs>, and image src attributes', async () => {
-      const filePath = 'pages/home/home.wxml';
+    it('should parse <import> and <include> tags with relative paths', async () => {
+      const filePath = 'src/pages/user/profile.wxml';
       const fileContent = `
-        <import src="../template/header.wxml"/>
-        <include src='/template/footer.wxml'/> <!-- Leading slash -->
-        <wxs src="../../utils/tools.wxs" module="tools"></wxs>
-        <image src="../../assets/logo.png"></image>
-        <image src="/static/images/banner.jpg"></image>
-        <image src="@/assets/icon.svg"></image> <!-- Alias path -->
+        <import src="../../components/header.wxml"/>
+        <include src="./user_info.wxml" />
+        <import src="/templates/footer"/> <!-- Root path, no extension -->
       `;
       mockFileContent(filePath, fileContent);
 
-      const headerPath = 'pages/template/header.wxml';
-      const footerPath = 'template/footer.wxml'; // Relative to project root due to leading slash
-      const toolsPath = 'utils/tools.wxs';
-      const logoPath = 'assets/logo.png';
-      const bannerPath = 'static/images/banner.jpg'; // Relative to project root
-      const iconPath = 'src/assets/icon.svg'; // Resolved alias
-      const absIconPath = actualPath.resolve(projectRoot, iconPath);
+      const headerPath = 'src/components/header.wxml';
+      const userInfoPath = 'src/pages/user/user_info.wxml';
+      const footerPath = 'templates/footer.wxml'; // Assume .wxml exists for root path
 
-      // 输出测试设置信息
-      console.log('Test setup - parseWXML paths:');
-      console.log('filePath:', filePath);
-      console.log('headerPath:', headerPath);
-      console.log('footerPath:', footerPath);
-      console.log('toolsPath:', toolsPath);
-      console.log('logoPath:', logoPath);
-      console.log('bannerPath:', bannerPath);
-      console.log('iconPath:', iconPath);
-
-      // Mock AliasResolver for the image path
-      mockAliasInitialize.mockReturnValue(true);
-      mockAliasResolve.mockImplementation((p) => {
-        console.log('mockAliasResolve called with:', p);
-        return p === '@/assets/icon.svg' ? absIconPath : null;
-      });
-      parser = new FileParser(projectRoot, { fileTypes: ['.wxml'] }); // Recreate parser with alias config
-
-      // Mock file existence
-      mockPathExists([headerPath, footerPath, toolsPath, logoPath, bannerPath, iconPath]);
+      mockPathExists([headerPath, userInfoPath, footerPath]);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      // Log final dependencies for debugging
-      // console.log('Final deps for parseWXML/src:', dependencies);
-
-      expect(dependencies).toHaveLength(6);
+      expect(dependencies).toHaveLength(3);
       expect(dependencies).toEqual(
         expect.arrayContaining([
           actualPath.resolve(projectRoot, headerPath),
+          actualPath.resolve(projectRoot, userInfoPath),
           actualPath.resolve(projectRoot, footerPath),
-          actualPath.resolve(projectRoot, toolsPath),
-          actualPath.resolve(projectRoot, logoPath),
-          actualPath.resolve(projectRoot, bannerPath),
-          absIconPath,
         ]),
       );
-      expect(mockAliasResolve).toHaveBeenCalledWith('@/assets/icon.svg', expect.any(String));
+      expect(mockAliasResolve).not.toHaveBeenCalled();
     });
 
-    it('should parse custom component dependencies via usingComponents in corresponding .json', async () => {
-      const wxmlPath = 'pages/user/user.wxml';
-      const jsonPath = 'pages/user/user.json';
-      const wxmlContent = `
-        <view>User Page</view>
-        <user-profile data="{{userInfo}}"></user-profile>
-        <component-lib.avatar src="{{avatarUrl}}"></component-lib.avatar> 
-        <another-comp></another-comp> 
+    it('should parse <wxs> tags with relative src', async () => {
+      const filePath = 'src/pages/index/index.wxml';
+      const fileContent = `<wxs src="../../utils/formatter.wxs" module="fmt" />`;
+      mockFileContent(filePath, fileContent);
+
+      const wxsPath = 'src/utils/formatter.wxs';
+      mockPathExists(wxsPath);
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, wxsPath));
+      expect(mockAliasResolve).not.toHaveBeenCalled();
+    });
+
+    it('should parse <image> tags with relative and root src (excluding URLs/data)', async () => {
+      const filePath = 'src/components/card/card.wxml';
+      const fileContent = `
+        <image src="../../assets/logo.png"></image>
+        <image src="/static/icons/default.svg"></image>
+        <image src="{{dynamic_image}}"></image>
+        <image src="http://example.com/remote.jpg"></image>
+        <image src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="></image>
       `;
-      const jsonContent = JSON.stringify({
-        component: true,
-        usingComponents: {
-          'user-profile': '../../components/profile/profile', // Relative path
-          'component-lib.avatar': 'plugin://myPlugin/avatar', // Plugin path - should be ignored by parser
-          'another-comp': '/components/common/another', // Root path
-          'unused-comp': 'components/unused', // Defined but not used in WXML (still a dependency)
-        },
+      mockFileContent(filePath, fileContent);
+
+      const logoPath = 'src/assets/logo.png';
+      const iconPath = 'static/icons/default.svg';
+
+      mockPathExists([logoPath, iconPath]);
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      expect(dependencies).toHaveLength(2);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, logoPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, iconPath));
+      expect(mockAliasResolve).not.toHaveBeenCalled();
+    });
+
+    it('should resolve aliases correctly for WXML imports/includes/wxs', async () => {
+      const filePath = 'src/pages/product/detail.wxml';
+      const fileContent = `
+        <import src="@/templates/common/price"/> <!-- Alias, no extension -->
+        <wxs src="@/common/filters" module="f"></wxs> <!-- Alias, no extension -->
+        <image src="@assets/placeholder"></image> <!-- Alias, no extension -->
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // --- Mock Alias Setup ---
+      const aliasMap = {
+        '@': [actualPath.resolve(projectRoot, 'src')],
+        '@assets': [actualPath.resolve(projectRoot, 'src/assets')],
+      };
+      mockAliasInitialize.mockReturnValue(true);
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      // Configure mockAliasResolve to return potential BASE paths (no extension)
+      const priceBasePath = actualPath.resolve(projectRoot, 'src/templates/common/price');
+      const filterBasePath = actualPath.resolve(projectRoot, 'src/common/filters');
+      const placeholderBasePath = actualPath.resolve(projectRoot, 'src/assets/placeholder');
+
+      mockAliasResolve.mockImplementation((importPath: string) => {
+        if (importPath === '@/templates/common/price') return priceBasePath;
+        if (importPath === '@/common/filters') return filterBasePath;
+        if (importPath === '@assets/placeholder') return placeholderBasePath;
+        return null;
       });
+      // --- End Alias Mock Setup ---
 
-      mockFileContent(wxmlPath, wxmlContent);
-      mockFileContent(jsonPath, jsonContent);
+      // --- Mock File System Setup ---
+      // Define the actual files that exist
+      const pricePath = 'src/templates/common/price.wxml'; // The expected import target
+      const filterPath = 'src/common/filters.wxs'; // The expected wxs target
+      const placeholderPath = 'src/assets/placeholder.jpg'; // The expected image target (assume jpg)
+      const competingJsPath = 'src/templates/common/price.js'; // Should NOT be picked for <import>
+      const competingWxmlPath = 'src/assets/placeholder.wxml'; // Should NOT be picked for <image>
 
-      // Paths for the first component (profile)
-      const profileCompBase = 'components/profile/profile';
-      const profileCompJs = profileCompBase + '.js';
-      const profileCompWxml = profileCompBase + '.wxml';
-      const profileCompJson = profileCompBase + '.json';
-      // Paths for the second component (another)
-      const anotherCompBase = 'components/common/another'; // Resolved from root path '/'
-      const anotherCompTs = anotherCompBase + '.ts';
-      const anotherCompWxml = anotherCompBase + '.wxml';
-      // Paths for the third component (unused)
-      const unusedCompBase = 'components/unused';
-      const unusedCompWxss = unusedCompBase + '.wxss';
+      mockPathExists([pricePath, filterPath, placeholderPath, competingJsPath, competingWxmlPath]);
+      // --- End File System Mock Setup ---
 
-      // Mock existence of components' files (assuming some exist)
-      mockPathExists([
-        jsonPath, // The .json file itself must exist
-        profileCompJs,
-        profileCompWxml,
-        profileCompJson,
-        anotherCompTs,
-        anotherCompWxml,
-        unusedCompWxss,
-      ]);
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      // Log mocked paths specifically for this test
-      console.log('usingComponents Test - Mocked Paths:', Array.from(mockedExistingPaths).sort());
+      // --- Assertions ---
+      // FileParser should have called resolveAnyPath with correct context-specific extensions
+      expect(dependencies).toHaveLength(3);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, pricePath)); // import -> .wxml
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, filterPath)); // wxs -> .wxs
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, placeholderPath)); // image -> .jpg
+      // Verify competing files were NOT included
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingJsPath));
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingWxmlPath));
 
-      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, wxmlPath));
-
-      // Log final dependencies for debugging
-      // console.log('Final deps for parseWXML/usingComponents:', dependencies);
-
-      // Should include all files associated with components found in usingComponents, except plugin paths
-      expect(dependencies).toHaveLength(6); // 3 for profile, 2 for another, 1 for unused
-      expect(dependencies).toEqual(
-        expect.arrayContaining([
-          // profile component files
-          actualPath.resolve(projectRoot, profileCompJs),
-          actualPath.resolve(projectRoot, profileCompWxml),
-          actualPath.resolve(projectRoot, profileCompJson),
-          // another component files
-          actualPath.resolve(projectRoot, anotherCompTs),
-          actualPath.resolve(projectRoot, anotherCompWxml),
-          // unused component files
-          actualPath.resolve(projectRoot, unusedCompWxss),
-        ]),
-      );
-      // Verify the json was read
-      expect(mockFs.readFileSync).toHaveBeenCalledWith(
-        actualPath.resolve(projectRoot, jsonPath),
-        'utf-8',
-      );
+      // Verify AliasResolver.resolve was called with the original alias paths
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/templates/common/price', expect.any(String));
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/common/filters', expect.any(String));
+      expect(mockAliasResolve).toHaveBeenCalledWith('@assets/placeholder', expect.any(String));
     });
 
-    it('should handle case where corresponding .json file does not exist or is invalid', async () => {
-      const wxmlPath = 'pages/simple/simple.wxml';
-      const jsonPath = 'pages/simple/simple.json';
-      const wxmlContent = `<my-comp></my-comp>`; // Has custom component usage
-      mockFileContent(wxmlPath, wxmlContent);
-
-      // Mock that the .json file does NOT exist
-      mockPathExists([wxmlPath]);
-      const absJsonPath = actualPath.resolve(projectRoot, jsonPath);
-      // Manipulate the global mock set directly for this test case
-      mockedExistingPaths.delete(absJsonPath);
-
-      let dependencies = await parser.parseFile(actualPath.resolve(projectRoot, wxmlPath));
-      expect(dependencies).toHaveLength(0);
-      // Verify readFileSync was not called for the (non-existent) JSON
-      expect(mockFs.readFileSync).not.toHaveBeenCalledWith(absJsonPath, 'utf-8');
-
-      // Mock that the .json exists but is invalid
-      jest.clearAllMocks(); // Clear mocks to reset existsSync behavior
-      // Re-mock basic existence needed for the second part
-      mockedExistingPaths = new Set<string>(); // Reset state
-      mockedStats = new Map<string, Partial<fs.Stats>>();
-      mockedFileContents = new Map<string, string>();
-      mockPathExists([wxmlPath, jsonPath]); // Now JSON exists
-      mockFileContent(wxmlPath, wxmlContent); // Need WXML content again
-      mockFileContent(jsonPath, 'invalid json content'); // Set invalid content
-
-      dependencies = await parser.parseFile(actualPath.resolve(projectRoot, wxmlPath));
-      expect(dependencies).toHaveLength(0); // Should not find component deps if JSON is invalid
-    });
+    // REMOVED processCustomComponents tests as the logic was removed
   });
 
   // --- WXSS Parsing Tests ---
   describe('parseWXSS', () => {
-    it('should parse @import statements and url() paths', async () => {
-      const filePath = 'styles/main.wxss';
+    it('should parse @import statements with relative paths', async () => {
+      const filePath = 'src/styles/theme.wxss';
       const fileContent = `
         @import "./base.wxss";
-        @import '/common/theme.wxss'; /* Root path */
-        @import '@/mixins/responsive.wxss'; /* Alias path */
-
-        .background {
-          background-image: url(../assets/bg.png);
-        }
-        .icon {
-          background: url("/static/icons/icon.svg") no-repeat;
-        }
-        .logo {
-          content: url(@/assets/logo.jpg);
-        }
+        @import "../components/button.wxss";
+        @import "/static/fonts.wxss"; /* Root path */
       `;
       mockFileContent(filePath, fileContent);
 
-      const basePath = 'styles/base.wxss';
-      const themePath = 'common/theme.wxss'; // From root
-      const mixinPath = 'src/mixins/responsive.wxss'; // Resolved alias
-      const bgPath = 'assets/bg.png';
-      const iconPath = 'static/icons/icon.svg'; // From root
-      const logoPath = 'src/assets/logo.jpg'; // Resolved alias
-      const absMixinPath = actualPath.resolve(projectRoot, mixinPath);
-      const absLogoPath = actualPath.resolve(projectRoot, logoPath);
+      const basePath = 'src/styles/base.wxss';
+      const buttonPath = 'src/components/button.wxss';
+      const fontPath = 'static/fonts.wxss';
 
-      // Mock AliasResolver
-      mockAliasInitialize.mockReturnValue(true);
-      mockAliasResolve.mockImplementation((p) => {
-        if (p === '@/mixins/responsive.wxss') return absMixinPath;
-        if (p === '@/assets/logo.jpg') return absLogoPath;
-        return null;
-      });
-      parser = new FileParser(projectRoot, { fileTypes: ['.wxss'] });
-
-      // Mock file existence
-      mockPathExists([basePath, themePath, mixinPath, bgPath, iconPath, logoPath]);
+      mockPathExists([basePath, buttonPath, fontPath]);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      expect(dependencies).toHaveLength(6);
+      expect(dependencies).toHaveLength(3);
       expect(dependencies).toEqual(
         expect.arrayContaining([
           actualPath.resolve(projectRoot, basePath),
-          actualPath.resolve(projectRoot, themePath),
-          absMixinPath,
-          actualPath.resolve(projectRoot, bgPath),
-          actualPath.resolve(projectRoot, iconPath),
-          absLogoPath,
+          actualPath.resolve(projectRoot, buttonPath),
+          actualPath.resolve(projectRoot, fontPath),
         ]),
       );
-      expect(mockAliasResolve).toHaveBeenCalledTimes(2); // Called for the two alias paths
+      expect(mockAliasResolve).not.toHaveBeenCalled();
     });
 
-    it('should not return dependencies if @import or url() targets do not exist', async () => {
-      const filePath = 'styles/empty.wxss';
+    it('should parse url() references (excluding http/data)', async () => {
+      const filePath = 'src/app.wxss';
       const fileContent = `
-         @import "./nonexistent.wxss";
-         .error { background: url(../nonexistent.png); }
-       `;
+        .logo { background: url('/assets/logo.png'); }
+        .icon { background-image: url("./icons/home.svg"); }
+        .external { background: url(https://example.com/bg.jpg); }
+        .inline { background: url('data:image/png;base64,abc'); }
+      `;
       mockFileContent(filePath, fileContent);
-      mockPathExists([]); // Nothing exists
+
+      const logoPath = 'assets/logo.png';
+      const iconPath = 'src/icons/home.svg'; // Relative to app.wxss
+
+      mockPathExists([logoPath, iconPath]);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      expect(dependencies).toHaveLength(0);
-      // Check that existsSync was called for the base paths (without extensions initially)
-      expect(mockFs.existsSync).toHaveBeenCalledWith(
-        actualPath.resolve(projectRoot, 'styles/nonexistent.wxss'),
-      );
-      // For url(), the relative path ../nonexistent.png resolves to /workspace/test-project/nonexistent.png
-      expect(mockFs.existsSync).toHaveBeenCalledWith(
-        actualPath.resolve(projectRoot, 'nonexistent.png'),
-      );
+      expect(dependencies).toHaveLength(2);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, logoPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, iconPath));
+      expect(mockAliasResolve).not.toHaveBeenCalled();
+    });
+
+    it('should resolve aliases correctly for WXSS @import and url()', async () => {
+      const filePath = 'src/pages/settings/page.wxss';
+      const fileContent = `
+        @import "@/styles/mixins"; /* Alias, no extension -> .wxss */
+        .background { background: url('~assets/backgrounds/main'); } /* Alias, no extension -> image */
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // --- Mock Alias Setup ---
+      const aliasMap = {
+        '@': [actualPath.resolve(projectRoot, 'src')],
+        '~assets': ['assets'], // Relative alias
+      };
+      mockAliasInitialize.mockReturnValue(true);
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      // Configure mockAliasResolve to return potential BASE paths
+      const mixinsBasePath = actualPath.resolve(projectRoot, 'src/styles/mixins');
+      const bgBasePath = actualPath.resolve(projectRoot, 'assets/backgrounds/main');
+
+      mockAliasResolve.mockImplementation((importPath: string) => {
+        if (importPath === '@/styles/mixins') return mixinsBasePath;
+        if (importPath === '~assets/backgrounds/main') return bgBasePath;
+        return null;
+      });
+      // --- End Alias Mock Setup ---
+
+      // --- Mock File System Setup ---
+      const mixinsPath = 'src/styles/mixins.wxss'; // Expected for @import
+      const bgPath = 'assets/backgrounds/main.png'; // Expected for url()
+      const competingMixinJs = 'src/styles/mixins.js'; // Should not be picked
+      const competingBgWxml = 'assets/backgrounds/main.wxml'; // Should not be picked
+
+      mockPathExists([mixinsPath, bgPath, competingMixinJs, competingBgWxml]);
+      // --- End File System Mock Setup ---
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // --- Assertions ---
+      expect(dependencies).toHaveLength(2);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, mixinsPath)); // @import -> .wxss
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, bgPath)); // url() -> .png
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingMixinJs));
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingBgWxml));
+
+      // Verify AliasResolver.resolve was called with the original alias paths
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/styles/mixins', expect.any(String));
+      expect(mockAliasResolve).toHaveBeenCalledWith('~assets/backgrounds/main', expect.any(String));
     });
   });
 
   // --- JSON Parsing Tests ---
   describe('parseJSON', () => {
-    it('should parse "pages" and "subpackages" (app.json style)', async () => {
-      const filePath = 'app.json';
-      const fileContent = JSON.stringify({
-        pages: ['pages/index/index', 'pages/logs/logs'],
-        subpackages: [
-          {
-            root: 'packageA',
-            pages: ['pages/feature1/feature1', 'pages/feature2/feature2'],
-          },
-          {
-            root: 'packageB',
-            pages: ['pages/feature3/feature3'],
-          },
-        ],
-      });
-      mockFileContent(filePath, fileContent);
-
-      const indexJs = 'pages/index/index.js';
-      const indexWxml = 'pages/index/index.wxml';
-      const logsJson = 'pages/logs/logs.json';
-      const feature1Ts = 'packageA/pages/feature1/feature1.ts';
-      const feature1Wxml = 'packageA/pages/feature1/feature1.wxml';
-      const feature2Js = 'packageA/pages/feature2/feature2.js';
-      const feature3Wxss = 'packageB/pages/feature3/feature3.wxss';
-
-      // Mock existence of page/subpackage files
-      mockPathExists([
-        indexJs,
-        indexWxml,
-        logsJson,
-        feature1Ts,
-        feature1Wxml,
-        feature2Js,
-        feature3Wxss,
-      ]);
-
-      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
-
-      // Should find all related files for each page entry
-      expect(dependencies).toHaveLength(7);
-      expect(dependencies).toEqual(
-        expect.arrayContaining([
-          actualPath.resolve(projectRoot, indexJs),
-          actualPath.resolve(projectRoot, indexWxml),
-          actualPath.resolve(projectRoot, logsJson),
-          actualPath.resolve(projectRoot, feature1Ts),
-          actualPath.resolve(projectRoot, feature1Wxml),
-          actualPath.resolve(projectRoot, feature2Js),
-          actualPath.resolve(projectRoot, feature3Wxss),
-        ]),
-      );
-    });
-
-    it('should parse "usingComponents" (component.json style)', async () => {
-      const filePath = 'components/my-comp/my-comp.json';
+    it('should parse usingComponents with relative and root paths', async () => {
+      const filePath = 'src/components/complex/comp.json';
       const fileContent = JSON.stringify({
         component: true,
         usingComponents: {
-          'inner-comp': './inner/inner-comp',
-          'shared-util': '@/utils/shared', // Alias
-          'plugin-button': 'plugin://myPlugin/button', // Ignore plugin
+          header: './header', // Relative, no extension
+          footer: '/components/common/footer', // Root, no extension
+          icon: '../../core/icon/icon.js', // Relative with extension
         },
       });
       mockFileContent(filePath, fileContent);
 
-      const innerCompBase = 'components/my-comp/inner/inner-comp';
-      const innerCompJs = innerCompBase + '.js';
-      const innerCompWxml = innerCompBase + '.wxml';
-      const sharedUtilBase = 'src/utils/shared'; // Resolved alias
-      const sharedUtilTs = sharedUtilBase + '.ts';
-      const absSharedUtilPath = actualPath.resolve(projectRoot, sharedUtilBase + '.ts');
+      // Define actual existing files
+      const headerCompPath = 'src/components/complex/header.wxml'; // Assume wxml exists
+      const footerCompPath = 'components/common/footer.json'; // Assume json exists
+      const iconCompPath = 'src/core/icon/icon.js';
+      // Add related files (these should also be added by the parser)
+      const headerJsonPath = 'src/components/complex/header.json';
+      const footerWxmlPath = 'components/common/footer.wxml';
 
-      // Mock AliasResolver
-      mockAliasInitialize.mockReturnValue(true);
-      mockAliasResolve.mockImplementation((p) =>
-        p === '@/utils/shared' ? absSharedUtilPath.replace(/\.ts$/, '') : null,
-      ); // Resolve alias base path
-      parser = new FileParser(projectRoot, { fileTypes: ['.json'] });
-
-      // Mock file existence
-      mockPathExists([innerCompJs, innerCompWxml, sharedUtilTs]);
+      mockPathExists([
+        headerCompPath,
+        footerCompPath,
+        iconCompPath,
+        headerJsonPath,
+        footerWxmlPath,
+      ]);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      expect(dependencies).toHaveLength(3); // 2 for inner-comp, 1 for shared-util
-      expect(dependencies).toEqual(
-        expect.arrayContaining([
-          actualPath.resolve(projectRoot, innerCompJs),
-          actualPath.resolve(projectRoot, innerCompWxml),
-          absSharedUtilPath, // Resolved alias path with extension
-        ]),
+      // Expecting resolved path + related files
+      expect(dependencies).toHaveLength(5);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, headerCompPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, headerJsonPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, footerCompPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, footerWxmlPath));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, iconCompPath));
+      expect(mockAliasResolve).not.toHaveBeenCalled();
+    });
+
+    it('should parse app.json specific fields (pages, subpackages, tabBar)', async () => {
+      const filePath = 'app.json'; // Assume at project root
+      const fileContent = JSON.stringify({
+        pages: ['pages/index/index', 'pages/user/user'],
+        subPackages: [
+          {
+            root: 'modules/moduleA',
+            pages: ['views/view1', 'views/view2'],
+          },
+        ],
+        tabBar: {
+          list: [
+            {
+              pagePath: 'pages/index/index',
+              text: 'Home',
+              iconPath: 'assets/tab/home.png',
+              selectedIconPath: 'assets/tab/home_active.png',
+            },
+            {
+              pagePath: 'pages/user/user',
+              text: 'User',
+              iconPath: '/static/icons/user.svg', // Root path
+            },
+          ],
+        },
+      });
+      mockFileContent(filePath, fileContent);
+
+      // Mock existence of related files (assuming .js is the primary file)
+      mockPathExists([
+        'pages/index/index.js',
+        'pages/index/index.wxml',
+        'pages/user/user.js',
+        'pages/user/user.wxss',
+        'modules/moduleA/views/view1.js',
+        'modules/moduleA/views/view2.js',
+        'assets/tab/home.png',
+        'assets/tab/home_active.png',
+        'static/icons/user.svg',
+      ]);
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // Check that all related files are included
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'pages/index/index.js'));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'pages/index/index.wxml')); // Related file
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'pages/user/user.js'));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'pages/user/user.wxss')); // Related file
+      expect(dependencies).toContain(
+        actualPath.resolve(projectRoot, 'modules/moduleA/views/view1.js'),
       );
-      expect(mockAliasResolve).toHaveBeenCalledWith('@/utils/shared', expect.any(String));
+      expect(dependencies).toContain(
+        actualPath.resolve(projectRoot, 'modules/moduleA/views/view2.js'),
+      );
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'assets/tab/home.png'));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'assets/tab/home_active.png'));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, 'static/icons/user.svg'));
+      expect(dependencies).toHaveLength(9); // Ensure no extras
+      expect(mockAliasResolve).not.toHaveBeenCalled();
     });
 
-    it('should return empty array for JSON without relevant fields or invalid JSON', async () => {
-      const filePath = 'data.json';
-      // Valid JSON, but no relevant fields
-      mockFileContent(filePath, JSON.stringify({ name: 'test', value: 123 }));
-      let dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
-      expect(dependencies).toHaveLength(0);
+    it('should resolve aliases correctly for usingComponents', async () => {
+      const filePath = 'src/pages/cart/cart.json';
+      const fileContent = JSON.stringify({
+        component: true,
+        usingComponents: {
+          'item-card': '@/components/item-card', // Alias, no ext
+          overlay: '~common/overlay/index', // Alias, maps to index file
+        },
+      });
+      mockFileContent(filePath, fileContent);
 
-      // Invalid JSON
-      mockFileContent(filePath, 'invalid json content');
-      dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
-      expect(dependencies).toHaveLength(0);
-      // Should not throw, just return empty
+      // --- Mock Alias Setup ---
+      const aliasMap = {
+        '@': [actualPath.resolve(projectRoot, 'src')],
+        '~common': ['common-components'], // Relative alias
+      };
+      mockAliasInitialize.mockReturnValue(true);
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      const itemCardBasePath = actualPath.resolve(projectRoot, 'src/components/item-card');
+      const overlayBasePath = actualPath.resolve(projectRoot, 'common-components/overlay/index');
+
+      mockAliasResolve.mockImplementation((importPath: string) => {
+        if (importPath === '@/components/item-card') return itemCardBasePath;
+        if (importPath === '~common/overlay/index') return overlayBasePath;
+        return null;
+      });
+      // --- End Alias Setup ---
+
+      // --- Mock File System ---
+      // item-card component exists as item-card.js (+ related)
+      const itemCardJs = 'src/components/item-card.js';
+      const itemCardWxml = 'src/components/item-card.wxml';
+      // overlay component exists as index.ts in the directory (+ related)
+      const overlayDir = 'common-components/overlay';
+      const overlayIndexTs = 'common-components/overlay/index.ts';
+      const overlayIndexJson = 'common-components/overlay/index.json';
+      const competingItemCardJson = 'src/components/item-card.json'; // Doesn't exist
+
+      mockPathExists([itemCardJs, itemCardWxml, overlayIndexTs, overlayIndexJson]);
+      mockPathExists(overlayDir, 'dir'); // Mock the directory for index lookup
+      // --- End File System ---
+
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // --- Assertions ---
+      // Allowed extensions for components: .js, .ts, .json, .wxml
+      expect(dependencies).toHaveLength(4); // item-card.js, item-card.wxml, overlay/index.ts, overlay/index.json
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, itemCardJs));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, itemCardWxml));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, overlayIndexTs));
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, overlayIndexJson));
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingItemCardJson));
+
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/components/item-card', expect.any(String));
+      expect(mockAliasResolve).toHaveBeenCalledWith('~common/overlay/index', expect.any(String));
     });
+
+    // Add tests for componentGenerics if needed
   });
 
   // --- WXS Parsing Tests ---
   describe('parseWXS', () => {
-    it('should parse require statements in WXS files', async () => {
-      const filePath = 'utils/filter.wxs';
-      const fileContent = `
-        var common = require('./common.wxs');
-        var config = require("../config.wxs");
-        module.exports = { /* ... */ };
-      `;
+    it('should parse require() statements with relative paths', async () => {
+      const filePath = 'src/utils/tools.wxs';
+      const fileContent = `var math = require("./math.wxs"); module.exports = {};`;
       mockFileContent(filePath, fileContent);
 
-      const commonPath = 'utils/common.wxs';
-      const configPath = 'config.wxs';
-
-      // Mock existence
-      mockPathExists([commonPath, configPath]);
+      const mathPath = 'src/utils/math.wxs';
+      mockPathExists(mathPath);
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
-      expect(dependencies).toHaveLength(2);
-      expect(dependencies).toEqual(
-        expect.arrayContaining([
-          actualPath.resolve(projectRoot, commonPath),
-          actualPath.resolve(projectRoot, configPath),
-        ]),
-      );
-      // Aliases are not typically used in WXS require, expect AliasResolver not called
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, mathPath));
       expect(mockAliasResolve).not.toHaveBeenCalled();
     });
 
-    it('should handle require paths that do not exist', async () => {
-      const filePath = 'utils/another.wxs';
-      const fileContent = `var missing = require('./nonexistent.wxs');`;
+    it('should resolve aliases correctly for WXS require()', async () => {
+      const filePath = 'src/filters/main.wxs';
+      const fileContent = `var formatter = require("@/common/formatter");`; // Alias, no ext
       mockFileContent(filePath, fileContent);
-      mockPathExists([filePath], 'dir'); // Nothing exists
+
+      // --- Mock Alias Setup ---
+      const aliasMap = { '@': [actualPath.resolve(projectRoot, 'src')] };
+      mockAliasInitialize.mockReturnValue(true);
+      mockGetAliases.mockReturnValue(aliasMap);
+
+      const formatterBasePath = actualPath.resolve(projectRoot, 'src/common/formatter');
+      mockAliasResolve.mockImplementation((importPath: string) => {
+        if (importPath === '@/common/formatter') return formatterBasePath;
+        return null;
+      });
+      // --- End Alias Setup ---
+
+      // --- Mock File System ---
+      const formatterPath = 'src/common/formatter.wxs'; // Expected target
+      const competingFormatterJs = 'src/common/formatter.js'; // Should not be picked
+      mockPathExists([formatterPath, competingFormatterJs]);
+      // --- End File System ---
 
       const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
 
+      // --- Assertions ---
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, formatterPath)); // require -> .wxs
+      expect(dependencies).not.toContain(actualPath.resolve(projectRoot, competingFormatterJs));
+      expect(mockAliasResolve).toHaveBeenCalledWith('@/common/formatter', expect.any(String));
+    });
+
+    it('should return empty array if required WXS file does not exist', async () => {
+      const filePath = 'src/filters/main.wxs';
+      const fileContent = `var helper = require("./nonexistent.wxs");`;
+      mockFileContent(filePath, fileContent);
+      mockPathExists([]); // Nothing exists
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
       expect(dependencies).toHaveLength(0);
-      expect(mockFs.existsSync).toHaveBeenCalledWith(
-        actualPath.resolve(projectRoot, 'utils/nonexistent.wxs'),
-      );
     });
   });
 

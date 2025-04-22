@@ -57,85 +57,58 @@ export class AliasResolver {
       this.initialize();
     }
 
-    logger.trace(`Resolving alias for import '${importPath}' in file '${currentFile}'`);
+    logger.trace(`Resolving alias prefix for import '${importPath}' in file '${currentFile}'`);
 
-    // 检查是否是别名路径
     for (const [alias, targets] of Object.entries(this.aliases)) {
-      // 别名必须以 @ 或字母开头，后面跟 / 或没有其他字符
-      const aliasPattern = new RegExp(`^${alias}(/|$)`);
+      // Basic alias pattern check (e.g., starts with @/ or aliasName/)
+      const aliasPrefix = alias + '/'; // e.g., "@/"
+      if (importPath.startsWith(aliasPrefix)) {
+        logger.trace(`Found matching alias prefix: ${alias} => ${targets.join(' or ')}`);
 
-      if (aliasPattern.test(importPath)) {
-        // 找到了匹配的别名
-        logger.trace(`Found matching alias: ${alias} => ${targets.join(' or ')}`);
-
-        for (const target of targets) {
-          // 替换别名为目标路径
-          // target is now potentially an absolute path from tsconfig or relative from custom config
-          const resolvedBase = path.isAbsolute(target)
+        // Try the first target path defined for the alias
+        // TODO: Handle multiple targets? For now, use the first.
+        if (targets.length > 0) {
+          const target = targets[0];
+          // target can be absolute (tsconfig) or relative (custom config)
+          const resolvedBaseDir = path.isAbsolute(target)
             ? target
             : path.resolve(this.projectRoot, target);
 
-          const remainingPath = importPath.replace(aliasPattern, '$1').slice(1); // Get the part after alias/, e.g., 'components/button'
-          const absolutePath = path.join(resolvedBase, remainingPath);
+          // Get the part of the import path *after* the alias prefix
+          const remainingPath = importPath.substring(aliasPrefix.length);
+          // Construct the potential absolute path *without* extension checking
+          const potentialPath = path.join(resolvedBaseDir, remainingPath);
 
-          logger.trace(`Trying resolved path: ${absolutePath}`);
-
-          // 如果路径存在，直接返回
-          if (fs.existsSync(absolutePath)) {
-            logger.trace(`Path exists, returning: ${absolutePath}`);
-
-            // 检查是否是目录，如果是，尝试查找index文件
-            try {
-              if (fs.statSync(absolutePath).isDirectory()) {
-                logger.trace(`Path is a directory, checking for index files`);
-                const possibleExts = [
-                  '.js',
-                  '.ts',
-                  '.tsx',
-                  '.jsx',
-                  '.json',
-                  '.wxml',
-                  '.wxss',
-                  '.wxs',
-                ];
-                for (const ext of possibleExts) {
-                  const indexPath = path.join(absolutePath, `index${ext}`);
-                  logger.trace(`Trying index file: ${indexPath}`);
-                  if (fs.existsSync(indexPath)) {
-                    logger.trace(`Index file exists, returning: ${indexPath}`);
-                    return indexPath;
-                  }
-                }
-              }
-            } catch (error) {
-              logger.warn(`Error checking if path is directory: ${(error as Error).message}`);
-            }
-
-            // 如果不是目录或目录中没有找到index文件，返回路径本身
-            return absolutePath;
-          }
-
-          // FIXME: 1. 特定的文件类型只能匹配特定的扩展名
-          // FIXME: 2. 假如文件夹下有 index.js 和 index.ts 怎么办?
-          // 处理没有扩展名的情况，尝试添加常见的扩展名
-          const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
-          for (const ext of possibleExts) {
-            // 重要：使用字符串连接格式，确保测试能捕获到这些调用
-            const pathWithExt = `${absolutePath}${ext}`;
-            logger.trace(`Trying with extension: ${pathWithExt}`);
-            if (fs.existsSync(pathWithExt)) {
-              logger.trace(`Path with extension exists, returning: ${pathWithExt}`);
-              return pathWithExt;
-            }
-          }
+          logger.trace(`Alias resolved to potential base path: ${potentialPath}`);
+          // Return the potential path. The caller (FileParser) will handle existence checks,
+          // index files, and extension appending based on context.
+          return potentialPath;
+        } else {
+          logger.warn(`Alias '${alias}' found but has no target paths defined.`);
         }
-
-        logger.debug(`Could not resolve alias ${alias} to a valid file path`);
+        // If we found a matching alias but couldn't resolve (e.g., no targets),
+        // stop checking other aliases for this import path.
+        return null;
+      }
+      // Handle aliases without a trailing slash (e.g., alias maps directly to a file/dir)
+      else if (importPath === alias) {
+        logger.trace(`Found matching alias (exact match): ${alias} => ${targets.join(' or ')}`);
+        if (targets.length > 0) {
+          const target = targets[0];
+          const potentialPath = path.isAbsolute(target)
+            ? target
+            : path.resolve(this.projectRoot, target);
+          logger.trace(`Alias resolved to potential base path: ${potentialPath}`);
+          return potentialPath;
+        } else {
+          logger.warn(`Alias '${alias}' found but has no target paths defined.`);
+        }
+        return null;
       }
     }
 
-    logger.trace(`No matching alias found for ${importPath}`);
-    return null;
+    logger.trace(`No matching alias prefix found for ${importPath}`);
+    return null; // No alias matched
   }
 
   /**

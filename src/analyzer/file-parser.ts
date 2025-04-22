@@ -73,17 +73,19 @@ export class FileParser {
   private async parseJavaScript(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies = new Set<string>(); // Use a Set directly
+      const dependencies = new Set<string>();
+      const allowedExtensions = ['.js', '.ts', '.json']; // JS can import JS, TS, JSON
 
-      // Pass the Set to helper functions
-      this.processImportStatements(content, filePath, dependencies);
-      this.processRequireStatements(content, filePath, dependencies);
-      // FIXME: 为什么需要处理这个?
-      this.processAliasImportComments(content, filePath, dependencies); // Keep for tests if needed
-      // FIXME: 小程序里不支持这种形式的引用吧?
-      this.processPageOrComponentStrings(content, filePath, dependencies);
+      this.processImportStatements(content, filePath, allowedExtensions, dependencies);
+      this.processRequireStatements(content, filePath, allowedExtensions, dependencies);
+      // FIXME: 为什么需要处理这个? -- Commenting out as likely unnecessary
+      // this.processAliasImportComments(content, filePath, dependencies);
+      // FIXME: 小程序里不支持这种形式的引用吧? -- Commenting out require.context style imports
+      // this.processRequireContext(content, filePath, dependencies);
+      // FIXME: 这是在干嘛? -- Removing, as string literal parsing for JS seems unreliable
+      // this.processPageOrComponentStrings(content, filePath, dependencies);
 
-      return Array.from(dependencies); // Return array from Set
+      return Array.from(dependencies);
     } catch (e) {
       logger.warn(`Error parsing JavaScript file ${filePath}: ${e}`);
       return [];
@@ -96,6 +98,7 @@ export class FileParser {
   private processImportStatements(
     content: string,
     filePath: string,
+    allowedExtensions: string[],
     dependencies: Set<string>,
   ): void {
     // Combined Regex: Handles
@@ -111,13 +114,15 @@ export class FileParser {
     while ((match = importRegex.exec(content)) !== null) {
       if (match[1]) {
         const importPath = match[1];
-        // FIXME: 这是在干嘛?
-        // Basic heuristic to potentially ignore type imports (not foolproof)
-        if (content.substring(match.index - 5, match.index).includes(' type')) continue;
+        // FIXME: 这是在干嘛? Basic heuristic to potentially ignore type imports (not foolproof)
+        // Keeping this heuristic for now, but it's not perfect.
+        if (content.substring(match.index - 5, match.index).includes(' type')) {
+          logger.trace(`Skipping potential type import: '${importPath}' in ${filePath}`);
+          continue;
+        }
 
-        const depPath = this.resolveAnyPath(importPath, filePath);
+        const depPath = this.resolveAnyPath(importPath, filePath, allowedExtensions);
         if (depPath) {
-          // if (this.options.verbose) console.log(`DEBUG processImportStatements: Adding ${depPath} from ${filePath}`);
           dependencies.add(depPath);
         }
       }
@@ -130,6 +135,7 @@ export class FileParser {
   private processRequireStatements(
     content: string,
     filePath: string,
+    allowedExtensions: string[],
     dependencies: Set<string>,
   ): void {
     const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -137,7 +143,7 @@ export class FileParser {
     let match;
     while ((match = requireRegex.exec(content)) !== null) {
       if (match[1]) {
-        const depPath = this.resolveAnyPath(match[1], filePath);
+        const depPath = this.resolveAnyPath(match[1], filePath, allowedExtensions);
         if (depPath) dependencies.add(depPath);
       }
     }
@@ -156,7 +162,13 @@ export class FileParser {
     let match;
     while ((match = aliasImportCommentRegex.exec(content)) !== null) {
       if (match[1]) {
-        const depPath = this.resolveAnyPath(match[1], filePath);
+        const depPath = this.resolveAnyPath(match[1], filePath, [
+          '.js',
+          '.ts',
+          '.wxml',
+          '.wxss',
+          '.json',
+        ]);
         if (depPath) dependencies.add(depPath);
       }
     }
@@ -185,7 +197,13 @@ export class FileParser {
         `Found page/component path string: ${pathString}, treating as ${rootRelativePath}`,
       );
 
-      const resolvedPath = this.resolveAnyPath(rootRelativePath, filePath);
+      const resolvedPath = this.resolveAnyPath(rootRelativePath, filePath, [
+        '.js',
+        '.ts',
+        '.wxml',
+        '.wxss',
+        '.json',
+      ]);
 
       if (resolvedPath) {
         // Add the initially resolved path (e.g., .../logs.js)
@@ -213,7 +231,7 @@ export class FileParser {
   private async parseWXML(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies = new Set<string>(); // Use a Set directly
+      const dependencies = new Set<string>();
 
       // Pass the Set to helper functions
       this.processImportIncludeTags(content, filePath, dependencies);
@@ -269,7 +287,7 @@ export class FileParser {
           }
         } else {
           // 处理相对路径
-          const depPath = this.resolveAnyPath(importPath, filePath);
+          const depPath = this.resolveAnyPath(importPath, filePath, ['.wxml']);
           if (depPath) dependencies.add(depPath);
         }
       }
@@ -296,7 +314,7 @@ export class FileParser {
             continue;
           }
         } else {
-          const depPath = this.resolveAnyPath(wxsPath, filePath);
+          const depPath = this.resolveAnyPath(wxsPath, filePath, ['.wxs']);
           if (depPath) dependencies.add(depPath);
         }
       }
@@ -318,7 +336,13 @@ export class FileParser {
         return;
       }
       // Resolve the path using resolveAnyPath
-      const resolvedPath = this.resolveAnyPath(src, filePath);
+      const resolvedPath = this.resolveAnyPath(src, filePath, [
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.gif',
+        '.svg',
+      ]);
       if (resolvedPath) {
         // console.log(`DEBUG processImageSources: Adding ${resolvedPath}`);
         dependencies.add(resolvedPath);
@@ -354,7 +378,13 @@ export class FileParser {
               // 排除插件路径 (plugin://)
               // 使用统一的路径解析函数
               // 1. Resolve the component path given in usingComponents (might resolve to index file, dir, etc.)
-              const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath);
+              const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath, [
+                '.js',
+                '.ts',
+                '.wxml',
+                '.wxss',
+                '.json',
+              ]);
 
               if (resolvedComponentPath) {
                 // 2. Determine the base name for checking related files
@@ -441,7 +471,7 @@ export class FileParser {
             }
           } else {
             // 普通相对路径
-            const depPath = this.resolveAnyPath(importPath, filePath);
+            const depPath = this.resolveAnyPath(importPath, filePath, ['.wxss']);
             if (depPath) dependencies.push(depPath);
           }
         }
@@ -496,8 +526,9 @@ export class FileParser {
               continue;
             }
 
-            // 如果直接路径不存在，尝试常规解析
-            const depPath = this.resolvePath(filePath, urlPath);
+            // 如果直接路径不存在，尝试使用 resolveAnyPath
+            const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+            const depPath = this.resolveAnyPath(urlPath, filePath, imageExtensions);
             if (depPath) dependencies.push(depPath);
           }
         }
@@ -572,7 +603,13 @@ export class FileParser {
 
             // 使用统一的路径解析函数
             // 1. Resolve the component path given in usingComponents (might resolve to index file, dir, etc.)
-            const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath);
+            const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath, [
+              '.js',
+              '.ts',
+              '.wxml',
+              '.wxss',
+              '.json',
+            ]);
 
             if (resolvedComponentPath) {
               // FIXME: 这里假设不对, 组件不一定 index.json, 也可能 /components/button/button.json
@@ -625,166 +662,304 @@ export class FileParser {
   }
 
   /**
-   * 解析 WXS 文件中的依赖
+   * 解析 WXS 文件中的依赖 (require)
    */
   private async parseWXS(filePath: string): Promise<string[]> {
-    // WXS模块依赖分析与JS类似
-    return this.parseJavaScript(filePath);
-  }
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const dependencies = new Set<string>();
+      const requireRegex = /require\s*\(\s*['"](.*?)['"]\s*\)/g;
+      const allowedExtensions = ['.wxs']; // WXS can only require WXS
 
-  // FIXME: 判断方式不严谨
-  /**
-   * 判断是否是别名路径
-   */
-  private isAliasPath(importPath: string): boolean {
-    return (
-      importPath.startsWith('@') ||
-      importPath.startsWith('$') ||
-      importPath.startsWith('~') ||
-      (/^[a-zA-Z]/.test(importPath) &&
-        !importPath.startsWith('./') &&
-        !importPath.startsWith('../') &&
-        !importPath.startsWith('/'))
-    );
-  }
-
-  /**
-   * 统一路径解析：处理别名、绝对路径和相对路径
-   * @param importPath 需要解析的导入路径
-   * @param sourcePath 源文件路径（解析相对路径的基准）
-   * @returns 解析后的绝对路径，如果无法解析则返回null
-   */
-  private resolveAnyPath(importPath: string, sourcePath: string): string | null {
-    logger.trace(`Resolving any path '${importPath}' from '${sourcePath}'`);
-
-    // 1. Handle alias
-    const isAliasPath = this.isAliasPath(importPath);
-    if (isAliasPath && this.aliasResolver) {
-      const aliasPath = this.aliasResolver.resolve(importPath, sourcePath);
-      if (aliasPath) {
-        if (fs.existsSync(aliasPath)) {
-          logger.trace(`Successfully resolved alias to existing file: ${aliasPath}`);
-          return aliasPath;
-        } else {
-          logger.trace(
-            `Resolved alias path ${aliasPath} does not exist directly, attempting further resolution...`,
-          );
-          return this.resolvePath(sourcePath, aliasPath);
+      let match;
+      while ((match = requireRegex.exec(content)) !== null) {
+        if (match[1]) {
+          const importPath = match[1];
+          // WXS requires are relative or absolute/alias?
+          // Assuming relative for now based on typical usage.
+          const depPath = this.resolveAnyPath(importPath, filePath, allowedExtensions);
+          if (depPath) {
+            dependencies.add(depPath);
+          }
         }
       }
-      logger.trace(`Alias resolution failed for ${importPath}`);
+      return Array.from(dependencies);
+    } catch (e) {
+      logger.warn(`Error parsing WXS file ${filePath}: ${e}`);
+      return [];
     }
+  }
 
-    // 2. Handle root-relative paths (explicitly start with '/')
-    if (importPath.startsWith('/')) {
-      // Path starting with '/' is relative to the project root.
-      // Use resolvePath with projectRootOverride
-      const resolvedRootPath = this.resolvePath(sourcePath, importPath, this.projectRoot);
-      if (resolvedRootPath) {
-        return resolvedRootPath;
-      } else {
-        return null;
-      }
+  // --- Path Resolution Logic ---
+
+  /**
+   * Checks if a given import path potentially uses a configured alias.
+   * This is a preliminary check before attempting full resolution.
+   */
+  private isAliasPath(importPath: string): boolean {
+    if (!this.aliasResolver || !this.hasAliasConfig) {
+      return false;
     }
-
-    // 3. Handle relative paths (explicitly start with './' or '../')
-    if (importPath.startsWith('.')) {
-      const resolvedRelative = this.resolvePath(sourcePath, importPath);
-      return resolvedRelative;
-    }
-
-    // 4. Handle implicit project root paths (e.g., 'components/button' in usingComponents)
-    //    These don't start with '/', './', or '../', and are not aliases.
-    //    Assume they are relative to the project root.
-    const implicitRootPath = '/' + importPath; // Treat as root-relative
-    const resolvedImplicitRoot = this.resolvePath(sourcePath, implicitRootPath, this.projectRoot);
-    logger.trace(
-      `Treating '${importPath}' as implicit root path -> '${implicitRootPath}', Resolved: ${resolvedImplicitRoot}`,
+    const aliases = this.aliasResolver.getAliases();
+    // Check if the import path starts with any defined alias prefix or matches an alias exactly
+    return Object.keys(aliases).some(
+      (alias) => importPath.startsWith(alias + '/') || importPath === alias,
     );
-    return resolvedImplicitRoot; // Return result (or null)
   }
 
   /**
-   * Resolves a relative path against a source file path, checking for various extensions and index files.
-   * @param sourcePath The absolute path of the source file containing the import.
-   * @param relativePath The relative path string to resolve.
-   * @param projectRootOverride Optional override for the project root, used for resolving absolute paths starting with '/'.
-   * @returns The absolute path of the resolved dependency, or null if not found.
+   * Resolves an import path (which could be relative, absolute, alias, or implicit root)
+   * to an existing file path, considering context-specific allowed extensions.
+   *
+   * @param importPath The original import string (e.g., './utils', '/pages/index', '@/comp', 'image.png').
+   * @param sourcePath The absolute path of the file containing the import.
+   * @param allowedExtensions An ordered array of extensions to check (e.g., ['.js', '.ts'] or ['.wxml']).
+   * @returns The absolute path of the resolved existing file, or null if not found.
    */
+  private resolveAnyPath(
+    importPath: string,
+    sourcePath: string,
+    allowedExtensions: string[],
+  ): string | null {
+    logger.trace(
+      `Resolving import '${importPath}' from '${sourcePath}' with allowed extensions: [${allowedExtensions.join(
+        ', ',
+      )}]`,
+    );
+
+    let potentialBasePath: string | null = null;
+    let isAlias = false;
+
+    // 1. Try resolving as an alias first
+    if (this.isAliasPath(importPath) && this.aliasResolver) {
+      isAlias = true; // Mark that we started from an alias
+      potentialBasePath = this.aliasResolver.resolve(importPath, sourcePath);
+      if (potentialBasePath) {
+        logger.trace(`Alias resolved to base path: ${potentialBasePath}`);
+        // Proceed to findExistingPath with this base path
+      } else {
+        logger.warn(`Alias '${importPath}' detected but could not be resolved by AliasResolver.`);
+        return null; // Alias detected but couldn't be mapped
+      }
+    }
+
+    // 2. Determine the absolute base path if not resolved by alias
+    if (!potentialBasePath) {
+      const sourceDir = path.dirname(sourcePath);
+      if (importPath.startsWith('/')) {
+        // Root-relative: Base is the miniappRoot
+        potentialBasePath = path.resolve(
+          this.options.miniappRoot || this.projectRoot,
+          importPath.slice(1),
+        );
+      } else if (importPath.startsWith('.')) {
+        // Relative: Resolve from source file's directory
+        potentialBasePath = path.resolve(sourceDir, importPath);
+      } else {
+        // Implicit root or node_modules: Try resolving from miniappRoot first
+        // This handles cases like 'components/button' in usingComponents
+        // or bare specifiers like 'lodash' (though node_modules aren't fully handled here)
+        potentialBasePath = path.resolve(this.options.miniappRoot || this.projectRoot, importPath);
+        // We could add node_modules resolution logic here if needed in the future
+      }
+      logger.trace(`Path resolved to potential base path: ${potentialBasePath}`);
+    }
+
+    // 3. Find the actual existing file using the base path and allowed extensions
+    if (potentialBasePath) {
+      const existingPath = this.findExistingPath(potentialBasePath, allowedExtensions);
+      if (existingPath) {
+        logger.trace(`Resolved '${importPath}' to existing file: ${existingPath}`);
+        return existingPath;
+      } else if (isAlias) {
+        // If alias resolution gave a base path but findExistingPath failed, log it.
+        logger.warn(
+          `Alias resolved to '${potentialBasePath}', but no existing file found with extensions [${allowedExtensions.join(
+            ', ',
+          )}]`,
+        );
+      }
+    }
+
+    // Only log warning if it wasn't an alias that resolved but failed extension checks
+    if (!isAlias) {
+      logger.warn(`Failed to resolve import '${importPath}' from '${sourcePath}'.`);
+    }
+    return null;
+  }
+
+  /**
+   * Given a potential absolute base path (without extension or index), finds the
+   * actual existing file path by checking for the path itself, adding allowed
+   * extensions, or checking for directory index files with allowed extensions.
+   *
+   * @param potentialPath Absolute path, possibly without extension (e.g., '/path/to/file' or '/path/to/dir')
+   * @param allowedExtensions Ordered list of extensions to check (e.g., ['.js', '.ts'])
+   * @returns The existing absolute file path, or null.
+   */
+  private findExistingPath(potentialPath: string, allowedExtensions: string[]): string | null {
+    logger.trace(
+      `Finding existing path for '${potentialPath}' with extensions [${allowedExtensions.join(
+        ', ',
+      )}]`,
+    );
+
+    // Check 1: Does the potential path exist exactly as specified?
+    if (fs.existsSync(potentialPath)) {
+      try {
+        // If it exists, is it a file?
+        if (fs.statSync(potentialPath).isFile()) {
+          logger.trace(`Path exists as file: ${potentialPath}`);
+          return potentialPath;
+        }
+        // If it's a directory, proceed to Check 3 (index files)
+        if (fs.statSync(potentialPath).isDirectory()) {
+          logger.trace(`Path exists as directory: ${potentialPath}. Checking index files.`);
+          // Fall through to Check 3
+        } else {
+          logger.trace(`Path exists but is not a file or directory: ${potentialPath}`);
+          // Treat as existing if it's not a directory? Maybe.
+          // Or return null? Let's return it for now, might be a link etc.
+          return potentialPath;
+        }
+      } catch (e) {
+        logger.warn(
+          `Error checking stats for ${potentialPath}: ${
+            (e as Error).message
+          }. Skipping direct/directory check.`,
+        );
+        // If stats fail, maybe still try extensions (Check 2)
+      }
+    }
+
+    // Check 2: Does the path exist if we add an allowed extension?
+    for (const ext of allowedExtensions) {
+      const pathWithExt = potentialPath + ext;
+      if (fs.existsSync(pathWithExt)) {
+        try {
+          // Ensure it's a file we found
+          if (fs.statSync(pathWithExt).isFile()) {
+            logger.trace(`Path with extension exists as file: ${pathWithExt}`);
+            return pathWithExt;
+          }
+        } catch (e) {
+          /* Ignore stat error, file might exist but be unreadable */
+        }
+      }
+    }
+
+    // Check 3: If the original path exists as a directory, check for index files within it.
+    // We re-check existsSync here in case the first check failed due to stats error.
+    let isDirectory = false;
+    try {
+      isDirectory = fs.existsSync(potentialPath) && fs.statSync(potentialPath).isDirectory();
+    } catch (e) {
+      /* Ignore error */
+    }
+
+    if (isDirectory) {
+      logger.trace(`Checking for index files in directory: ${potentialPath}`);
+      for (const ext of allowedExtensions) {
+        const indexPath = path.join(potentialPath, `index${ext}`);
+        if (fs.existsSync(indexPath)) {
+          try {
+            // Ensure it's a file we found
+            if (fs.statSync(indexPath).isFile()) {
+              logger.trace(`Index file exists: ${indexPath}`);
+              return indexPath;
+            }
+          } catch (e) {
+            /* Ignore stat error */
+          }
+        }
+      }
+    }
+
+    logger.trace(`No existing file found for base path '${potentialPath}' with given extensions.`);
+    return null;
+  }
+
+  /*
+  // OLD resolvePath - TO BE REMOVED
   private resolvePath(
     sourcePath: string,
     relativePath: string,
     projectRootOverride?: string,
   ): string | null {
     const sourceDir = path.dirname(sourcePath);
+    const baseDir = projectRootOverride || sourceDir;
 
-    // --- Determine the base path for resolution ---
-    let effectiveBasePath: string;
-
-    if (relativePath.startsWith('/') && projectRootOverride) {
-      // Path starts with '/' and we have a project root context.
-      // Could be project-relative ('/pages/...') or an absolute system path containing the root.
-      if (path.isAbsolute(relativePath) && relativePath.startsWith(projectRootOverride)) {
-        // It's an absolute system path that already includes the project root override.
-        // Use it directly to avoid doubling the root.
-        effectiveBasePath = relativePath;
-        logger.trace(
-          `Absolute path '${relativePath}' contains project root override '${projectRootOverride}', using directly.`,
-        );
-      } else {
-        // It's a project-root-relative path like '/pages/...' (or potentially absolute but *not* containing the override)
-        effectiveBasePath = path.resolve(projectRootOverride, relativePath.substring(1));
-        logger.trace(
-          `Root-relative path '${relativePath}', resolving from override '${projectRootOverride}'. Base: ${effectiveBasePath}`,
-        );
-      }
+    let targetPath: string;
+    if (relativePath.startsWith('/')) {
+      // Absolute path relative to the effective project root
+      targetPath = path.resolve(baseDir, relativePath.slice(1));
     } else {
-      // Standard relative path (./ ../) or potentially an absolute system path without override context.
-      // path.resolve handles both cases correctly relative to sourceDir.
-      effectiveBasePath = path.resolve(sourceDir, relativePath);
-      logger.trace(
-        `Standard relative/absolute path '${relativePath}', resolving from source dir '${sourceDir}'. Base: ${effectiveBasePath}`,
-      );
+      // Relative path from the source file's directory
+      targetPath = path.resolve(baseDir, relativePath);
     }
 
-    // If the path doesn't have an extension, try adding common ones.
-    const possibleExts =
-      path.extname(effectiveBasePath) === ''
-        ? ['.js', '.ts', '.wxml', '.wxss', '.json', '.wxs']
-        : [path.extname(effectiveBasePath)];
+        logger.trace(
+      `Resolving path: source=${sourcePath}, relative=${relativePath}, base=${baseDir} -> target=${targetPath}`,
+        );
 
-    // 1. Check direct path existence (as file)
-    try {
-      const existsDirect = fs.existsSync(effectiveBasePath);
-      const isFileDirect = existsDirect && fs.statSync(effectiveBasePath).isFile();
-      logger.trace(
-        `Direct Check: Exists=${existsDirect}, IsFile=${isFileDirect} -> ${effectiveBasePath}`,
+    // 1. Check if the exact path exists
+    if (fs.existsSync(targetPath)) {
+      try {
+        if (fs.statSync(targetPath).isFile()) {
+          logger.trace(`Resolved path exists as file: ${targetPath}`);
+          return targetPath;
+        }
+        if (fs.statSync(targetPath).isDirectory()) {
+          logger.trace(`Resolved path is directory: ${targetPath}, checking index files`);
+          // If it's a directory, check for index files (fall through to check 2)
+    } else {
+          // Path exists but isn't a file or directory (e.g., symlink?)
+          logger.trace(`Resolved path exists but is not file/directory: ${targetPath}`);
+          return targetPath; // Return the path if it exists, even if not file/dir?
+        }
+      } catch (e) {
+        logger.warn(
+          `Error getting stats for existing path ${targetPath}: ${(e as Error).message}`,
       );
-      if (isFileDirect) {
-        logger.trace(`resolvePath: Found direct file: ${effectiveBasePath}`);
-        return effectiveBasePath;
+        // If stats fail, maybe it still exists? Try extensions anyway.
+      }
+    }
+
+    // 2. Check for index file in directory
+    try {
+      if (fs.existsSync(targetPath) && fs.statSync(targetPath).isDirectory()) {
+        const indexExtensions = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
+        for (const ext of indexExtensions) {
+          const indexPath = path.join(targetPath, `index${ext}`);
+          if (fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()) {
+            logger.trace(`Resolved directory to index file: ${indexPath}`);
+            return indexPath;
+          }
+        }
+        logger.trace(`Directory found but no suitable index file: ${targetPath}`);
       }
     } catch (e) {
-      /* ignore */
+      // Ignore stat errors during index check
     }
 
-    // 2. Check with extensions appended (as file)
-    logger.trace(`Extension Check:`);
+    // 3. Check by adding extensions
+    const possibleExts = ['.js', '.ts', '.tsx', '.jsx', '.json', '.wxml', '.wxss', '.wxs'];
     for (const ext of possibleExts) {
-      const pathWithExt = effectiveBasePath + ext;
-      try {
-        const existsExt = fs.existsSync(pathWithExt);
-        const isFileExt = existsExt && fs.statSync(pathWithExt).isFile();
-        logger.trace(`Try ${ext}: Exists=${existsExt}, IsFile=${isFileExt} -> ${pathWithExt}`);
-        if (isFileExt) {
-          logger.trace(`resolvePath: Found with extension: ${pathWithExt}`);
+      const pathWithExt = targetPath + ext;
+      if (fs.existsSync(pathWithExt)) {
+        try {
+          if (fs.statSync(pathWithExt).isFile()) {
+            logger.trace(`Resolved path by adding extension ${ext}: ${pathWithExt}`);
           return pathWithExt;
         }
       } catch (e) {
-        /* ignore */
+          // Ignore stat errors, maybe file exists but is unreadable
+        }
       }
     }
 
-    return null; // Not found
+    logger.warn(`Could not resolve path for import '${relativePath}' from '${sourcePath}'`);
+    return null;
   }
+*/
 }

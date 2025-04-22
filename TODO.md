@@ -1,0 +1,5 @@
+- [ ] 修复 FIXME, 组件路径解析有大bug
+- [ ] import * 的ts配置
+- [ ] 更实用的graph, 现在的不好看
+- [ ] 发布npm包
+- [ ] github actions 自动发布
