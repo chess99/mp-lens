@@ -5,7 +5,18 @@ import { AliasResolver } from '../utils/alias-resolver';
 import { logger } from '../utils/debug-logger';
 
 /**
- * 文件解析器：负责解析不同类型的文件，提取其中的依赖关系
+ * FileParser: Responsible for parsing different file types in a WeChat Mini Program
+ * and extracting their direct code-level or configuration-defined dependencies.
+ *
+ * Scope:
+ * - Analyzes `import`, `require`, WXML `<import>`, `<include>`, `<wxs>`, WXSS `@import`.
+ * - Analyzes component usage declared in JSON (`usingComponents`).
+ * - Analyzes page paths declared in `app.json` (`pages`, `subPackages`).
+ * - Analyzes resource paths referenced directly in WXML (`<image src>`) and WXSS (`url()`).
+ * - Analyzes `.wxs` module dependencies.
+ * - **Does NOT** analyze string literals in JavaScript/TypeScript that might represent
+ *   navigation targets (e.g., 'pages/index/index' within `wx.navigateTo`). This is considered
+ *   runtime navigation logic, not a direct code dependency.
  */
 export class FileParser {
   private projectRoot: string;
@@ -74,16 +85,15 @@ export class FileParser {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const dependencies = new Set<string>();
-      const allowedExtensions = ['.js', '.ts', '.json']; // JS can import JS, TS, JSON
 
+      // Allowed extensions for JS/TS imports
+      const allowedExtensions = ['.js', '.ts', '.json']; // Typically import these
+
+      // Process standard import statements
       this.processImportStatements(content, filePath, allowedExtensions, dependencies);
+
+      // Process standard require statements
       this.processRequireStatements(content, filePath, allowedExtensions, dependencies);
-      // FIXME: 为什么需要处理这个? -- Commenting out as likely unnecessary
-      // this.processAliasImportComments(content, filePath, dependencies);
-      // FIXME: 小程序里不支持这种形式的引用吧? -- Commenting out require.context style imports
-      // this.processRequireContext(content, filePath, dependencies);
-      // FIXME: 这是在干嘛? -- Removing, as string literal parsing for JS seems unreliable
-      // this.processPageOrComponentStrings(content, filePath, dependencies);
 
       return Array.from(dependencies);
     } catch (e) {
@@ -145,82 +155,6 @@ export class FileParser {
       if (match[1]) {
         const depPath = this.resolveAnyPath(match[1], filePath, allowedExtensions);
         if (depPath) dependencies.add(depPath);
-      }
-    }
-  }
-
-  /**
-   * 处理特殊的@alias-import注释 (仅用于测试别名解析)
-   */
-  private processAliasImportComments(
-    content: string,
-    filePath: string,
-    dependencies: Set<string>,
-  ): void {
-    const aliasImportCommentRegex = /\/\/\s*@alias-import[^'"]*from\s+['"]([^'"]+)['"]/g;
-
-    let match;
-    while ((match = aliasImportCommentRegex.exec(content)) !== null) {
-      if (match[1]) {
-        const depPath = this.resolveAnyPath(match[1], filePath, [
-          '.js',
-          '.ts',
-          '.wxml',
-          '.wxss',
-          '.json',
-        ]);
-        if (depPath) dependencies.add(depPath);
-      }
-    }
-  }
-
-  /**
-   * Handles string literals that look like 'pages/...' or 'components/...'
-   * Resolves them and finds related files (.wxml, .json, etc.)
-   */
-  private processPageOrComponentStrings(
-    content: string,
-    filePath: string,
-    dependencies: Set<string>,
-  ): void {
-    // Updated regex to match 'pages/path' or 'components/path' in more contexts
-    // Now matches quotes, variable assignments, and path strings without quotes
-    const pathRegex = /['"]?((?:pages|components)\/[^'"\s,;)]+)['"]?/g;
-
-    let match;
-    while ((match = pathRegex.exec(content)) !== null) {
-      const pathString = match[1]; // e.g., pages/logs/logs
-      // Treat as root-relative
-      const rootRelativePath = '/' + pathString;
-
-      logger.trace(
-        `Found page/component path string: ${pathString}, treating as ${rootRelativePath}`,
-      );
-
-      const resolvedPath = this.resolveAnyPath(rootRelativePath, filePath, [
-        '.js',
-        '.ts',
-        '.wxml',
-        '.wxss',
-        '.json',
-      ]);
-
-      if (resolvedPath) {
-        // Add the initially resolved path (e.g., .../logs.js)
-        dependencies.add(resolvedPath);
-
-        // Find and add related files
-        const baseName = resolvedPath.replace(/\.[^.]+$/, '');
-        for (const ext of ['.js', '.ts', '.wxml', '.wxss', '.json']) {
-          const relatedPath = baseName + ext;
-          if (fs.existsSync(relatedPath)) {
-            dependencies.add(relatedPath); // Add to Set automatically handles duplicates
-          }
-        }
-      } else {
-        logger.trace(
-          `processPageOrComponentStrings: resolveAnyPath returned null for ${rootRelativePath}`,
-        );
       }
     }
   }
@@ -431,114 +365,57 @@ export class FileParser {
   private async parseWXSS(filePath: string): Promise<string[]> {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
-      const dependencies: string[] = [];
+      const dependencies = new Set<string>(); // Use Set for automatic deduplication
 
-      // 匹配@import语句
+      // Match @import statements
       const importRegex = /@import\s+['"]([^'"]+)['"]/g;
-
-      // 匹配url()中的路径
+      // Match url() references
       const urlRegex = /url\(['"]?([^'")]+)['"]?\)/g;
+      // Allowed extensions for imports and urls
+      const importExtensions = ['.wxss'];
+      const urlExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp']; // Common image/font types
 
       let match;
 
-      // 处理@import语句
+      // Process @import statements
       while ((match = importRegex.exec(content)) !== null) {
         if (match[1]) {
           const importPath = match[1];
-
-          // 尝试别名解析
-          const isAliasPath =
-            importPath.startsWith('@') ||
-            importPath.startsWith('$') ||
-            importPath.startsWith('~') ||
-            (/^[a-zA-Z]/.test(importPath) &&
-              !importPath.startsWith('./') &&
-              !importPath.startsWith('../') &&
-              !importPath.startsWith('/'));
-
-          if (this.hasAliasConfig && this.aliasResolver && isAliasPath) {
-            const aliasPath = this.aliasResolver.resolve(importPath, filePath);
-            if (aliasPath) {
-              dependencies.push(aliasPath);
-              continue;
-            }
-          } else if (importPath.startsWith('/')) {
-            // 对于以 / 开头的路径，直接拼接项目根目录
-            const absolutePath = path.join(this.projectRoot, importPath.slice(1));
-            if (fs.existsSync(absolutePath)) {
-              dependencies.push(absolutePath);
-              continue;
-            }
-          } else {
-            // 普通相对路径
-            const depPath = this.resolveAnyPath(importPath, filePath, ['.wxss']);
-            if (depPath) dependencies.push(depPath);
+          // Directly use resolveAnyPath, it handles relative, root, and alias paths
+          const resolvedPath = this.resolveAnyPath(importPath, filePath, importExtensions);
+          if (resolvedPath) {
+            dependencies.add(resolvedPath);
           }
         }
       }
 
-      // 处理url()中的路径
+      // Process url() references
       while ((match = urlRegex.exec(content)) !== null) {
         if (match[1]) {
-          const urlPath = match[1];
+          const urlPath = match[1].trim(); // Trim whitespace
 
-          // 忽略数据URI和外部URL
-          if (urlPath.startsWith('data:') || urlPath.match(/^https?:\/\//)) {
+          // Skip data URIs and external URLs
+          if (urlPath.startsWith('data:') || /^(http|https):\/\//.test(urlPath)) {
             continue;
           }
 
-          // 检查 url 路径
-          if (this.options.verbose) {
-            logger.trace(`Processing url path: ${urlPath}`);
+          // Skip dynamic template strings (like url({{someVar}}))
+          if (/{{.*?}}/.test(urlPath)) {
+            continue;
           }
 
-          // 尝试别名解析
-          const isAliasPath = this.isAliasPath(urlPath);
-
-          if (this.aliasResolver && isAliasPath) {
-            const aliasPath = this.aliasResolver.resolve(urlPath, filePath);
-            if (aliasPath) {
-              dependencies.push(aliasPath);
-              continue;
-            }
-          } else if (urlPath.startsWith('/')) {
-            // 对于以 / 开头的路径，直接拼接项目根目录
-            const absolutePath = path.join(this.projectRoot, urlPath.slice(1));
-            if (fs.existsSync(absolutePath)) {
-              dependencies.push(absolutePath);
-              continue;
-            }
-          } else {
-            // 对于相对路径特殊处理
-            const fileDir = path.dirname(filePath);
-            let targetPath;
-
-            // 处理 "../path" 形式的路径
-            if (urlPath.startsWith('../')) {
-              targetPath = path.resolve(fileDir, urlPath);
-            } else {
-              // 普通相对路径
-              targetPath = path.join(fileDir, urlPath);
-            }
-
-            if (fs.existsSync(targetPath)) {
-              dependencies.push(targetPath);
-              continue;
-            }
-
-            // 如果直接路径不存在，尝试使用 resolveAnyPath
-            const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
-            const depPath = this.resolveAnyPath(urlPath, filePath, imageExtensions);
-            if (depPath) dependencies.push(depPath);
+          // Directly use resolveAnyPath, it handles relative, root, and alias paths
+          const resolvedPath = this.resolveAnyPath(urlPath, filePath, urlExtensions);
+          if (resolvedPath) {
+            dependencies.add(resolvedPath);
           }
         }
       }
 
-      return [...new Set(dependencies)]; // 去除重复项
+      return Array.from(dependencies);
     } catch (e) {
-      if (this.options.verbose) {
-        logger.warn(`Error parsing WXSS file ${filePath}: ${e}`);
-      }
+      // Use logger.error for consistency or keep as warn if it's expected to fail sometimes
+      logger.warn(`Error parsing WXSS file ${filePath}: ${(e as Error).message}`);
       return [];
     }
   }
@@ -549,45 +426,55 @@ export class FileParser {
   private async parseJSON(filePath: string): Promise<string[]> {
     try {
       const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      const dependencies: string[] = [];
+      const dependencies = new Set<string>(); // Use Set for automatic deduplication
+      // Define standard extensions for components (used in usingComponents, generics)
+      const componentExtensions = ['.js', '.ts', '.wxml', '.json']; // Usually component logic + template + style + config
+      // Define standard extensions for pages (prioritizing script)
+      const pageScriptExtensions = ['.js', '.ts'];
+      // Define extensions for images/icons
+      const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
 
-      // 处理 app.json 中的 pages 和 subpackages
+      // --- Process app.json specific fields ---
+
+      // Handle 'pages' array
       if (content.pages && Array.isArray(content.pages)) {
-        for (const page of content.pages) {
-          if (typeof page === 'string') {
-            // 解析页面路径，可能带有或不带有扩展名
-            const basePath = path.join(this.projectRoot, page);
-            const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-
-            for (const ext of exts) {
-              const fullPath = basePath + ext;
-              if (fs.existsSync(fullPath)) {
-                dependencies.push(fullPath);
-              }
+        for (const pagePath of content.pages) {
+          if (typeof pagePath === 'string') {
+            // Resolve the primary script file for the page, treating paths as root-relative
+            const resolvedPagePath = this.resolveAnyPath(
+              '/' + pagePath,
+              filePath,
+              pageScriptExtensions,
+            );
+            if (resolvedPagePath) {
+              dependencies.add(resolvedPagePath);
+              // Note: Finding related files (.wxml, .wxss, .json) is delegated to the caller/graph builder.
             }
           }
         }
       }
 
-      // 处理子包配置 - 支持两种可能的字段名：subpackages 或 subPackages
-      const subpackages = content.subpackages || content.subPackages;
+      // Handle 'subPackages' or 'subpackages' array
+      const subpackages = content.subPackages || content.subpackages;
       if (subpackages && Array.isArray(subpackages)) {
         for (const subpackage of subpackages) {
           const root = subpackage.root;
-          const pages = subpackage.pages;
+          const subPages = subpackage.pages;
 
-          if (typeof root === 'string' && Array.isArray(pages)) {
-            for (const page of pages) {
-              if (typeof page === 'string') {
-                // 解析子包中的页面路径
-                const basePath = path.join(this.projectRoot, root, page);
-                const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-
-                for (const ext of exts) {
-                  const fullPath = basePath + ext;
-                  if (fs.existsSync(fullPath)) {
-                    dependencies.push(fullPath);
-                  }
+          if (typeof root === 'string' && Array.isArray(subPages)) {
+            for (const pagePath of subPages) {
+              if (typeof pagePath === 'string') {
+                // Construct the full root-relative path
+                const fullPagePath = '/' + path.join(root, pagePath);
+                // Resolve the primary script file for the subpackage page
+                const resolvedPagePath = this.resolveAnyPath(
+                  fullPagePath,
+                  filePath,
+                  pageScriptExtensions,
+                );
+                if (resolvedPagePath) {
+                  dependencies.add(resolvedPagePath);
+                  // Note: Related file finding delegated to caller.
                 }
               }
             }
@@ -595,67 +482,72 @@ export class FileParser {
         }
       }
 
-      // 处理组件配置中的 usingComponents
+      // Handle 'tabBar' icon paths (these are direct file references)
+      if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
+        for (const item of content.tabBar.list) {
+          if (item && typeof item.iconPath === 'string') {
+            const resolvedIconPath = this.resolveAnyPath(item.iconPath, filePath, imageExtensions);
+            if (resolvedIconPath) dependencies.add(resolvedIconPath);
+          }
+          if (item && typeof item.selectedIconPath === 'string') {
+            const resolvedSelectedIconPath = this.resolveAnyPath(
+              item.selectedIconPath,
+              filePath,
+              imageExtensions,
+            );
+            if (resolvedSelectedIconPath) dependencies.add(resolvedSelectedIconPath);
+          }
+        }
+      }
+
+      // --- Process component.json specific fields ---
+
+      // Handle 'usingComponents' object
       if (content.usingComponents && typeof content.usingComponents === 'object') {
         for (const [_componentName, componentPath] of Object.entries(content.usingComponents)) {
           if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
-            // 排除插件路径 (plugin://)
-
-            // 使用统一的路径解析函数
-            // 1. Resolve the component path given in usingComponents (might resolve to index file, dir, etc.)
-            const resolvedComponentPath = this.resolveAnyPath(componentPath as string, filePath, [
-              '.js',
-              '.ts',
-              '.wxml',
-              '.wxss',
-              '.json',
-            ]);
-
+            // Resolve the primary component file (e.g., comp.js, comp.ts, index.js)
+            const resolvedComponentPath = this.resolveAnyPath(
+              componentPath,
+              filePath,
+              componentExtensions,
+            );
             if (resolvedComponentPath) {
-              // FIXME: 这里假设不对, 组件不一定 index.json, 也可能 /components/button/button.json
-              // FIXME: 为什么 resolvedComponentPath 会带后缀
-              // FIXME: 这里也导致了第三步的错误
-              // FIXME: 目前的状态:
-              // resolvedComponentPath: /Users/zcs/code/mmbb/mt-address-msc/src/common/view/location-view/index.ts
-              // componentPath: "/common/view/location-view/index"
-              // filePath: '/Users/zcs/code/mmbb/mt-address-msc/src/components/address-home-v2/__r-list/address-list/index.json'
+              dependencies.add(resolvedComponentPath);
+              // Note: Related file finding delegated to the caller/graph builder.
+            }
+          }
+        }
+      }
 
-              // 2. Determine the base name for checking related files
-              //    (remove /index.ext or just .ext)
-              const componentBase = resolvedComponentPath.replace(/(\/index)?\.\w+$/, '');
-              // FIXME: current: /Users/zcs/code/mmbb/mt-address-msc/src/common/view/location-view
-
-              // 3. Check for related component files based on the derived base name
-              const exts = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-              for (const ext of exts) {
-                // FIXME: 这里怎么
-                const fullPath = componentBase + ext;
-                if (fs.existsSync(fullPath)) {
-                  // Only add if it hasn't been added already (e.g., if resolvedComponentPath was one of these)
-                  if (!dependencies.includes(fullPath)) {
-                    dependencies.push(fullPath);
-                  }
-                }
-              }
-              // Ensure the originally resolved path is also included if it wasn't caught by the extension loop
-              // (e.g., if resolveAnyPath resolved to a directory path represented in the graph)
-              if (
-                fs.existsSync(resolvedComponentPath) &&
-                !dependencies.includes(resolvedComponentPath)
-              ) {
-                // Check if it's a file before adding? Or assume if resolveAnyPath returned it, it's relevant?
-                // Let's add it cautiously. If resolveAnyPath resolved to a dir, adding it might be wrong.
-                // For now, rely on the extension check loop above.
+      // Handle 'componentGenerics' (if needed in the future)
+      if (content.componentGenerics && typeof content.componentGenerics === 'object') {
+        for (const genericName in content.componentGenerics) {
+          const genericInfo = content.componentGenerics[genericName];
+          if (genericInfo && typeof genericInfo.default === 'string') {
+            const defaultComponentPath = genericInfo.default;
+            if (!defaultComponentPath.startsWith('plugin://')) {
+              const resolvedDefaultPath = this.resolveAnyPath(
+                defaultComponentPath,
+                filePath,
+                componentExtensions,
+              );
+              if (resolvedDefaultPath) {
+                dependencies.add(resolvedDefaultPath);
               }
             }
           }
         }
       }
 
-      return [...new Set(dependencies)]; // 去除重复项
+      return Array.from(dependencies); // Return unique dependencies
     } catch (e) {
-      if (this.options.verbose) {
-        logger.warn(`Error parsing JSON file ${filePath}: ${e}`);
+      // Only log if parsing actually fails, not just missing fields
+      if (e instanceof SyntaxError) {
+        logger.error(`Error parsing JSON file ${filePath}: ${(e as Error).message}`);
+      } else if (this.options.verbose) {
+        // Log other errors (like file read errors) verbosely
+        logger.warn(`Error processing JSON file ${filePath}: ${(e as Error).message}`);
       }
       return [];
     }
@@ -697,14 +589,21 @@ export class FileParser {
    * This is a preliminary check before attempting full resolution.
    */
   private isAliasPath(importPath: string): boolean {
-    if (!this.aliasResolver || !this.hasAliasConfig) {
+    if (!this.hasAliasConfig || !this.aliasResolver) {
       return false;
     }
     const aliases = this.aliasResolver.getAliases();
-    // Check if the import path starts with any defined alias prefix or matches an alias exactly
-    return Object.keys(aliases).some(
-      (alias) => importPath.startsWith(alias + '/') || importPath === alias,
-    );
+    console.log('[isAliasPath] Checking path:', importPath);
+    console.log('[isAliasPath] Available aliases:', aliases);
+    if (Object.keys(aliases).length === 0) {
+      console.log('[isAliasPath] No aliases configured.');
+      return false;
+    }
+    const aliasPatterns = Object.keys(aliases).map((alias) => alias.replace(/\*$/, '')); // Remove trailing /*
+    console.log('[isAliasPath] Alias patterns:', aliasPatterns);
+    const isAlias = aliasPatterns.some((pattern) => importPath.startsWith(pattern));
+    console.log(`[isAliasPath] Path '${importPath}' starts with alias pattern? ${isAlias}`);
+    return isAlias;
   }
 
   /**
@@ -726,6 +625,10 @@ export class FileParser {
         ', ',
       )}]`,
     );
+    // Add check for absolute path input
+    if (path.isAbsolute(importPath)) {
+      logger.trace(`Input importPath '${importPath}' is already absolute.`);
+    }
 
     let potentialBasePath: string | null = null;
     let isAlias = false;
@@ -798,6 +701,9 @@ export class FileParser {
    * @returns The existing absolute file path, or null.
    */
   private findExistingPath(potentialPath: string, allowedExtensions: string[]): string | null {
+    // --- DEBUG LOGGING START ---
+    // console.log(`[findExistingPath] Input: potentialPath='${potentialPath}', extensions=[${allowedExtensions.join(',')}]`);
+    // --- DEBUG LOGGING END ---
     logger.trace(
       `Finding existing path for '${potentialPath}' with extensions [${allowedExtensions.join(
         ', ',
@@ -805,78 +711,124 @@ export class FileParser {
     );
 
     // Check 1: Does the potential path exist exactly as specified?
-    if (fs.existsSync(potentialPath)) {
+    logger.trace(`Check 1: Checking exact path: ${potentialPath}`);
+    let potentialPathIsDir = false; // Flag to track if it's a directory
+    const check1Exists = fs.existsSync(potentialPath); // Store result for logging
+    // --- DEBUG LOGGING START ---
+    // console.log(`[findExistingPath] Check 1: fs.existsSync('${potentialPath}') -> ${check1Exists}`);
+    // --- DEBUG LOGGING END ---
+    if (check1Exists) {
       try {
-        // If it exists, is it a file?
-        if (fs.statSync(potentialPath).isFile()) {
-          logger.trace(`Path exists as file: ${potentialPath}`);
-          return potentialPath;
+        const stats = fs.statSync(potentialPath);
+        // --- DEBUG LOGGING START ---
+        // console.log(`[findExistingPath] Check 1: fs.statSync('${potentialPath}') -> isFile=${stats.isFile()}, isDir=${stats.isDirectory()}`);
+        // --- DEBUG LOGGING END ---
+        if (stats.isFile()) {
+          logger.trace(`Check 1: SUCCESS - Path exists as file: ${potentialPath}`);
+          return potentialPath; // Found exact file, return immediately
         }
-        // If it's a directory, proceed to Check 3 (index files)
-        if (fs.statSync(potentialPath).isDirectory()) {
-          logger.trace(`Path exists as directory: ${potentialPath}. Checking index files.`);
-          // Fall through to Check 3
+        if (stats.isDirectory()) {
+          logger.trace(
+            `Check 1: Path exists as directory: ${potentialPath}. Will proceed to Check 3.`,
+          );
+          potentialPathIsDir = true; // Mark as directory, proceed checks below
         } else {
-          logger.trace(`Path exists but is not a file or directory: ${potentialPath}`);
-          // Treat as existing if it's not a directory? Maybe.
-          // Or return null? Let's return it for now, might be a link etc.
-          return potentialPath;
+          logger.trace(`Check 1: Path exists but is not a file or directory: ${potentialPath}`);
+          return potentialPath; // Return other existing types (links etc.)
         }
       } catch (e) {
+        // --- DEBUG LOGGING START ---
+        // console.log(`[findExistingPath] Check 1: fs.statSync('${potentialPath}') -> ERROR: ${(e as Error).message}`);
+        // --- DEBUG LOGGING END ---
         logger.warn(
-          `Error checking stats for ${potentialPath}: ${
+          `Check 1: Error checking stats for ${potentialPath}: {
             (e as Error).message
-          }. Skipping direct/directory check.`,
+          }. Proceeding.`,
         );
-        // If stats fail, maybe still try extensions (Check 2)
       }
+    } else {
+      logger.trace(`Check 1: Exact path does not exist or failed existsSync: ${potentialPath}`);
     }
 
     // Check 2: Does the path exist if we add an allowed extension?
-    for (const ext of allowedExtensions) {
-      const pathWithExt = potentialPath + ext;
-      if (fs.existsSync(pathWithExt)) {
-        try {
-          // Ensure it's a file we found
-          if (fs.statSync(pathWithExt).isFile()) {
-            logger.trace(`Path with extension exists as file: ${pathWithExt}`);
-            return pathWithExt;
-          }
-        } catch (e) {
-          /* Ignore stat error, file might exist but be unreadable */
-        }
-      }
-    }
-
-    // Check 3: If the original path exists as a directory, check for index files within it.
-    // We re-check existsSync here in case the first check failed due to stats error.
-    let isDirectory = false;
-    try {
-      isDirectory = fs.existsSync(potentialPath) && fs.statSync(potentialPath).isDirectory();
-    } catch (e) {
-      /* Ignore error */
-    }
-
-    if (isDirectory) {
-      logger.trace(`Checking for index files in directory: ${potentialPath}`);
+    if (!potentialPathIsDir) {
+      logger.trace(
+        `Check 2: Checking extensions [${allowedExtensions.join(',')}] for base: ${potentialPath}`,
+      );
       for (const ext of allowedExtensions) {
-        const indexPath = path.join(potentialPath, `index${ext}`);
-        if (fs.existsSync(indexPath)) {
+        const pathWithExt = potentialPath + ext;
+        logger.trace(`Check 2: Trying path with extension: ${pathWithExt}`);
+        const check2Exists = fs.existsSync(pathWithExt); // Store result
+        // --- DEBUG LOGGING START ---
+        // console.log(`[findExistingPath] Check 2: fs.existsSync('${pathWithExt}') -> ${check2Exists}`);
+        // --- DEBUG LOGGING END ---
+        if (check2Exists) {
           try {
-            // Ensure it's a file we found
-            if (fs.statSync(indexPath).isFile()) {
-              logger.trace(`Index file exists: ${indexPath}`);
-              return indexPath;
+            const stats = fs.statSync(pathWithExt);
+            // --- DEBUG LOGGING START ---
+            // console.log(`[findExistingPath] Check 2: fs.statSync('${pathWithExt}') -> isFile=${stats.isFile()}`);
+            // --- DEBUG LOGGING END ---
+            if (stats.isFile()) {
+              logger.trace(`Check 2: SUCCESS - Path with extension exists as file: ${pathWithExt}`);
+              return pathWithExt; // Return the first valid file found
+            } else {
+              logger.trace(`Check 2: Path with extension exists but is not a file: ${pathWithExt}`);
             }
           } catch (e) {
-            /* Ignore stat error */
+            // --- DEBUG LOGGING START ---
+            // console.log(`[findExistingPath] Check 2: fs.statSync('${pathWithExt}') -> ERROR: ${(e as Error).message}`);
+            // --- DEBUG LOGGING END ---
+            logger.warn(`Check 2: Stat error for ${pathWithExt}: ${(e as Error).message}`);
           }
+        } else {
+          logger.trace(`Check 2: Path with extension does not exist: ${pathWithExt}`);
         }
-      }
-    }
+      } // End loop for Check 2 extensions
+    } // End of Check 2 block (!potentialPathIsDir)
 
-    logger.trace(`No existing file found for base path '${potentialPath}' with given extensions.`);
-    return null;
+    // Check 3: If the original path was identified as a directory in Check 1, check for index files.
+    if (potentialPathIsDir) {
+      logger.trace(`Check 3: Checking for index files in directory: ${potentialPath}`);
+      for (const ext of allowedExtensions) {
+        const indexPath = path.join(potentialPath, `index${ext}`);
+        logger.trace(`Check 3: Trying index file: ${indexPath}`);
+        const check3Exists = fs.existsSync(indexPath); // Store result
+        // --- DEBUG LOGGING START ---
+        // console.log(`[findExistingPath] Check 3: fs.existsSync('${indexPath}') -> ${check3Exists}`);
+        // --- DEBUG LOGGING END ---
+        if (check3Exists) {
+          try {
+            const stats = fs.statSync(indexPath);
+            // --- DEBUG LOGGING START ---
+            // console.log(`[findExistingPath] Check 3: fs.statSync('${indexPath}') -> isFile=${stats.isFile()}`);
+            // --- DEBUG LOGGING END ---
+            if (stats.isFile()) {
+              logger.trace(`Check 3: SUCCESS - Index file exists: ${indexPath}`);
+              return indexPath;
+            } else {
+              logger.trace(`Check 3: Index path exists but is not a file: ${indexPath}`);
+            }
+          } catch (e) {
+            // --- DEBUG LOGGING START ---
+            // console.log(`[findExistingPath] Check 3: fs.statSync('${indexPath}') -> ERROR: ${(e as Error).message}`);
+            // --- DEBUG LOGGING END ---
+            logger.warn(`Check 3: Stat error for index file ${indexPath}: ${(e as Error).message}`);
+          }
+        } else {
+          logger.trace(`Check 3: Index file does not exist: ${indexPath}`);
+        }
+      } // End loop for Check 3 extensions
+    } // End of Check 3 block (potentialPathIsDir)
+
+    // --- DEBUG LOGGING START ---
+    // console.log(`[findExistingPath] FAILED for potentialPath='${potentialPath}'`);
+    // --- DEBUG LOGGING END ---
+    logger.trace(
+      `findExistingPath: FAILED for base path '${potentialPath}' with given extensions [${allowedExtensions.join(
+        ',',
+      )}]`,
+    );
+    return null; // Failed to find anything
   }
 
   /*

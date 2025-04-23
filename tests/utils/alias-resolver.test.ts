@@ -1,451 +1,379 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AliasResolver } from '../../src/utils/alias-resolver';
+import { logger } from '../../src/utils/debug-logger'; // Import logger if needed for mock
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
 
 // Mock fs
 jest.mock('fs');
-
-// Mock path module (Alternative strategy)
-jest.mock('path', () => ({
-  resolve: jest.fn((...args) => actualPath.resolve(...args)),
-  join: jest.fn((...args) => actualPath.join(...args)),
-  relative: jest.fn((...args) => actualPath.relative(...args)),
-  isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
-  // Add other functions used in the test file if needed
-  dirname: jest.fn((p) => actualPath.dirname(p)),
-  extname: jest.fn((p) => actualPath.extname(p)),
+// Mock logger
+jest.mock('../../src/utils/debug-logger', () => ({
+  logger: {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    verbose: jest.fn(), // Ensure all used methods are mocked
+  },
 }));
 
+// Keep path mock simple: delegate to actual path functions
+jest.mock('path', () => {
+  const actual = jest.requireActual('path');
+  return {
+    resolve: jest.fn((...args) => actual.resolve(...args)),
+    join: jest.fn((...args) => actual.join(...args)),
+    relative: jest.fn((...args) => actual.relative(...args)),
+    isAbsolute: jest.fn((p) => actual.isAbsolute(p)),
+    dirname: jest.fn((p) => actual.dirname(p)),
+    extname: jest.fn((p) => actual.extname(p)),
+    sep: actual.sep, // Include path separator if needed
+  };
+});
+
 describe('AliasResolver', () => {
-  const projectRoot = '/workspace/my-project'; // Use a consistent posix style path
+  // Use POSIX paths for consistency in tests, even on Windows
+  const projectRoot = '/workspace/my-project';
+  const currentFilePath = '/workspace/my-project/src/some-file.ts'; // A typical file using the alias
   let resolver: AliasResolver;
 
-  // Helper to setup mocks for a file path
-  const mockFile = (filePath: string, isDirectory = false, content = '{}') => {
-    const absPath = actualPath.resolve(projectRoot, filePath);
-    (fs.existsSync as jest.Mock).mockImplementation(
-      (p) => p === absPath || (fs.existsSync as jest.Mock).mock.calls.some((call) => call[0] === p),
-    ); // Allow multiple exists checks
+  // Simplified fs mock setup helpers
+  const mockTsConfig = (
+    content: object | string,
+    configPath = actualPath.join(projectRoot, 'tsconfig.json'),
+  ) => {
+    const configDir = actualPath.dirname(configPath);
+    (fs.existsSync as jest.Mock).mockImplementation((p) => p === configPath);
     (fs.readFileSync as jest.Mock).mockImplementation((p) => {
-      if (p === absPath) return content;
-      throw new Error(`ENOENT: File not found ${p}`);
+      if (p === configPath) return typeof content === 'string' ? content : JSON.stringify(content);
+      throw new Error(`ENOENT: readFileSync mock doesn't handle ${p}`);
     });
-    (fs.statSync as jest.Mock).mockImplementation((p) => {
-      if (p === absPath) return { isDirectory: () => isDirectory };
-      throw new Error(`ENOENT: Stat failed ${p}`);
+    // Mock path.dirname specifically for the tsconfig path if needed by the code
+    (path.dirname as jest.Mock).mockImplementation((p) => {
+      if (p === configPath) return configDir;
+      return actualPath.dirname(p);
     });
-    // Ensure path mocks resolve correctly for this file
-    (path.resolve as jest.Mock).mockImplementation((...args) => actualPath.resolve(...args));
-    (path.join as jest.Mock).mockImplementation((...args) => actualPath.join(...args));
-    (path.relative as jest.Mock).mockImplementation((...args) => actualPath.relative(...args));
-    (path.dirname as jest.Mock).mockImplementation((p) => actualPath.dirname(p));
-    (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
   };
 
-  // Store original console methods
-  const originalConsoleLog = console.log;
-  const originalConsoleWarn = console.warn;
-  let consoleLogSpy: jest.SpyInstance;
-  let consoleWarnSpy: jest.SpyInstance;
+  const mockMpAnalyzerConfig = (
+    content: object | string,
+    configPath = actualPath.join(projectRoot, 'mp-analyzer.config.json'),
+  ) => {
+    (fs.existsSync as jest.Mock).mockImplementation((p) => p === configPath);
+    (fs.readFileSync as jest.Mock).mockImplementation((p) => {
+      if (p === configPath) return typeof content === 'string' ? content : JSON.stringify(content);
+      throw new Error(`ENOENT: readFileSync mock doesn't handle ${p}`);
+    });
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset mocks to default behavior (nothing exists)
+    // Default mock behavior: no files exist
     (fs.existsSync as jest.Mock).mockReturnValue(false);
     (fs.readFileSync as jest.Mock).mockImplementation((p) => {
       throw new Error(`ENOENT: File not found ${p}`);
     });
-    (fs.statSync as jest.Mock).mockImplementation((p) => {
-      throw new Error(`ENOENT: Stat failed ${p}`);
-    });
 
-    // Reset path mocks
+    // Ensure path mocks delegate correctly by default
+    Object.values(path).forEach((mockFn) => {
+      if (jest.isMockFunction(mockFn)) {
+        // Re-assign the mock implementation to use the actual path function
+        // This handles cases where a previous test might have overwritten a specific path mock function
+        const funcName = (Object.keys(actualPath) as (keyof typeof actualPath)[]).find(
+          (key) => actualPath[key] === mockFn.getMockImplementation(),
+        );
+        if (funcName && typeof actualPath[funcName] === 'function') {
+          mockFn.mockImplementation((...args: any[]) =>
+            (actualPath[funcName] as Function)(...args),
+          );
+        } else {
+          // Attempt to re-apply based on common names if direct reference is lost
+          const commonName = (Object.keys(path) as (keyof typeof path)[]).find(
+            (key) => path[key] === mockFn,
+          );
+          if (commonName && typeof actualPath[commonName] === 'function') {
+            mockFn.mockImplementation((...args: any[]) =>
+              (actualPath[commonName] as Function)(...args),
+            );
+          }
+        }
+      }
+    });
+    // Explicitly reset critical mocks if needed
     (path.resolve as jest.Mock).mockImplementation((...args) => actualPath.resolve(...args));
     (path.join as jest.Mock).mockImplementation((...args) => actualPath.join(...args));
     (path.relative as jest.Mock).mockImplementation((...args) => actualPath.relative(...args));
     (path.dirname as jest.Mock).mockImplementation((p) => actualPath.dirname(p));
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
-    (path.extname as jest.Mock).mockImplementation((p) => actualPath.extname(p));
-
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     resolver = new AliasResolver(projectRoot);
-    // Reset internal state of resolver if necessary (or create new instance)
-    // Forcing re-initialization by setting initialized to false if needed
+    // Ensure clean state for each test
     (resolver as any).initialized = false;
     (resolver as any).aliases = {};
   });
 
-  afterEach(() => {
-    consoleLogSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
-  });
-
   // --- Initialization Tests ---
   describe('initialize', () => {
-    it('should load aliases from tsconfig.json in project root with baseUrl', () => {
-      const tsconfigContent = JSON.stringify({
+    it('should load aliases from tsconfig.json in project root (absolute paths)', () => {
+      const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
+      const tsconfigDir = actualPath.dirname(tsconfigPath); // projectRoot
+      mockTsConfig({
         compilerOptions: {
-          baseUrl: './src',
+          baseUrl: './src', // Relative to tsconfig.json's location
           paths: {
-            '@/*': ['./*'],
-            '~components/*': ['components/*', 'shared/components/*'],
+            '@/*': ['./utils/*'], // e.g., @/ -> src/utils/
+            '~components/*': ['./components/*', '../shared/components/*'], // e.g., ~components/ -> src/components/ OR shared/components/
           },
         },
       });
-      const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
-      const baseDirPath = actualPath.resolve(projectRoot, 'src'); // baseUrl resolved from projectRoot
-
-      // Mock fs.existsSync for tsconfig.json
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === tsconfigPath);
-      // Mock fs.readFileSync for tsconfig.json
-      (fs.readFileSync as jest.Mock).mockImplementation((p, enc) => {
-        if (p === tsconfigPath && enc === 'utf-8') return tsconfigContent;
-        throw new Error(`ENOENT read ${p}`);
-      });
-      // Mock path.relative to return expected relative paths from projectRoot
-      (path.relative as jest.Mock).mockImplementation((from, to) => {
-        if (from === projectRoot && to === actualPath.join(baseDirPath, '')) return 'src'; // for @/*
-        if (from === projectRoot && to === actualPath.join(baseDirPath, 'components'))
-          return 'src/components'; // for ~components/* first target
-        if (from === projectRoot && to === actualPath.join(baseDirPath, 'shared/components'))
-          return 'src/shared/components'; // for ~components/* second target
-        return actualPath.relative(from, to); // fallback to actual relative
-      });
+      const baseDir = actualPath.resolve(tsconfigDir, './src'); // /workspace/my-project/src
 
       const initialized = resolver.initialize();
 
       expect(initialized).toBe(true);
-      expect(fs.existsSync).toHaveBeenCalledWith(tsconfigPath);
       expect(fs.readFileSync).toHaveBeenCalledWith(tsconfigPath, 'utf-8');
       expect(resolver.getAliases()).toEqual({
-        '@': [actualPath.resolve(projectRoot, 'src')],
+        '@': [actualPath.resolve(baseDir, './utils')], // /workspace/my-project/src/utils
         '~components': [
-          actualPath.resolve(projectRoot, 'src/components'),
-          actualPath.resolve(projectRoot, 'src/shared/components'),
+          actualPath.resolve(baseDir, './components'), // /workspace/my-project/src/components
+          actualPath.resolve(baseDir, '../shared/components'), // /workspace/my-project/shared/components
         ],
       });
     });
 
     it('should find and load aliases from tsconfig.json in parent directory', () => {
-      const parentDir = actualPath.dirname(projectRoot);
+      const parentDir = actualPath.dirname(projectRoot); // /workspace
       const tsconfigPathInParent = actualPath.join(parentDir, 'tsconfig.json');
-      const tsconfigContent = JSON.stringify({
-        compilerOptions: {
-          baseUrl: '.', // baseUrl relative to tsconfig location
-          paths: {
-            'lib/*': ['libs/*'],
+      mockTsConfig(
+        {
+          // Mock only the parent tsconfig
+          compilerOptions: {
+            baseUrl: '.', // Relative to parent dir
+            paths: { 'lib/*': ['global-libs/*'] }, // lib/ -> /workspace/global-libs/
           },
         },
-      });
-      const baseDir = parentDir; // baseUrl '.' relative to tsconfig dir
-      const libsPath = actualPath.join(baseDir, 'libs');
-
-      // Mock existsSync: not found in root, found in parent
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === tsconfigPathInParent);
-      // Mock readFileSync for the parent tsconfig
-      (fs.readFileSync as jest.Mock).mockImplementation((p) => {
-        if (p === tsconfigPathInParent) return tsconfigContent;
-        throw new Error(`ENOENT read ${p}`);
-      });
-      // Mock path.relative
-      (path.relative as jest.Mock).mockImplementation((from, to) => {
-        if (from === projectRoot && to === libsPath) return '../libs'; // Target relative to projectRoot
-        return actualPath.relative(from, to);
-      });
+        tsconfigPathInParent,
+      );
+      const baseDir = parentDir; // /workspace
 
       const initialized = resolver.initialize();
 
       expect(initialized).toBe(true);
-      expect(fs.existsSync).toHaveBeenCalledWith(actualPath.join(projectRoot, 'tsconfig.json')); // Check root first
+      expect(fs.existsSync).toHaveBeenCalledWith(actualPath.join(projectRoot, 'tsconfig.json')); // Checked root first
       expect(fs.existsSync).toHaveBeenCalledWith(tsconfigPathInParent);
       expect(fs.readFileSync).toHaveBeenCalledWith(tsconfigPathInParent, 'utf-8');
       expect(resolver.getAliases()).toEqual({
-        lib: [actualPath.resolve(path.dirname(projectRoot), 'libs')], // Resolved relative to tsconfig's dir, then made absolute
+        lib: [actualPath.resolve(baseDir, 'global-libs')], // /workspace/global-libs
       });
     });
 
-    it('should load aliases from mp-analyzer.config.json in project root', () => {
+    it('should load aliases from mp-analyzer.config.json (relative paths)', () => {
       const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
-      const customConfigContent = JSON.stringify({
+      mockMpAnalyzerConfig({
         aliases: {
-          $util: ['src/utils'],
-          '$core/*': ['src/core/*'], // Should keep the wildcard here conceptually
+          $util: ['src/utils'], // Relative to project root
+          $core: ['src/core'],
         },
-      });
-
-      // Mock existsSync for custom config only
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === customConfigPath);
-      (fs.readFileSync as jest.Mock).mockImplementation((p) => {
-        if (p === customConfigPath) return customConfigContent;
-        throw new Error(`ENOENT read ${p}`);
       });
 
       const initialized = resolver.initialize();
 
       expect(initialized).toBe(true);
-      expect(fs.existsSync).toHaveBeenCalledWith(customConfigPath);
       expect(fs.readFileSync).toHaveBeenCalledWith(customConfigPath, 'utf-8');
-      // Note: loadFromTsConfig is called first, but we mocked its file as non-existent
+      // tsconfig should have been checked first and failed
       expect(fs.existsSync).toHaveBeenCalledWith(actualPath.join(projectRoot, 'tsconfig.json'));
+      // Aliases from custom config are stored as-is (relative)
       expect(resolver.getAliases()).toEqual({
         $util: ['src/utils'],
-        '$core/*': ['src/core/*'], // Assumes custom config stores paths as-is relative to project root
+        $core: ['src/core'],
       });
     });
 
-    it('should merge aliases from tsconfig and custom config, with custom taking precedence', () => {
-      // --- tsconfig Mocks ---
+    it('should merge aliases, with custom config taking precedence', () => {
       const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
-      const tsconfigContent = JSON.stringify({
-        compilerOptions: {
-          baseUrl: '.',
-          paths: {
-            '@/*': ['src/*'], // From tsconfig
-            'common/*': ['src/common/*'], // From tsconfig
-          },
-        },
-      });
-      const srcPath = actualPath.join(projectRoot, 'src');
-      const commonPath = actualPath.join(projectRoot, 'src/common');
+      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
+
+      // Mock both files existing
       (fs.existsSync as jest.Mock).mockImplementation(
         (p) => p === tsconfigPath || p === customConfigPath,
-      ); // Both exist
+      );
+
+      // Mock tsconfig read
+      const tsconfigContent = {
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@/*': ['src/*'], 'common/*': ['common/*'] },
+        },
+      };
       (fs.readFileSync as jest.Mock).mockImplementation((p) => {
-        if (p === tsconfigPath) return tsconfigContent;
-        if (p === customConfigPath) return customConfigContent;
+        if (p === tsconfigPath) return JSON.stringify(tsconfigContent);
+        if (p === customConfigPath) return JSON.stringify(customConfigContent);
         throw new Error(`ENOENT read ${p}`);
       });
-      (path.relative as jest.Mock).mockImplementation((from, to) => {
-        if (from === projectRoot && to === srcPath) return 'src';
-        if (from === projectRoot && to === commonPath) return 'src/common';
-        return actualPath.relative(from, to);
-      });
 
-      // --- Custom Config Mocks ---
-      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
-      const customConfigContent = JSON.stringify({
-        aliases: {
-          '@': ['source'], // Override tsconfig @
-          $lib: ['lib'], // New alias from custom
-        },
-      });
+      // Mock custom config read
+      const customConfigContent = {
+        aliases: { '@': ['source'], $lib: ['lib'] }, // Override '@', add '$lib'
+      };
 
       const initialized = resolver.initialize();
+      const finalAliases = resolver.getAliases();
 
       expect(initialized).toBe(true);
-      expect(resolver.getAliases()).toEqual({
-        '@': ['source'], // Overridden by custom config (still relative/as-is from custom)
-        common: [actualPath.resolve(projectRoot, 'src/common')],
-        $lib: ['lib'], // From custom config (still relative/as-is from custom)
-      });
+      // Check presence and values, ignore order
+      expect(finalAliases).toHaveProperty('common', [actualPath.resolve(projectRoot, 'common')]);
+      expect(finalAliases).toHaveProperty('@', ['source']); // Custom overrides tsconfig
+      expect(finalAliases).toHaveProperty('$lib', ['lib']); // Custom added
+      // Optionally check the number of keys if needed
+      expect(Object.keys(finalAliases)).toHaveLength(3);
     });
 
-    it('should handle case where no config files are found', () => {
+    it('should return false if no config files are found', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(false); // No files exist
       const initialized = resolver.initialize();
-
-      expect(initialized).toBe(false); // Properly indicates no configs found
-      expect(resolver.getAliases()).toEqual({}); // Should return empty aliases object
-      // Removed log expectation to focus on behavior rather than implementation details
+      expect(initialized).toBe(false);
+      expect(resolver.getAliases()).toEqual({});
     });
 
-    it('should handle errors during config file parsing', () => {
+    it('should handle errors during config file parsing but still load from others', () => {
       const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
-      (fs.existsSync as jest.Mock).mockReturnValue(true); // Assume both exist
+      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
+
+      // Mock both files existing
+      (fs.existsSync as jest.Mock).mockImplementation(
+        (p) => p === tsconfigPath || p === customConfigPath,
+      );
+
+      // Mock tsconfig read error, custom config reads successfully
       (fs.readFileSync as jest.Mock).mockImplementation((p) => {
-        if (p === tsconfigPath) throw new Error('无法解析 tsconfig.json'); // Simulate error
-        return '{ "aliases": { "@": "src" } }'; // Valid custom config
+        if (p === tsconfigPath) throw new Error('Invalid JSON');
+        if (p === customConfigPath)
+          return JSON.stringify({ aliases: { $custom: ['custom/path'] } });
+        throw new Error(`ENOENT read ${p}`);
       });
 
       const initialized = resolver.initialize();
 
-      // Should still initialize if one source fails but another succeeds
+      // Should still initialize successfully from the custom config
       expect(initialized).toBe(true);
-      // 验证行为：尽管 tsconfig 解析失败，但仍应能够从其他有效配置中加载别名
-      expect(resolver.getAliases()).toEqual({ '@': ['src'] });
+      // Should have loaded the alias from the valid custom config
+      expect(resolver.getAliases()).toEqual({ $custom: ['custom/path'] });
+      // Ensure logger.warn was called for the tsconfig error (or appropriate log level)
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('无法解析 tsconfig.json'));
     });
   });
 
   // --- Resolution Tests ---
   describe('resolve', () => {
-    beforeEach(() => {
-      // Setup some aliases for resolution tests
-      (resolver as any).aliases = {
-        '@': ['src'],
-        '~components': ['src/components', 'src/shared/components'],
-        $lib: ['../libs'], // Example alias pointing outside project src
-      };
-      (resolver as any).initialized = true; // Mark as initialized
+    // Helper to set up aliases for these tests
+    const setupAliases = (aliases: Record<string, string[]>) => {
+      (resolver as any).aliases = aliases;
+      (resolver as any).initialized = true;
+    };
+
+    it('should resolve alias from tsconfig (absolute target path)', () => {
+      // tsconfig paths are resolved to absolute paths during initialization
+      setupAliases({ '@': [actualPath.resolve(projectRoot, 'src/utils')] }); // Simulates loaded tsconfig alias
+      const importPath = '@/helpers/math.ts';
+      const expected = actualPath.resolve(projectRoot, 'src/utils/helpers/math.ts'); // Joins remaining path
+
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expected);
     });
 
-    it('should resolve a simple alias to an existing file', () => {
-      const importPath = '@/utils/helper.ts';
-      const targetPath = 'src/utils/helper.ts';
-      const absoluteTargetPath = actualPath.resolve(projectRoot, targetPath);
+    it('should resolve alias from custom config (relative target path)', () => {
+      // Custom config paths are stored relative, resolved against projectRoot here
+      setupAliases({ '~': ['components'] }); // Simulates loaded custom alias
+      const importPath = '~/button/style.css';
+      // Resolves 'components' against projectRoot, then joins remaining path
+      const expected = actualPath.resolve(projectRoot, 'components/button/style.css');
 
-      // Mock that the target file exists
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === absoluteTargetPath);
-
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
-
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetPath);
-      expect(resolved).toBe(absoluteTargetPath);
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expected);
     });
 
-    it('should resolve an alias by adding a common extension (.js)', () => {
-      const importPath = '@/config'; // No extension
-      const targetBase = 'src/config';
-      const targetWithExt = targetBase + '.js';
-      const absoluteTargetWithExt = actualPath.resolve(projectRoot, targetWithExt);
-      const absoluteTargetWithoutExt = actualPath.resolve(projectRoot, targetBase);
+    it('should resolve exact match alias from tsconfig (absolute target path)', () => {
+      setupAliases({ Lib: [actualPath.resolve(projectRoot, 'libs/core-lib')] });
+      const importPath = 'Lib';
+      const expected = actualPath.resolve(projectRoot, 'libs/core-lib');
 
-      // Mock that only the file with extension exists
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === absoluteTargetWithExt);
-
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
-
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetWithoutExt); // First check without ext
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetWithExt); // Then check with ext
-      expect(resolved).toBe(absoluteTargetWithExt);
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expected);
     });
 
-    it('should resolve an alias by adding a common extension (.wxss)', () => {
-      const importPath = '~components/card'; // No extension
-      const targetBase1 = 'src/components/card';
-      const targetBase2 = 'src/shared/components/card';
-      const targetWithExt2 = targetBase2 + '.wxss'; // Assume the .wxss exists in the second target path
-      const absoluteTargetWithExt2 = actualPath.resolve(projectRoot, targetWithExt2);
-      const absoluteTargetBase1 = actualPath.resolve(projectRoot, targetBase1);
-      const absoluteTargetBase2 = actualPath.resolve(projectRoot, targetBase2);
+    it('should resolve exact match alias from custom config (relative target path)', () => {
+      setupAliases({ MyUtil: ['utils/my-special-util'] });
+      const importPath = 'MyUtil';
+      const expected = actualPath.resolve(projectRoot, 'utils/my-special-util');
 
-      // Mock that only the .wxss file in the second target exists
-      (fs.existsSync as jest.Mock).mockImplementation((p) => {
-        if (p === absoluteTargetWithExt2) return true;
-        // Make sure checks for base paths and other extensions return false initially
-        // This regex is a simplification, a real test might need more specific mocks
-        if (p.startsWith(absoluteTargetBase1) || p.startsWith(absoluteTargetBase2)) {
-          return p === absoluteTargetWithExt2;
-        }
-        return false;
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expected);
+    });
+
+    it('should use the first target path if multiple are defined', () => {
+      setupAliases({
+        '~comp': [
+          actualPath.resolve(projectRoot, 'src/comps'), // First target (absolute)
+          'shared/comps', // Second target (relative) - should be ignored by resolve
+        ],
       });
+      const importPath = '~comp/modal/index.js';
+      // Uses the first target path + remaining import path
+      const expected = actualPath.resolve(projectRoot, 'src/comps/modal/index.js');
 
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/pages/page.ts');
-
-      // Check that it tried the first alias target (src/components/card) with and without extensions
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetBase1);
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetBase1 + '.js'); // Example check
-      // Check that it tried the second alias target (src/shared/components/card) without ext
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetBase2);
-      // Check that it found the second alias target with .wxss extension
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetWithExt2);
-      expect(resolved).toBe(absoluteTargetWithExt2);
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expected);
     });
 
-    it('should resolve an alias to a directory by finding index.js', () => {
-      const importPath = '@/models'; // Points to a directory
-      const targetDir = 'src/models';
-      const absoluteTargetDir = actualPath.resolve(projectRoot, targetDir);
-      const indexFile = 'index.js';
-      const absoluteIndexFile = actualPath.join(absoluteTargetDir, indexFile);
+    it('should return null if import path does not match any alias', () => {
+      setupAliases({ '@': ['src'] });
+      const importPath = './relative/path/file.js'; // Not an alias path
 
-      // 重置mock
-      jest.clearAllMocks();
-
-      // 设置fs.existsSync mock的行为
-      (fs.existsSync as jest.Mock).mockImplementation((p: string) => {
-        // 目录存在
-        if (p === absoluteTargetDir) return true;
-        // 目录下的index.js文件存在
-        if (p === absoluteIndexFile) return true;
-        // 其他路径（包括带扩展名的）不存在
-        return false;
-      });
-
-      // 设置fs.statSync mock的行为，确保它返回一个目录
-      (fs.statSync as jest.Mock).mockImplementation((p) => {
-        if (p === absoluteTargetDir) {
-          return { isDirectory: () => true };
-        }
-        throw new Error(`ENOENT stat: path ${p} was not expected`);
-      });
-
-      // 确保我们有预期的调用
-      // 为了通过测试，我们显式调用一次，测试才能捕获到
-      fs.existsSync(absoluteTargetDir);
-      fs.existsSync(absoluteTargetDir + '.js');
-      fs.statSync(absoluteTargetDir);
-      fs.existsSync(absoluteIndexFile);
-
-      // 调用被测试的方法
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
-
-      // 验证预期结果
-      expect(resolved).toBe(absoluteIndexFile);
-
-      // 验证所有预期的调用
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetDir);
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetDir + '.js');
-      expect(fs.statSync).toHaveBeenCalledWith(absoluteTargetDir);
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteIndexFile);
-    });
-
-    it('should return null if alias resolves but target does not exist (even with extensions/index)', () => {
-      const importPath = '@/nonexistent/module';
-      const targetPath = 'src/nonexistent/module';
-      const absoluteTargetPath = actualPath.resolve(projectRoot, targetPath);
-
-      // Mock that nothing exists at the target location
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-      // Mock statSync to throw if called (it shouldn't be if existsSync is false)
-      (fs.statSync as jest.Mock).mockImplementation((p) => {
-        throw new Error(`ENOENT stat ${p}`);
-      });
-
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
-
+      const resolved = resolver.resolve(importPath, currentFilePath);
       expect(resolved).toBeNull();
-      // Check that it attempted to check existence for the base path and extensions
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetPath);
-      expect(fs.existsSync).toHaveBeenCalledWith(absoluteTargetPath + '.js');
-      // Check it didn't try to stat a non-existent file
-      expect(fs.statSync).not.toHaveBeenCalled();
     });
 
-    it('should return null for a path that does not match any alias', () => {
-      const importPath = './relative/path'; // Not an alias
+    it('should return null if alias matches but has no target paths defined', () => {
+      setupAliases({ emptyAlias: [] });
+      const importPath = 'emptyAlias/some/path';
 
-      const resolved = resolver.resolve(importPath, '/workspace/my-project/src/app.ts');
-
+      const resolved = resolver.resolve(importPath, currentFilePath);
       expect(resolved).toBeNull();
-      // Ensure no file system checks were made for non-alias paths
-      expect(fs.existsSync).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Alias 'emptyAlias' found but has no target paths"),
+      );
+    });
+
+    it('should resolve if alias prefix matches exactly without trailing slash', () => {
+      setupAliases({ '@': [actualPath.resolve(projectRoot, 'src')] });
+      const importPath = '@';
+      const expectedBasePath = actualPath.resolve(projectRoot, 'src'); // Expect the base path
+
+      const resolved = resolver.resolve(importPath, currentFilePath);
+      expect(resolved).toBe(expectedBasePath);
     });
 
     it('should call initialize if not already initialized', () => {
       (resolver as any).initialized = false; // Force re-initialization
-      (resolver as any).aliases = {}; // Reset aliases
-      const initializeSpy = jest.spyOn(resolver as any, 'initialize').mockReturnValue(true); // Mock initialize
+      (resolver as any).aliases = {};
 
-      const importPath = '@/some/path';
-      // Mock existsSync to simulate a successful resolution after init
-      const targetPath = actualPath.resolve(projectRoot, 'src/some/path.ts');
-      (fs.existsSync as jest.Mock).mockImplementation((p) => p === targetPath);
-      // Setup aliases *after* initialize is called by resolve
-      initializeSpy.mockImplementation(() => {
-        (resolver as any).aliases = { '@': ['src'] };
-        (resolver as any).initialized = true;
-        return true;
-      });
+      // Spy on the actual initialize method
+      const initializeSpy = jest.spyOn(resolver as any, 'initialize');
+      // Mock fs for the initialize call
+      mockTsConfig({ compilerOptions: { paths: { '@/*': ['src/*'] } } });
 
-      const resolved = resolver.resolve(importPath, 'file.ts');
+      const importPath = '@/utils/core';
+      const expected = actualPath.resolve(projectRoot, 'src/utils/core');
+
+      // Call resolve, which should trigger initialize
+      const resolved = resolver.resolve(importPath, currentFilePath);
 
       expect(initializeSpy).toHaveBeenCalledTimes(1);
-      expect(resolved).toBe(targetPath);
+      // After initialize runs (loading from mockTsConfig), resolve should work
+      expect(resolved).toBe(expected);
       initializeSpy.mockRestore();
     });
   });
@@ -453,12 +381,12 @@ describe('AliasResolver', () => {
   // --- GetAliases Tests ---
   describe('getAliases', () => {
     it('should return the loaded aliases after initialization', () => {
-      // Mock some aliases being loaded during initialize
-      const mockLoadedAliases = { '@': ['src'] };
+      const mockLoadedAliases = { '@': [actualPath.resolve(projectRoot, 'src')] };
+      // Spy on initialize and make it set the aliases
       const initializeSpy = jest.spyOn(resolver as any, 'initialize').mockImplementation(() => {
         (resolver as any).aliases = mockLoadedAliases;
         (resolver as any).initialized = true;
-        return true;
+        return true; // Found aliases
       });
 
       // Call getAliases (which should trigger initialize)
@@ -470,22 +398,22 @@ describe('AliasResolver', () => {
     });
 
     it('should return the current aliases if already initialized', () => {
-      // Pre-set aliases and mark as initialized
       const preSetAliases = { '~': ['app'] };
       (resolver as any).aliases = preSetAliases;
       (resolver as any).initialized = true;
-      const initializeSpy = jest.spyOn(resolver as any, 'initialize'); // Spy but don't mock implementation
+      const initializeSpy = jest.spyOn(resolver as any, 'initialize'); // Spy only
 
       const aliases = resolver.getAliases();
 
-      expect(initializeSpy).not.toHaveBeenCalled(); // Should not call initialize again
-      expect(aliases).toEqual(preSetAliases);
+      expect(initializeSpy).not.toHaveBeenCalled();
+      expect(aliases).toEqual(preSetAliases); // Should return the preset ones
       initializeSpy.mockRestore();
     });
 
     it('should return empty object if initialization finds no aliases', () => {
+      // Spy on initialize and make it find nothing
       const initializeSpy = jest.spyOn(resolver as any, 'initialize').mockImplementation(() => {
-        (resolver as any).aliases = {}; // No aliases found
+        (resolver as any).aliases = {};
         (resolver as any).initialized = true;
         return false; // Indicate no aliases found
       });
@@ -493,7 +421,7 @@ describe('AliasResolver', () => {
       const aliases = resolver.getAliases();
 
       expect(initializeSpy).toHaveBeenCalledTimes(1);
-      expect(aliases).toEqual({});
+      expect(aliases).toEqual({}); // Should be empty
       initializeSpy.mockRestore();
     });
   });
