@@ -431,6 +431,8 @@ export class FileParser {
       const componentExtensions = ['.js', '.ts', '.wxml', '.json']; // Usually component logic + template + style + config
       // Define standard extensions for pages (prioritizing script)
       const pageScriptExtensions = ['.js', '.ts'];
+      // Define ALL standard extensions for pages/components files
+      const pageAllExtensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
       // Define extensions for images/icons
       const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
 
@@ -440,15 +442,19 @@ export class FileParser {
       if (content.pages && Array.isArray(content.pages)) {
         for (const pagePath of content.pages) {
           if (typeof pagePath === 'string') {
-            // Resolve the primary script file for the page, treating paths as root-relative
+            // Resolve *any* primary file for the page (js, ts, wxml, wxss, json)
+            // treating paths as root-relative
             const resolvedPagePath = this.resolveAnyPath(
               '/' + pagePath,
               filePath,
-              pageScriptExtensions,
+              pageAllExtensions, // <-- Use all extensions
             );
             if (resolvedPagePath) {
               dependencies.add(resolvedPagePath);
-              // Note: Finding related files (.wxml, .wxss, .json) is delegated to the caller/graph builder.
+              // Note: Finding related files is handled by the graph builder ensuring all siblings are added later
+            } else if (this.options.verbose) {
+              // Add verbose logging if resolution fails
+              logger.warn(`Could not resolve page path from app.json: /${pagePath}`);
             }
           }
         }
@@ -466,15 +472,20 @@ export class FileParser {
               if (typeof pagePath === 'string') {
                 // Construct the full root-relative path
                 const fullPagePath = '/' + path.join(root, pagePath);
-                // Resolve the primary script file for the subpackage page
+                // Resolve *any* primary file for the subpackage page
                 const resolvedPagePath = this.resolveAnyPath(
                   fullPagePath,
                   filePath,
-                  pageScriptExtensions,
+                  pageAllExtensions, // <-- Use all extensions
                 );
                 if (resolvedPagePath) {
                   dependencies.add(resolvedPagePath);
-                  // Note: Related file finding delegated to caller.
+                  // Note: Related file finding handled by graph builder
+                } else if (this.options.verbose) {
+                  // Add verbose logging if resolution fails
+                  logger.warn(
+                    `Could not resolve subpackage page path from app.json: ${fullPagePath}`,
+                  );
                 }
               }
             }
@@ -625,15 +636,36 @@ export class FileParser {
         ', ',
       )}]`,
     );
-    // Add check for absolute path input
+
+    // --- REVISED: Handle true absolute paths FIRST, only if they EXIST at that absolute location ---
     if (path.isAbsolute(importPath)) {
-      logger.trace(`Input importPath '${importPath}' is already absolute.`);
+      logger.trace(
+        `Input importPath '${importPath}' is absolute. Checking direct existence first.`,
+      );
+      // Check if the file exists *directly* at this absolute path before treating it as special.
+      // We use findExistingPath because it also checks extensions.
+      const existingAbsolutePath = this.findExistingPath(importPath, allowedExtensions);
+      if (existingAbsolutePath) {
+        // If it exists at the true absolute path, return it.
+        logger.trace(
+          `Found existing file at true absolute path: ${existingAbsolutePath}. Returning directly.`,
+        );
+        return existingAbsolutePath;
+      } else {
+        // If it doesn't exist at the true absolute path, log it, but let it fall through.
+        // It might be a root-relative path (e.g., /pages/index on Linux/Mac) that needs project-relative resolution.
+        logger.trace(
+          `Absolute path '${importPath}' not found directly. Will proceed to normal resolution (might be root-relative).`,
+        );
+        // DO NOT return null here. Let it fall through to alias/relative/root-relative checks.
+      }
     }
+    // --- END REVISED ---
 
     let potentialBasePath: string | null = null;
     let isAlias = false;
 
-    // 1. Try resolving as an alias first
+    // 1. Try resolving as an alias first (Skip if already resolved as absolute)
     if (this.isAliasPath(importPath) && this.aliasResolver) {
       isAlias = true; // Mark that we started from an alias
       potentialBasePath = this.aliasResolver.resolve(importPath, sourcePath);

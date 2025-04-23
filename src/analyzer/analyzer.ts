@@ -411,7 +411,9 @@ function resolveEssentialFiles(
 ): Set<string> {
   const projectLevelFiles = [
     'tsconfig.json',
+    'jsconfig.json',
     'mp-analyzer.config.json',
+    'mp-analyzer.config.js',
     'package.json',
     '.eslintrc.js',
     '.eslintrc.json',

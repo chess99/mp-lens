@@ -827,6 +827,26 @@ describe('FileParser', () => {
       expect(AliasResolver.prototype.resolve as jest.Mock).not.toHaveBeenCalled(); // No aliases here
     });
 
+    it('should resolve app.json page entry even if only WXML exists', async () => {
+      const filePath = 'app.json';
+      const fileContent = JSON.stringify({
+        pages: ['pages/onlywxml/index'], // Page with only WXML
+      });
+      mockFileContent(filePath, fileContent);
+
+      // Mock ONLY the WXML file existence
+      const pageWxml = 'pages/onlywxml/index.wxml';
+      mockPathExists([pageWxml]);
+      // Crucially, do NOT mock .js or .ts for this page
+
+      // Use default parser
+      const dependencies = await parser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // Expect the WXML file to be added as a dependency (entry point)
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, pageWxml));
+      expect(dependencies).toHaveLength(1); // Should only find the WXML
+    });
+
     it('should resolve aliases correctly for usingComponents and return primary file', async () => {
       const filePath = 'src/pages/cart/cart.json';
       const fileContent = JSON.stringify({
