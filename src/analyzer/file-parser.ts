@@ -604,16 +604,17 @@ export class FileParser {
       return false;
     }
     const aliases = this.aliasResolver.getAliases();
-    console.log('[isAliasPath] Checking path:', importPath);
-    console.log('[isAliasPath] Available aliases:', aliases);
+    // REMOVED: Repetitive console logs
+    // console.log('[isAliasPath] Checking path:', importPath);
+    // console.log('[isAliasPath] Available aliases:', aliases);
     if (Object.keys(aliases).length === 0) {
-      console.log('[isAliasPath] No aliases configured.');
+      // console.log('[isAliasPath] No aliases configured.');
       return false;
     }
     const aliasPatterns = Object.keys(aliases).map((alias) => alias.replace(/\*$/, '')); // Remove trailing /*
-    console.log('[isAliasPath] Alias patterns:', aliasPatterns);
+    // console.log('[isAliasPath] Alias patterns:', aliasPatterns);
     const isAlias = aliasPatterns.some((pattern) => importPath.startsWith(pattern));
-    console.log(`[isAliasPath] Path '${importPath}' starts with alias pattern? ${isAlias}`);
+    // console.log(`[isAliasPath] Path '${importPath}' starts with alias pattern? ${isAlias}`);
     return isAlias;
   }
 

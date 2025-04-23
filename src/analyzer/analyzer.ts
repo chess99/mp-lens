@@ -276,96 +276,87 @@ function parseEntryContent(
   entryFiles: Set<string>,
 ): void {
   try {
-    const addIfExists = (filePathRelative: string) => {
+    // Helper to find and add all related component files for a given base path
+    const addAllRelatedFilesIfExists = (baseRelativePath: string) => {
+      const normalizedRelativePath = baseRelativePath.replace(/\\\\/g, '/');
+      const absoluteBasePath = path.resolve(miniappRoot, normalizedRelativePath);
+      let fileAdded = false; // Track if at least one related file was found
+
+      const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+
+      for (const ext of extensions) {
+        const potentialFilePath = absoluteBasePath + ext;
+        if (fs.existsSync(potentialFilePath) && graph.hasNode(potentialFilePath)) {
+          // Check if it exists and is part of the initial file scan
+          entryFiles.add(potentialFilePath);
+          fileAdded = true;
+        }
+      }
+      return fileAdded;
+    };
+
+    // Helper to add a single file path if it exists (used for direct references like icons)
+    const addSingleFileIfExists = (filePathRelative: string) => {
       const normalizedRelativePath = filePathRelative.replace(/\\\\/g, '/');
-
       const absolutePath = path.resolve(miniappRoot, normalizedRelativePath);
-
       if (fs.existsSync(absolutePath) && graph.hasNode(absolutePath)) {
         entryFiles.add(absolutePath);
         return true;
       }
-
-      const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-      const hasExtension = path.extname(normalizedRelativePath) !== '';
-
-      if (!hasExtension) {
-        for (const ext of extensions) {
-          const pathWithExt = absolutePath + ext;
-          if (fs.existsSync(pathWithExt) && graph.hasNode(pathWithExt)) {
-            entryFiles.add(pathWithExt);
-            return true;
-          }
-        }
-      }
       return false;
     };
 
+    // Process Pages (add all related files)
     if (content.pages && Array.isArray(content.pages)) {
-      content.pages.forEach((page: string) => addIfExists(page));
+      content.pages.forEach((page: string) => addAllRelatedFilesIfExists(page));
     }
 
+    // Process Subpackages (add all related files for pages)
     const subpackages = content.subpackages || content.subPackages || [];
     if (Array.isArray(subpackages)) {
       subpackages.forEach((pkg: any) => {
         if (pkg.root && pkg.pages && Array.isArray(pkg.pages)) {
           pkg.pages.forEach((page: string) => {
             const pagePath = path.join(pkg.root, page);
-            addIfExists(pagePath);
+            addAllRelatedFilesIfExists(pagePath);
           });
-          addIfExists(path.join(pkg.root, 'app.js'));
-          addIfExists(path.join(pkg.root, 'app.json'));
-          addIfExists(path.join(pkg.root, 'app.ts'));
+          // Check for subpackage-specific app.js/ts (add single file)
+          addSingleFileIfExists(path.join(pkg.root, 'app.js'));
+          addSingleFileIfExists(path.join(pkg.root, 'app.ts'));
         }
       });
     }
 
+    // Process TabBar (pagePath needs all related, icons are single files)
     if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
       content.tabBar.list.forEach((item: any) => {
-        if (item.pagePath) addIfExists(item.pagePath);
-        if (item.iconPath) addIfExists(item.iconPath);
-        if (item.selectedIconPath) addIfExists(item.selectedIconPath);
+        if (item.pagePath) addAllRelatedFilesIfExists(item.pagePath); // Page path
+        if (item.iconPath) addSingleFileIfExists(item.iconPath); // Icon file
+        if (item.selectedIconPath) addSingleFileIfExists(item.selectedIconPath); // Icon file
       });
     }
 
+    // Process Global usingComponents (add all related files for components)
+    // Note: Component-specific usingComponents are handled during file parsing,
+    // This section handles those defined globally in app.json
     if (content.usingComponents && typeof content.usingComponents === 'object') {
       Object.entries(content.usingComponents).forEach(([_componentName, componentPath]) => {
-        if (typeof componentPath === 'string') {
-          let success = addIfExists(componentPath as string);
-
-          if (!success) {
-            const pathStr = componentPath as string;
-            const normalizedPath = pathStr.startsWith('/') ? pathStr.substring(1) : pathStr;
-
-            success = addIfExists(normalizedPath);
-
-            if (!success) {
-              const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-
-              for (const ext of extensions) {
-                if (addIfExists(`${pathStr}${ext}`)) {
-                  logger.info(
-                    `Successfully added component dependency (original path): ${pathStr}${ext}`,
-                  );
-                  success = true;
-                  break;
-                }
-              }
-
-              if (!success) {
-                for (const ext of extensions) {
-                  if (addIfExists(`${normalizedPath}${ext}`)) {
-                    logger.info(
-                      `Successfully added component dependency (standardized path): ${normalizedPath}${ext}`,
-                    );
-                    break;
-                  }
-                }
-              }
-            }
-          }
+        if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
+          // Treat component paths like page paths - add all related files
+          addAllRelatedFilesIfExists(componentPath as string);
         }
       });
+    }
+
+    // Add theme.json if present
+    if (content.themeLocation) {
+      addSingleFileIfExists(content.themeLocation);
+    }
+    addSingleFileIfExists('theme.json'); // Default location
+
+    // Add workers if present (they are entry points)
+    if (content.workers && typeof content.workers === 'string') {
+      addSingleFileIfExists(content.workers);
     }
   } catch (error) {
     logger.error(`Failed to parse entry content: ${(error as Error).message}`);
