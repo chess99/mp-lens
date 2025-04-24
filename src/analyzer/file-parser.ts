@@ -604,18 +604,27 @@ export class FileParser {
       return false;
     }
     const aliases = this.aliasResolver.getAliases();
-    // REMOVED: Repetitive console logs
-    // console.log('[isAliasPath] Checking path:', importPath);
-    // console.log('[isAliasPath] Available aliases:', aliases);
     if (Object.keys(aliases).length === 0) {
-      // console.log('[isAliasPath] No aliases configured.');
       return false;
     }
-    const aliasPatterns = Object.keys(aliases).map((alias) => alias.replace(/\*$/, '')); // Remove trailing /*
-    // console.log('[isAliasPath] Alias patterns:', aliasPatterns);
-    const isAlias = aliasPatterns.some((pattern) => importPath.startsWith(pattern));
-    // console.log(`[isAliasPath] Path '${importPath}' starts with alias pattern? ${isAlias}`);
-    return isAlias;
+
+    // Create a more precise pattern matching approach
+    // 1. Check if the import path matches exactly with an alias
+    if (importPath in aliases) {
+      return true;
+    }
+
+    // 2. Check if the import path starts with an alias followed by a slash
+    for (const alias of Object.keys(aliases)) {
+      // Ensure we match exact alias prefixes (e.g., '@mtfe/' not just '@')
+      // This prevents incorrectly matching npm packages like '@analytics/wechat-sdk'
+      // when we have an alias like '@mtfe'
+      if (importPath === alias || importPath.startsWith(`${alias}/`)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -637,6 +646,13 @@ export class FileParser {
         ', ',
       )}]`,
     );
+
+    // Quick check for npm package imports that don't match our alias patterns
+    // This prevents unnecessary warnings for packages that can't be resolved in the file system
+    if (this.isNpmPackageImport(importPath)) {
+      logger.trace(`Skipping resolution for npm package import: ${importPath}`);
+      return null;
+    }
 
     // --- REVISED: Handle true absolute paths FIRST, only if they EXIST at that absolute location ---
     if (path.isAbsolute(importPath)) {
@@ -722,6 +738,42 @@ export class FileParser {
       logger.warn(`Failed to resolve import '${importPath}' from '${sourcePath}'.`);
     }
     return null;
+  }
+
+  /**
+   * Check if the import path looks like an npm package that we shouldn't try to resolve
+   * on the file system or with aliases
+   */
+  private isNpmPackageImport(importPath: string): boolean {
+    // Typical npm package patterns:
+    // 1. Non-relative, non-absolute path that doesn't match our aliases (e.g., 'lodash', 'react')
+    // 2. Scoped packages (e.g., '@angular/core', '@analytics/wechat-sdk')
+
+    // For scoped packages, check if it starts with @ but is not one of our aliases
+    if (importPath.startsWith('@')) {
+      // Extract the scope part (e.g., '@angular' from '@angular/core')
+      const scope = importPath.split('/')[0];
+
+      // If we have alias config, check if this scope matches any of our aliases
+      if (this.hasAliasConfig && this.aliasResolver) {
+        const aliases = this.aliasResolver.getAliases();
+        // If the scope exactly matches an alias or is a prefix of an alias followed by /,
+        // then it's likely not an npm package but a configured alias
+        if (
+          scope in aliases ||
+          Object.keys(aliases).some((alias) => alias === scope || alias.startsWith(`${scope}/`))
+        ) {
+          return false;
+        }
+      }
+
+      // If no alias match, it's likely an npm package
+      return true;
+    }
+
+    // For non-scoped packages, harder to detect reliably.
+    // We'll return false to let the regular resolution logic handle it
+    return false;
   }
 
   /**

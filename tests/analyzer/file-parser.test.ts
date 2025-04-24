@@ -1088,6 +1088,163 @@ describe('FileParser', () => {
     });
   });
 
+  // --- NPM Package Detection and Alias Resolution Tests ---
+  describe('NPM Package Detection and Alias Resolution', () => {
+    it('should not attempt to resolve npm package imports starting with @', async () => {
+      const filePath = 'src/app.ts';
+      const fileContent = `
+        import analytics from '@analytics/wechat-sdk';
+        import { Component } from '@mtfe/component-lib';
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // Set up alias configuration
+      const aliasMap = {
+        '@mtfe': [actualPath.resolve(projectRoot, 'src/npm/@mtfe')],
+        '@common': [actualPath.resolve(projectRoot, 'src/common')],
+      };
+
+      // Apply casting here
+      (AliasResolver.prototype.initialize as jest.Mock).mockReturnValue(true);
+      (AliasResolver.prototype.getAliases as jest.Mock).mockReturnValue(aliasMap);
+
+      // Mock the AliasResolver.resolve to return paths for configured aliases only
+      (AliasResolver.prototype.resolve as jest.Mock).mockImplementation((importPath) => {
+        if (importPath.startsWith('@mtfe/')) {
+          return actualPath.resolve(projectRoot, 'src/npm', importPath);
+        }
+        return null;
+      });
+
+      // Mock existence of the component library file
+      const componentLibPath = 'src/npm/@mtfe/component-lib.ts';
+      mockPathExists([componentLibPath]);
+
+      // Create a fresh parser with the mocked alias resolver
+      const testParser = new FileParser(projectRoot, { fileTypes: ['.ts', '.js'], verbose: false });
+
+      // Parse the file
+      const dependencies = await testParser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // Verify that the analyzer found the @mtfe import (configured alias)
+      // but ignored @analytics/wechat-sdk (npm package)
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, componentLibPath));
+      expect(AliasResolver.prototype.resolve as jest.Mock).toHaveBeenCalledWith(
+        '@mtfe/component-lib',
+        expect.any(String),
+      );
+      // Verify it was NOT called for the npm package
+      expect(AliasResolver.prototype.resolve as jest.Mock).not.toHaveBeenCalledWith(
+        '@analytics/wechat-sdk',
+        expect.any(String),
+      );
+    });
+
+    it('should correctly identify npm packages vs configured aliases', async () => {
+      const filePath = 'src/utils/index.ts';
+      const fileContent = `
+        import { logger } from '@common/logger';
+        import { fetch } from '@fetch/core';
+        import lib from '@analytics/web-sdk';
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // Set up alias configuration with multiple aliases
+      const aliasMap = {
+        '@common': [actualPath.resolve(projectRoot, 'src/common')],
+        '@components': [actualPath.resolve(projectRoot, 'src/components')],
+        '@utils': [actualPath.resolve(projectRoot, 'src/utils')],
+      };
+
+      // Apply casting here
+      (AliasResolver.prototype.initialize as jest.Mock).mockReturnValue(true);
+      (AliasResolver.prototype.getAliases as jest.Mock).mockReturnValue(aliasMap);
+
+      // Mock the AliasResolver.resolve to return paths for configured aliases
+      (AliasResolver.prototype.resolve as jest.Mock).mockImplementation((importPath) => {
+        if (importPath.startsWith('@common/')) {
+          return actualPath.resolve(projectRoot, 'src/common', importPath.substring(8));
+        }
+        return null;
+      });
+
+      // Mock existence of the logger file
+      const loggerPath = 'src/common/logger.ts';
+      mockPathExists([loggerPath]);
+
+      // Create a fresh parser
+      const testParser = new FileParser(projectRoot, { fileTypes: ['.ts', '.js'], verbose: false });
+
+      // Parse the file
+      const dependencies = await testParser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // Verify that the analyzer found the @common import (configured alias)
+      // but ignored @fetch/core and @analytics/web-sdk (npm packages)
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, loggerPath));
+      expect(AliasResolver.prototype.resolve as jest.Mock).toHaveBeenCalledWith(
+        '@common/logger',
+        expect.any(String),
+      );
+      // Verify it was NOT called for npm packages
+      expect(AliasResolver.prototype.resolve as jest.Mock).not.toHaveBeenCalledWith(
+        '@fetch/core',
+        expect.any(String),
+      );
+      expect(AliasResolver.prototype.resolve as jest.Mock).not.toHaveBeenCalledWith(
+        '@analytics/web-sdk',
+        expect.any(String),
+      );
+    });
+
+    it('should correctly handle exact alias matches without slashes', async () => {
+      const filePath = 'src/app.ts';
+      const fileContent = `
+        import * as common from '@common';
+        import * as analytics from '@analytics';
+      `;
+      mockFileContent(filePath, fileContent);
+
+      // Set up alias configuration with one alias that matches exactly
+      const aliasMap = {
+        '@common': [actualPath.resolve(projectRoot, 'src/common')],
+        '@utils': [actualPath.resolve(projectRoot, 'src/utils')],
+      };
+
+      (AliasResolver.prototype.initialize as jest.Mock).mockReturnValue(true);
+      (AliasResolver.prototype.getAliases as jest.Mock).mockReturnValue(aliasMap);
+
+      (AliasResolver.prototype.resolve as jest.Mock).mockImplementation((importPath) => {
+        if (importPath === '@common') {
+          return actualPath.resolve(projectRoot, 'src/common');
+        }
+        return null;
+      });
+
+      // Mock existence of common as a directory with an index.ts file
+      const commonIndexPath = 'src/common/index.ts';
+      mockPathExists(['src/common'], 'dir');
+      mockPathExists([commonIndexPath]);
+
+      const testParser = new FileParser(projectRoot, { fileTypes: ['.ts', '.js'], verbose: false });
+      const dependencies = await testParser.parseFile(actualPath.resolve(projectRoot, filePath));
+
+      // Should find the index.ts for the exact alias match
+      expect(dependencies).toHaveLength(1);
+      expect(dependencies).toContain(actualPath.resolve(projectRoot, commonIndexPath));
+      expect(AliasResolver.prototype.resolve as jest.Mock).toHaveBeenCalledWith(
+        '@common',
+        expect.any(String),
+      );
+      // Should not try to resolve @analytics as an alias
+      expect(AliasResolver.prototype.resolve as jest.Mock).not.toHaveBeenCalledWith(
+        '@analytics',
+        expect.any(String),
+      );
+    });
+  });
+
   // --- General File Type Handling ---
   describe('General File Handling', () => {
     it('should return empty dependencies for image files', async () => {
