@@ -2,6 +2,7 @@ import * as path from 'path';
 import { CommandOptions, ConfigFileOptions } from '../types/command-options';
 import { logger } from './debug-logger';
 import { findAppJsonConfig } from './fs-finder';
+import { loadTsConfigTypes } from './tsconfig-helper';
 
 // Type guard to check if a value is a non-empty string
 export function isString(value: unknown): value is string {
@@ -76,23 +77,42 @@ export function mergeOptions(
   merged.keepAssets = merged.keepAssets || [];
 
   // 2. Essential Files
+  let essentialFilesFromCliOrConfig: string[] = [];
   let essentialFilesSource: string | string[] | undefined = undefined;
   if (cliOptions.essentialFiles !== undefined) {
     essentialFilesSource = cliOptions.essentialFiles;
-  } else if (fileConf?.essentialFiles) {
-    essentialFilesSource = fileConf.essentialFiles;
+  } else if (fileConfig?.essentialFiles) {
+    essentialFilesSource = fileConfig.essentialFiles;
   }
-  let finalEssentialFilesList: string[] | undefined = undefined;
   if (essentialFilesSource) {
-    finalEssentialFilesList =
+    essentialFilesFromCliOrConfig =
       typeof essentialFilesSource === 'string'
         ? essentialFilesSource.split(',').map((f) => f.trim())
         : Array.isArray(essentialFilesSource)
         ? essentialFilesSource
-        : undefined;
+        : []; // Default to empty array if invalid type
   }
-  if (finalEssentialFilesList) {
-    merged.essentialFiles = finalEssentialFilesList.map((f) => path.resolve(projectRoot, f));
+
+  // Resolve paths from CLI/Config
+  const resolvedEssentialFromCliOrConfig = essentialFilesFromCliOrConfig.map((f) =>
+    path.resolve(projectRoot, f),
+  );
+
+  // --- Start: Load essential files from tsconfig.types ---
+  const essentialFromTsConfig = loadTsConfigTypes(projectRoot);
+  // --- End: Load essential files from tsconfig.types ---
+
+  // Combine and deduplicate all essential files
+  const allEssentialFiles = [
+    ...new Set([...resolvedEssentialFromCliOrConfig, ...essentialFromTsConfig]),
+  ];
+
+  if (allEssentialFiles.length > 0) {
+    merged.essentialFiles = allEssentialFiles;
+    logger.debug(
+      `Final essential files list (CLI/Config + tsconfig):`,
+      allEssentialFiles.map((f) => path.relative(projectRoot, f)),
+    );
   } else {
     merged.essentialFiles = undefined;
   }

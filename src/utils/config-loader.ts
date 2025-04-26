@@ -3,7 +3,8 @@ import * as path from 'path';
 import { ConfigFileOptions } from '../types/command-options';
 
 /**
- * 配置文件加载器，支持多种格式的配置文件
+ * Loads the mp-analyzer specific configuration file (e.g., mp-analyzer.config.js).
+ * It does NOT handle loading tsconfig.json or other project-specific config files.
  */
 export class ConfigLoader {
   /**
