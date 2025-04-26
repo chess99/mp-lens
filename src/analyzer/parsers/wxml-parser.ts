@@ -87,7 +87,8 @@ export class WXMLParser {
   }
 
   private processImageSources(content: string, filePath: string, dependencies: Set<string>): void {
-    const IMAGE_SRC_REGEX = /<image.*?src=["'](.*?)["']/g;
+    // Added 's' flag (dotAll) to allow . to match newline characters
+    const IMAGE_SRC_REGEX = /<image[\s\S]*?src=["'](.*?)["']/gs;
     const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
     const matches = [...content.matchAll(IMAGE_SRC_REGEX)];
 

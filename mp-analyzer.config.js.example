@@ -1,0 +1,159 @@
+/**
+ * mp-analyzer 配置文件示例 (JavaScript 格式)
+ * 使用 JavaScript 格式允许添加注释并进行更灵活的配置。
+ */
+module.exports = {
+  /**
+   * [可选] 小程序源代码所在的子目录（相对于此配置文件所在的目录）。
+   * 如果省略，则假定项目根目录即为小程序根目录。
+   * 例: "src", "./miniprogram"
+   */
+  miniappRoot: 'src',
+
+  /**
+   * [可选] 指定分析的入口文件（相对于 miniappRoot）。
+   * 默认为 "app.json"。
+   * 例: "app.js", "my-custom-entry.json"
+   */
+  entryFile: 'app.json',
+
+  /**
+   * [可选] 要分析的文件类型扩展名列表，用逗号分隔。
+   * 默认值: 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs'
+   */
+  types: 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs',
+
+  /**
+   * [可选] 要排除的文件/目录的 Glob 模式列表。
+   * 这些文件不会被分析，也不会被列为未使用或被清理。
+   * 支持使用 minimatch 语法 (https://github.com/isaacs/minimatch)
+   * 例: ["**/node_modules/**", "dist/**", "**/*.mock.js"]
+   */
+  exclude: [
+    '**/node_modules/**',
+    '**/miniprogram_npm/**',
+    '**/dist/**',
+    '**/*.spec.ts',
+    '**/*.test.ts',
+    '**/mock/**',
+  ],
+  // excludePatterns: [] // 旧的别名，与 exclude 功能相同，保留以兼容
+
+  /**
+   * [可选] 应始终被视为必需的文件路径列表（相对于项目根目录）。
+   * 这些文件永远不会被报告为未使用或被清理，即使没有找到引用。
+   * 对于某些通过特殊方式引用或全局使用的文件很有用。
+   * 例: ["utils/init.js", "config/theme.json"]
+   */
+  essentialFiles: [
+    'project.config.json', // 项目配置文件通常是必需的
+    'sitemap.json',      // 站点地图文件
+  ],
+
+  /**
+   * [可选] Glob 模式列表，用于匹配那些不应被报告为未使用或被清理的文件。
+   * 主要用于静态分析无法可靠检测到的动态加载资源（如来自 API 的图片）。
+   * 即使分析器没有找到这些文件的直接静态引用，它们也会被保留。
+   * 例: ["images/dynamic-icons/*", "assets/vendor/**/*.png"]
+   */
+  keepAssets: [
+    'images/from-backend/**',
+    'assets/vendor/**/*.png',
+  ],
+
+  /**
+   * [可选] 路径别名配置，用于解析模块导入。
+   * 如果项目中有 tsconfig.json 或 jsconfig.json 包含 paths 配置，
+   * 通常会自动加载，无需在此手动配置。
+   * 如果需要覆盖或补充自动加载的配置，可以在此定义。
+   * 例: {
+   *   "@": "./src",
+   *   "@components": "./src/components",
+   *   "@utils/*": ["./src/utils/*"]
+   * }
+   */
+  aliases: {
+    // "@": "./src", // 示例，通常会自动从 tsconfig/jsconfig 加载
+  },
+  // aliasMap: {} // 旧的别名，不再推荐使用
+
+  // --- 特定命令的配置 (通常通过命令行参数指定，但也可在此配置) ---
+
+  /**
+   * [list-unused 命令可选] 输出未使用文件列表的格式。
+   * 'text': 纯文本列表 (默认)
+   * 'json': JSON 格式输出
+   */
+  outputFormat: 'text',
+
+  /**
+   * [graph 命令可选] 生成依赖图的格式。
+   * 'html': 交互式 HTML 文件 (默认)
+   * 'dot': Graphviz DOT 语言文件
+   * 'json': JSON 格式表示图数据
+   * 'png': PNG 图片 (需要系统安装 Graphviz)
+   * 'svg': SVG 图片 (需要系统安装 Graphviz)
+   */
+  format: 'html',
+  // graphFormat: 'html' // 旧的别名
+
+  /**
+   * [graph 命令可选] 限制依赖图的显示深度。
+   * 默认不限制。
+   */
+  depth: undefined,
+  // graphDepth: undefined // 旧的别名
+
+  /**
+   * [graph 命令可选] 是否在依赖图中包含 npm 包 (node_modules 或 miniprogram_npm)。
+   * 默认: true (包含)
+   */
+  includeNpm: true,
+  // npm: true // 旧的别名
+
+  /**
+   * [graph 命令可选] 高亮显示与特定文件相关的依赖路径（相对于项目根目录）。
+   * 例: "src/pages/home/index.js"
+   */
+  focus: undefined,
+
+  /**
+   * [clean 命令可选] 是否仅模拟清理操作，而不实际删除文件。
+   * 强烈建议在首次执行清理前使用。
+   * 默认: false
+   */
+  dryRun: false,
+
+  /**
+   * [clean 命令可选] 指定一个目录，将清理掉的文件移动到此目录作为备份，而非永久删除。
+   * 例: "./unused_backup"
+   */
+  backup: undefined,
+  // backupDir: undefined // 旧的别名
+
+  /**
+   * [clean 命令可选] 是否跳过交互式确认，直接删除文件。
+   * ⚠️ 危险操作，请谨慎使用！
+   * 默认: false
+   */
+  yes: false,
+
+  /**
+   * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
+   * 这在入口文件由构建工具动态生成时可能有用。
+   * 如果提供此项，将忽略 entryFile 选项。
+   * 例: {
+   *   "pages": ["pages/index/index"],
+   *   "subPackages": []
+   * }
+   */
+  entryContent: undefined,
+
+  /**
+   * [可选] 指定命令的输出文件路径（相对于项目根目录）。
+   * list-unused: 如果指定，列表将写入文件而非控制台。
+   * graph: 指定图文件的保存路径。
+   * 例: "reports/unused_files.txt", "dist/dependency-graph.html"
+   */
+  output: undefined,
+}; 

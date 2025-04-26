@@ -14,6 +14,7 @@ export interface AnalyzerOptions {
   miniappRoot?: string;
   entryFile?: string;
   entryContent?: any;
+  keepAssets?: string[];
 }
 
 export interface OutputOptions {
@@ -67,6 +68,7 @@ export interface ConfigFileOptions {
   exclude?: string[]; // 要排除的文件/目录
   excludePatterns?: string[]; // 要排除的文件/目录（兼容旧的API）
   essentialFiles?: string[] | string; // 必要文件列表
+  keepAssets?: string[]; // Patterns for assets to always keep
 
   // 别名相关
   aliases?: {

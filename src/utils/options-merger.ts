@@ -64,6 +64,15 @@ export function mergeOptions(
     delete merged.excludePatterns;
   }
 
+  // NEW: Handle keepAssets array
+  if (cliOptions.keepAssets !== undefined && Array.isArray(cliOptions.keepAssets)) {
+    merged.keepAssets = cliOptions.keepAssets;
+  } else if (fileConf?.keepAssets && !merged.keepAssets) {
+    merged.keepAssets = fileConf.keepAssets;
+  }
+  // Ensure keepAssets is always an array (even if empty)
+  merged.keepAssets = merged.keepAssets || [];
+
   // 2. Essential Files
   let essentialFilesSource: string | string[] | undefined = undefined;
   if (cliOptions.essentialFiles !== undefined) {

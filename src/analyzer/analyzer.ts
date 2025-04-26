@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as glob from 'glob';
+import minimatch from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
@@ -95,6 +96,7 @@ export async function analyzeProject(
     essentialFiles,
     entryFile,
     entryContent,
+    options,
   );
 
   return {
@@ -141,6 +143,7 @@ function findUnusedFiles(
   essentialFilesUser: string[] = [],
   entryFileUser?: string,
   entryContent?: any,
+  options?: AnalyzerOptions,
 ): string[] {
   // 1. Resolve entry points relative to the miniapp root
   const entryPoints = resolveEntryPoints(graph, miniappRoot, entryFileUser, entryContent);
@@ -153,7 +156,28 @@ function findUnusedFiles(
 
   // 4. Determine unused files
   const allProjectFiles = graph.nodes();
-  const unusedFiles = allProjectFiles.filter((file) => !reachableFiles.has(file));
+  let unusedFiles = allProjectFiles.filter((file) => !reachableFiles.has(file));
+
+  // 5. Filter out files matching keepAssets patterns
+  const keepPatterns = options?.keepAssets || [];
+  if (keepPatterns.length > 0) {
+    logger.debug(`Filtering unused files against keepAssets patterns: ${keepPatterns.join(', ')}`);
+    // We need to match relative paths from the project root against the patterns
+    // Use imported minimatch function
+
+    unusedFiles = unusedFiles.filter((absolutePath) => {
+      const relativePath = path.relative(projectRoot, absolutePath);
+      const shouldKeep = keepPatterns.some((pattern) => minimatch(relativePath, pattern));
+      if (shouldKeep) {
+        logger.verbose(
+          `Keeping file due to keepAssets match (${relativePath} matches ${keepPatterns.find((p) =>
+            minimatch(relativePath, p),
+          )}): ${absolutePath}`,
+        );
+      }
+      return !shouldKeep;
+    });
+  }
 
   // Debugging output
   logger.verbose('All Project Files:', allProjectFiles.length);
