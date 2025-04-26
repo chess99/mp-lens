@@ -1,5 +1,7 @@
 import * as path from 'path';
 import { CommandOptions, ConfigFileOptions } from '../types/command-options';
+import { logger } from './debug-logger';
+import { findAppJsonConfig } from './fs-finder';
 
 // Type guard to check if a value is a non-empty string
 export function isString(value: unknown): value is string {
@@ -104,6 +106,25 @@ export function mergeOptions(
   };
   merged.miniappRoot = resolvePathIfNeeded(merged.miniappRoot);
   merged.entryFile = resolvePathIfNeeded(merged.entryFile);
+
+  // --- Start: Auto-detection logic ---
+  if (!merged.miniappRoot && !merged.entryFile) {
+    logger.debug('miniappRoot and entryFile not specified, attempting auto-detection...');
+    const detectedConfig = findAppJsonConfig(projectRoot);
+
+    if (detectedConfig && detectedConfig !== 'ambiguous') {
+      merged.miniappRoot = detectedConfig.miniappRoot;
+      merged.entryFile = detectedConfig.entryFile;
+    } else if (detectedConfig === 'ambiguous') {
+      logger.debug(
+        'Auto-detection resulted in ambiguity, leaving miniappRoot and entryFile undefined.',
+      );
+    } else {
+      logger.debug('Auto-detection did not find a suitable app.json.');
+    }
+  }
+  // --- End: Auto-detection logic ---
+
   merged.output = resolvePathIfNeeded(merged.output);
   merged.focus = resolvePathIfNeeded(merged.focus);
 
