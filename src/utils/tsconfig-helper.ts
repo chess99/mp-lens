@@ -21,7 +21,7 @@ function getAllFilesRecursive(dirPath: string, fileList: string[] = []): string[
 }
 
 /**
- * Loads tsconfig.json, parses the compilerOptions.types array,
+ * Loads tsconfig.json, parses the types array (root level first, then compilerOptions.types),
  * and returns a list of absolute paths for project-local type definition files/directories.
  * It filters out module names (like "miniprogram-api-typings").
  *
@@ -42,10 +42,18 @@ export function loadTsConfigTypes(projectRoot: string): string[] {
     // Basic JSON parsing, potentially improve with a more robust parser that handles comments
     const tsConfig = JSON.parse(tsConfigContent);
 
-    const types = tsConfig?.compilerOptions?.types;
+    // Check root-level 'types' first, then fallback to 'compilerOptions.types'
+    let types: string[] | undefined = undefined;
+    if (Array.isArray(tsConfig?.types)) {
+      types = tsConfig.types;
+    } else if (Array.isArray(tsConfig?.compilerOptions?.types)) {
+      types = tsConfig.compilerOptions.types;
+    } else {
+      // Skip the loop below if types is undefined
+    }
 
     if (Array.isArray(types)) {
-      logger.debug(`Found compilerOptions.types: ${types.join(', ')}`);
+      // Check if types was successfully assigned
       for (const typeRef of types) {
         if (typeof typeRef === 'string') {
           // Refined check: Consider anything starting with '.' or containing '/' or '\' as a path.
@@ -54,26 +62,13 @@ export function loadTsConfigTypes(projectRoot: string): string[] {
 
           if (isLikelyPath) {
             const potentialPath = path.resolve(projectRoot, typeRef); // Resolve path only if likely a path
-            logger.trace(
-              `Processing tsconfig type reference as path: ${typeRef} -> ${potentialPath}`,
-            );
             try {
               const stats = fs.statSync(potentialPath);
               if (stats.isFile()) {
-                logger.debug(
-                  `Adding file from tsconfig types: ${path.relative(projectRoot, potentialPath)}`,
-                );
                 essentialTypeFiles.push(potentialPath);
               } else if (stats.isDirectory()) {
-                logger.debug(
-                  `Adding files in directory from tsconfig types: ${path.relative(
-                    projectRoot,
-                    potentialPath,
-                  )}`,
-                );
                 const filesInDir = getAllFilesRecursive(potentialPath);
                 essentialTypeFiles.push(...filesInDir);
-                logger.trace(`  -> Added ${filesInDir.length} files from directory ${typeRef}`);
               }
             } catch (err: any) {
               // Ignore if path doesn't exist or can't be accessed
@@ -81,13 +76,11 @@ export function loadTsConfigTypes(projectRoot: string): string[] {
             }
           } else {
             // Assume it's a module name (like "miniprogram-api-typings") and ignore
-            logger.trace(`Ignoring tsconfig type reference (assumed module): ${typeRef}`);
           }
         }
       }
-    } else {
-      logger.trace('compilerOptions.types not found or not an array in tsconfig.json');
     }
+    // No else needed here, already logged if no array was found
   } catch (error: any) {
     logger.error(`Failed to read or parse tsconfig.json at ${tsConfigPath}: ${error.message}`);
   }

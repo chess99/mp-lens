@@ -27,12 +27,13 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug list-unused command",
+      "name": "Debug clean command",
       "args": [
         "${workspaceFolder}/dist/cli.js",
         "-p",
         "/Users/zcs/code/mmbb/mt-address-msc",
-        "list-unused"
+        "clean",
+        "--list"
       ],
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
