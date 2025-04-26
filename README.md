@@ -1,12 +1,12 @@
-# mp-analyzer (小程序依赖分析与清理工具)
+# mp-lens (小程序分析工具)
 
-[![NPM 版本](https://img.shields.io/npm/v/mp-analyzer.svg?style=flat)](https://www.npmjs.com/package/mp-analyzer) <!-- 如果项目名称不同，请替换 'mp-analyzer' -->
-[![许可证](https://img.shields.io/npm/l/mp-analyzer.svg?style=flat)](LICENSE) <!-- 链接到你的 LICENSE 文件 -->
-[![构建状态](https://img.shields.io/travis/com/your-username/mp-analyzer.svg?style=flat)](https://travis-ci.com/your-username/mp-analyzer) <!-- CI/CD占位符 -->
+[![NPM 版本](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.com/package/mp-lens)
+[![许可证](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](LICENSE)
+[![构建状态](https://img.shields.io/travis/com/your-username/mp-lens.svg?style=flat)](https://travis-ci.com/your-username/mp-lens) <!-- CI/CD占位符 -->
 
-**mp-analyzer** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系，并安全地移除未使用的文件。
+**mp-lens** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系、分析包大小（未来）并安全地移除未使用的文件。
 
-是否厌倦了臃肿的项目体积，以及手动寻找未使用的组件、页面、图片或工具函数的繁琐过程？ `mp-analyzer` 会扫描你的项目，构建依赖图，并找出可以安全移除的孤立文件。
+是否厌倦了臃肿的项目体积，以及手动寻找未使用的组件、页面、图片或工具函数的繁琐过程？ `mp-lens` 会扫描你的项目，构建依赖图，并找出可以安全移除的孤立文件。
 
 ## ✨ 功能特性
 
@@ -14,9 +14,9 @@
 * **依赖图可视化:** 生成交互式 HTML 或静态图文件（如 DOT 语言、SVG、PNG），助你清晰理解页面、组件、脚本之间的相互联系。
 * **未使用的文件检测:** 根据分析结果，识别出项目中未被任何地方引用的文件（包括页面、组件、脚本、样式、图片、WXS模块等）。
 * **路径别名支持:** 支持解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置，正确分析使用别名导入的模块依赖关系。
-* **灵活的项目结构支持:** 支持自定义小程序项目路径和入口文件路径，适用于不同目录结构的项目。
+* **灵活的项目结构支持:** 支持自定义小程序项目路径和入口文件路径，适用于不同目录结构的项目。也支持自动检测 `app.json`。
 * **安全清理:**
-  * 提供 `--dry-run` (试运行)模式，预览哪些文件*将*被删除，但并**不执行**实际删除操作。
+  * 提供 `--list` 模式，预览哪些文件*将*被删除，但并**不执行**实际删除操作。
   * 默认在删除文件前进行**交互式确认**。
   * 支持 Glob 模式，可在分析和清理时**排除**特定的文件或目录。
 * **可配置:** 可通过命令行选项快速执行任务，也支持通过配置文件进行更复杂的设置。
@@ -24,35 +24,35 @@
 
 ## 🚀 安装
 
-你可以全局安装 `mp-analyzer`，或将其作为项目的开发依赖项。
+你可以全局安装 `mp-lens`，或将其作为项目的开发依赖项。
 
 **全局安装:**
 
 ```bash
-npm install -g mp-analyzer
+npm install -g mp-lens
 # 或者
-yarn global add mp-analyzer
+yarn global add mp-lens
 ```
 
 **本地安装 (推荐用于项目):**
 
 ```bash
-npm install --save-dev mp-analyzer
+npm install --save-dev mp-lens
 # 或者
-yarn add --dev mp-analyzer
+yarn add --dev mp-lens
 ```
 
-如果本地安装，通常通过 `npx` 运行：`npx mp-analyzer <命令>`，或者将其添加到 `package.json` 的 `scripts` 中。
+如果本地安装，通常通过 `npx` 运行：`npx mp-lens <命令>`，或者将其添加到 `package.json` 的 `scripts` 中。
 
 ## 💡 使用方法
 
 基本命令结构如下：
 
 ```bash
-mp-analyzer [全局选项] <命令> [命令选项]
+mp-lens [全局选项] <命令> [命令选项]
 ```
 
-如果本地安装且未使用 `npx`，请使用相对路径运行，例如：`./node_modules/.bin/mp-analyzer`。
+如果本地安装且未使用 `npx`，请使用相对路径运行，例如：`./node_modules/.bin/mp-lens`。
 
 **全局选项:**
 
@@ -60,8 +60,8 @@ mp-analyzer [全局选项] <命令> [命令选项]
 * `-h, --help`: 显示帮助信息。
 * `-v, --verbose`: 显示更详细的日志输出。
 * `--config <路径>`: 指定配置文件的路径 (可选高级功能)。
-* `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。
-* `--entry-file <路径>`: 指定入口文件路径（相对于小程序根目录，默认为app.json）。
+* `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录，可自动检测）。
+* `--entry-file <路径>`: 指定入口文件路径（相对于小程序根目录，默认为app.json，可自动检测）。
 
 **可用命令:**
 
@@ -71,13 +71,13 @@ mp-analyzer [全局选项] <命令> [命令选项]
 
 ```bash
 # 在当前目录生成一个交互式的 HTML 依赖图
-mp-analyzer graph
+mp-lens graph
 
 # 为指定项目生成 SVG 格式的依赖图并保存
-mp-analyzer -p ../我的小程序 graph -f svg -o dependency-graph.svg
+mp-lens -p ../我的小程序 graph -f svg -o dependency-graph.svg
 
 # 生成聚焦于特定页面的依赖图
-mp-analyzer graph --focus src/pages/home/index.js -o home-deps.html
+mp-lens graph --focus src/pages/home/index.js -o home-deps.html
 ```
 
 **选项:**
@@ -107,22 +107,22 @@ mp-analyzer graph --focus src/pages/home/index.js -o home-deps.html
 
 ```bash
 # 默认模式: 列出文件并提示确认删除
-mp-analyzer clean
+mp-lens clean
 
 # 列表模式: 只列出将被删除的文件 (安全，不执行任何操作)
-mp-analyzer clean --list
+mp-lens clean --list
 
 # 删除模式: 直接删除未使用文件，不进行确认 (谨慎使用!)
-mp-analyzer clean --delete
+mp-lens clean --delete
 
 # 仅清理未使用的图片文件 (会提示确认)
-mp-analyzer clean --types png,jpg,gif
+mp-lens clean --types png,jpg,gif
 
 # 清理时排除特定的目录 (会提示确认)
-mp-analyzer clean --exclude "**/legacy/**"
+mp-lens clean --exclude "**/legacy/**"
 
 # 直接删除未使用的 JS 和 WXML 文件 (谨慎使用!)
-mp-analyzer clean --delete --types js,wxml
+mp-lens clean --delete --types js,wxml
 ```
 
 **选项:**
@@ -135,9 +135,9 @@ mp-analyzer clean --delete --types js,wxml
 
 ## ⚙️ Configuration File
 
-对于复杂的配置（例如，大量的排除规则、路径别名等），可以使用配置文件 `mp-analyzer.config.json` 或 `mp-analyzer.config.js` 放置于项目根目录，或通过全局选项 `--config` 指定路径。
+对于复杂的配置（例如，大量的排除规则、路径别名等），可以使用配置文件 `mp-lens.config.json` 或 `mp-lens.config.js` 放置于项目根目录，或通过全局选项 `--config` 指定路径。
 
-配置文件示例 (`mp-analyzer.config.json`):
+配置文件示例 (`mp-lens.config.json`):
 
 ```json
 {

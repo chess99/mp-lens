@@ -60,7 +60,7 @@ describe('AliasResolver', () => {
 
   const mockMpAnalyzerConfig = (
     content: object | string,
-    configPath = actualPath.join(projectRoot, 'mp-analyzer.config.json'),
+    configPath = actualPath.join(projectRoot, 'mp-lens.config.json'),
   ) => {
     (fs.existsSync as jest.Mock).mockImplementation((p) => p === configPath);
     (fs.readFileSync as jest.Mock).mockImplementation((p) => {
@@ -170,8 +170,8 @@ describe('AliasResolver', () => {
       });
     });
 
-    it('should load aliases from mp-analyzer.config.json (relative paths)', () => {
-      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
+    it('should load aliases from mp-lens.config.json (relative paths)', () => {
+      const customConfigPath = actualPath.join(projectRoot, 'mp-lens.config.json');
       mockMpAnalyzerConfig({
         aliases: {
           $util: ['src/utils'], // Relative to project root
@@ -194,7 +194,7 @@ describe('AliasResolver', () => {
 
     it('should merge aliases, with custom config taking precedence', () => {
       const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
-      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
+      const customConfigPath = actualPath.join(projectRoot, 'mp-lens.config.json');
 
       // Mock both files existing
       (fs.existsSync as jest.Mock).mockImplementation(
@@ -240,7 +240,7 @@ describe('AliasResolver', () => {
 
     it('should handle errors during config file parsing but still load from others', () => {
       const tsconfigPath = actualPath.join(projectRoot, 'tsconfig.json');
-      const customConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json');
+      const customConfigPath = actualPath.join(projectRoot, 'mp-lens.config.json');
 
       // Mock both files existing
       (fs.existsSync as jest.Mock).mockImplementation(

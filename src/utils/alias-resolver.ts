@@ -37,7 +37,7 @@ export class AliasResolver {
     }
 
     if (foundCustomConfig && this.projectRoot) {
-      logger.info(`已从mp-analyzer.config.json加载别名配置，项目路径: ${this.projectRoot}`);
+      logger.info(`已从mp-lens.config.json加载别名配置，项目路径: ${this.projectRoot}`);
     }
 
     this.initialized = true;
@@ -184,8 +184,8 @@ export class AliasResolver {
    * @returns 是否成功加载到别名配置
    */
   private loadFromCustomConfig(): boolean {
-    // 尝试从mp-analyzer.config.json加载配置
-    const configPath = path.join(this.projectRoot, 'mp-analyzer.config.json');
+    // 尝试从mp-lens.config.json加载配置
+    const configPath = path.join(this.projectRoot, 'mp-lens.config.json');
     if (!fs.existsSync(configPath)) {
       return false;
     }
@@ -203,7 +203,7 @@ export class AliasResolver {
         return Object.keys(this.aliases).length > initialAliasCount;
       }
     } catch (error) {
-      logger.warn(`Failed to parse mp-analyzer.config.json: ${(error as Error).message}`);
+      logger.warn(`Failed to parse mp-lens.config.json: ${(error as Error).message}`);
     }
 
     return false;

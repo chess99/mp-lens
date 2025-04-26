@@ -3,7 +3,7 @@ import * as path from 'path';
 import { ConfigFileOptions } from '../types/command-options';
 
 /**
- * Loads the mp-analyzer specific configuration file (e.g., mp-analyzer.config.js).
+ * Loads the mp-lens specific configuration file (e.g., mp-lens.config.js).
  * It does NOT handle loading tsconfig.json or other project-specific config files.
  */
 export class ConfigLoader {
@@ -24,9 +24,9 @@ export class ConfigLoader {
 
     // 默认配置文件名称（支持多种格式）
     const possibleConfigs = [
-      'mp-analyzer.config.js',
-      'mp-analyzer.config.ts',
-      'mp-analyzer.config.json',
+      'mp-lens.config.js',
+      'mp-lens.config.ts',
+      'mp-lens.config.json',
     ];
 
     // 从项目根目录查找配置文件

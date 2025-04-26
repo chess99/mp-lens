@@ -427,8 +427,8 @@ function resolveEssentialFiles(
   const projectLevelFiles = [
     'tsconfig.json',
     'jsconfig.json',
-    'mp-analyzer.config.json',
-    'mp-analyzer.config.js',
+    'mp-lens.config.json',
+    'mp-lens.config.js',
     'package.json',
     '.eslintrc.js',
     '.eslintrc.json',

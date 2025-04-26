@@ -1,5 +1,5 @@
 /**
- * mp-analyzer 配置文件示例 (JavaScript 格式)
+ * mp-lens 配置文件示例 (JavaScript 格式)
  * 使用 JavaScript 格式允许添加注释并进行更灵活的配置。
  */
 module.exports = {

@@ -1,10 +1,10 @@
 {
-  "name": "mp-analyzer",
+  "name": "mp-lens",
   "version": "0.1.0",
-  "description": "微信小程序依赖分析与清理工具",
+  "description": "微信小程序分析工具 (Unused Code, Dependencies, Visualization)",
   "main": "dist/index.js",
   "bin": {
-    "mp-analyzer": "dist/cli.js"
+    "mp-lens": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

@@ -63,8 +63,8 @@ jest.mock(
   { virtual: true },
 );
 jest.mock('/fake/project/root/my-config.ts', () => mockConfig, { virtual: true });
-jest.mock('/fake/project/root/mp-analyzer.config.js', () => mockConfig, { virtual: true });
-jest.mock('/fake/project/root/mp-analyzer.config.ts', () => mockConfig, { virtual: true });
+jest.mock('/fake/project/root/mp-lens.config.js', () => mockConfig, { virtual: true });
+jest.mock('/fake/project/root/mp-lens.config.ts', () => mockConfig, { virtual: true });
 jest.mock(
   '/fake/project/root/error.js',
   () => {
@@ -109,7 +109,7 @@ describe('ConfigLoader', () => {
         normalizedPath ===
           actualPath.normalize(actualPath.resolve(projectRoot, 'my-config.json')) ||
         normalizedPath ===
-          actualPath.normalize(actualPath.join(projectRoot, 'mp-analyzer.config.json'))
+          actualPath.normalize(actualPath.join(projectRoot, 'mp-lens.config.json'))
       ) {
         return JSON.stringify(mockConfig);
       }
@@ -202,8 +202,8 @@ describe('ConfigLoader', () => {
     expect(fs.readFileSync).not.toHaveBeenCalled(); // Should not be called for TS
   });
 
-  it('should auto-find and load mp-analyzer.config.js if exists', async () => {
-    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-analyzer.config.js'); // Calculate for assertion
+  it('should auto-find and load mp-lens.config.js if exists', async () => {
+    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-lens.config.js'); // Calculate for assertion
     (fs.existsSync as jest.Mock).mockImplementation(
       (p) => actualPath.normalize(p) === actualPath.normalize(jsConfigPath),
     );
@@ -215,9 +215,9 @@ describe('ConfigLoader', () => {
     expect(mockTsNodeRegister).not.toHaveBeenCalled();
   });
 
-  it('should auto-find and load mp-analyzer.config.ts if .js doesnt exist', async () => {
-    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-analyzer.config.js'); // Calculate for assertion
-    const tsConfigPath = actualPath.resolve(projectRoot, 'mp-analyzer.config.ts'); // Calculate for assertion
+  it('should auto-find and load mp-lens.config.ts if .js doesnt exist', async () => {
+    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-lens.config.js'); // Calculate for assertion
+    const tsConfigPath = actualPath.resolve(projectRoot, 'mp-lens.config.ts'); // Calculate for assertion
     (fs.existsSync as jest.Mock).mockImplementation(
       (p) => actualPath.normalize(p) === actualPath.normalize(tsConfigPath),
     ); // Only TS exists
@@ -230,10 +230,10 @@ describe('ConfigLoader', () => {
     expect(loadedConfig).toEqual(mockConfig); // Comes from the jest.mock
   });
 
-  it('should auto-find and load mp-analyzer.config.json if .js and .ts dont exist', async () => {
-    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-analyzer.config.js'); // Calculate for assertion
-    const tsConfigPath = actualPath.resolve(projectRoot, 'mp-analyzer.config.ts'); // Calculate for assertion
-    const jsonConfigPath = actualPath.join(projectRoot, 'mp-analyzer.config.json'); // Calculate for assertion
+  it('should auto-find and load mp-lens.config.json if .js and .ts dont exist', async () => {
+    const jsConfigPath = actualPath.resolve(projectRoot, 'mp-lens.config.js'); // Calculate for assertion
+    const tsConfigPath = actualPath.resolve(projectRoot, 'mp-lens.config.ts'); // Calculate for assertion
+    const jsonConfigPath = actualPath.join(projectRoot, 'mp-lens.config.json'); // Calculate for assertion
 
     (fs.existsSync as jest.Mock).mockImplementation(
       (p) => actualPath.normalize(p) === actualPath.normalize(jsonConfigPath),
@@ -275,13 +275,13 @@ describe('ConfigLoader', () => {
     expect(loadedConfig).toBeNull();
     // Check that default paths were checked using the absolute paths
     expect(fs.existsSync).toHaveBeenCalledWith(
-      actualPath.resolve(projectRoot, 'mp-analyzer.config.js'),
+      actualPath.resolve(projectRoot, 'mp-lens.config.js'),
     );
     expect(fs.existsSync).toHaveBeenCalledWith(
-      actualPath.resolve(projectRoot, 'mp-analyzer.config.ts'),
+      actualPath.resolve(projectRoot, 'mp-lens.config.ts'),
     );
     expect(fs.existsSync).toHaveBeenCalledWith(
-      actualPath.join(projectRoot, 'mp-analyzer.config.json'),
+      actualPath.join(projectRoot, 'mp-lens.config.json'),
     );
   });
 
