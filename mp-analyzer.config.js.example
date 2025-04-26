@@ -125,13 +125,6 @@ module.exports = {
   dryRun: false,
 
   /**
-   * [clean 命令可选] 指定一个目录，将清理掉的文件移动到此目录作为备份，而非永久删除。
-   * 例: "./unused_backup"
-   */
-  backup: undefined,
-  // backupDir: undefined // 旧的别名
-
-  /**
    * [clean 命令可选] 是否跳过交互式确认，直接删除文件。
    * ⚠️ 危险操作，请谨慎使用！
    * 默认: false

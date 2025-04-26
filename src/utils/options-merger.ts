@@ -105,8 +105,6 @@ export function mergeOptions(
   merged.miniappRoot = resolvePathIfNeeded(merged.miniappRoot);
   merged.entryFile = resolvePathIfNeeded(merged.entryFile);
   merged.output = resolvePathIfNeeded(merged.output);
-  merged.backup = resolvePathIfNeeded(merged.backup);
-  merged.backupDir = resolvePathIfNeeded(merged.backupDir);
   merged.focus = resolvePathIfNeeded(merged.focus);
 
   // 4. Aliases/Alternative Names
@@ -133,14 +131,6 @@ export function mergeOptions(
   } else if (merged.includeNpm !== undefined) {
     merged.npm = merged.includeNpm;
     delete merged.includeNpm;
-  }
-  // Backup dir (backup/backupDir)
-  if (cliOptions.backup !== undefined) {
-    merged.backup = resolvePathIfNeeded(cliOptions.backup);
-    delete merged.backupDir;
-  } else if (merged.backupDir !== undefined) {
-    merged.backup = resolvePathIfNeeded(merged.backupDir);
-    delete merged.backupDir;
   }
 
   return merged;

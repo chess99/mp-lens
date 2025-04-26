@@ -38,7 +38,6 @@ export interface CleanOptions extends CommandOptions {
   exclude: string[];
   essentialFiles?: string;
   dryRun: boolean;
-  backup?: string;
   yes: boolean;
   miniappRoot?: string;
   entryFile?: string;
@@ -91,8 +90,6 @@ export interface ConfigFileOptions {
 
   // 清理相关
   dryRun?: boolean; // 是否仅模拟删除
-  backup?: string; // 备份目录路径
-  backupDir?: string; // 备份目录路径（替代名称）
   yes?: boolean; // 是否跳过确认
 
   // 高级选项

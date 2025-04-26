@@ -5,7 +5,7 @@ import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
-import { isString, mergeOptions } from '../utils/options-merger';
+import { mergeOptions } from '../utils/options-merger';
 
 // Define the shape of the raw options passed from cli.ts
 interface RawCleanOptions {
@@ -23,7 +23,6 @@ interface RawCleanOptions {
   exclude?: string[];
   essentialFiles?: string;
   dryRun?: boolean;
-  backup?: string;
   yes?: boolean;
 
   [key: string]: any;
@@ -58,7 +57,6 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
   const miniappRoot = mergedConfig.miniappRoot;
   const entryFile = mergedConfig.entryFile;
   const dryRun = mergedConfig.dryRun ?? false;
-  const backup = mergedConfig.backup; // Resolved path or undefined
   const yes = mergedConfig.yes ?? false;
 
   // Validate required options
@@ -68,39 +66,15 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
 
   // Log final options
   logger.info(`File types to clean: ${types}`);
-  if (dryRun) logger.info(chalk.yellow('Dry Run Mode Enabled'));
+  if (dryRun)
+    logger.info(chalk.yellow('⚠️ Dry Run Mode: Files will be listed but NOT deleted or moved.'));
   logger.info('🧹 Starting unused file cleanup...');
   logger.info(`Project path: ${projectRoot}`);
   if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
   if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
   if (exclude.length > 0) logger.debug(`Exclude patterns: ${exclude.join(', ')}`);
 
-  if (dryRun) {
-    logger.info(chalk.yellow('⚠️ Dry Run Mode: Files will be listed but NOT deleted or moved.'));
-  }
-  if (backup) {
-    logger.info(`Backup directory: ${backup}`);
-  }
-
   try {
-    // Safety Check using final options
-    if (!dryRun && !backup && !yes) {
-      logger.warn('This operation will permanently delete files.');
-      logger.warn('Use --dry-run to preview, or --backup <dir> to move files instead.');
-      const answers = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'proceed',
-          message: 'Are you sure you want to continue?',
-          default: false,
-        },
-      ]);
-      if (!answers.proceed) {
-        logger.info('Operation cancelled.');
-        return;
-      }
-    }
-
     // Analyze project using final options
     const fileTypes = types.split(',').map((t) => t.trim());
     logger.info('Analyzing project to find unused files...');
@@ -124,21 +98,19 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files to process:`));
     unusedFiles.forEach((file) => {
       const relativePath = path.relative(projectRoot, file);
-      logger.info(`  ${dryRun ? '[Dry Run] ' : backup ? '[Backup] ' : '[Delete] '}${relativePath}`);
+      logger.info(`  ${dryRun ? '[Dry Run] ' : '[Delete] '}${relativePath}`);
     });
     console.log(); // Add spacing
 
     // Confirmation before action (using final options)
     let proceed = yes || dryRun;
-    if (!proceed && !backup) {
-      // Don't ask again if backing up (already warned)
+    if (!proceed) {
+      logger.warn('Use --dry-run to preview.');
       const answers = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'proceedConfirm',
-          message: `Proceed with ${backup ? 'backing up' : 'deleting'} ${
-            unusedFiles.length
-          } files?`,
+          message: `Proceed with deleting ${unusedFiles.length} files?`,
           default: false,
         },
       ]);
@@ -159,29 +131,11 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     let processedCount = 0;
     let errorCount = 0;
 
-    if (isString(backup)) {
-      logger.info(`Backing up files to ${backup}...`);
-      if (!fs.existsSync(backup)) {
-        fs.mkdirSync(backup, { recursive: true });
-      }
-    }
-
     for (const file of unusedFiles) {
       try {
         const relativePath = path.relative(projectRoot, file);
-        if (isString(backup)) {
-          const backupPath = path.join(backup, relativePath);
-          const backupDir = path.dirname(backupPath);
-          if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir, { recursive: true });
-          }
-          fs.renameSync(file, backupPath);
-          logger.debug(`Backed up: ${relativePath} -> ${backupPath}`);
-        } else {
-          // Deletion logic
-          fs.unlinkSync(file);
-          logger.debug(`Deleted: ${relativePath}`);
-        }
+        fs.unlinkSync(file);
+        logger.debug(`Deleted: ${relativePath}`);
         processedCount++;
       } catch (err) {
         logger.error(`Failed to process file ${file}: ${(err as Error).message}`);
@@ -190,13 +144,7 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     }
 
     // Final summary (using final options)
-    if (isString(backup)) {
-      logger.info(chalk.green(`✅ Successfully backed up ${processedCount} files to ${backup}.`));
-    } else {
-      if (!mergedConfig.backup) {
-        logger.info(chalk.green(`✅ Successfully deleted ${processedCount} files.`));
-      }
-    }
+    logger.info(chalk.green(`✅ Successfully deleted ${processedCount} files.`));
     if (errorCount > 0) {
       logger.error(chalk.red(` Encountered errors processing ${errorCount} files.`));
     }

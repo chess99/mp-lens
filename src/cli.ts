@@ -123,7 +123,6 @@ program
   )
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔')
   .option('--dry-run', '只显示会被删除的文件，不实际执行', false)
-  .option('--backup <dir>', '将文件移动到备份目录而不是删除')
   .option('--yes', '跳过删除确认提示', false)
   .action(async (cmdOptions) => {
     const globalOptions = program.opts();

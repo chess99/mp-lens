@@ -18,7 +18,6 @@
 * **安全清理:**
   * 提供 `--dry-run` (试运行)模式，预览哪些文件*将*被删除，但并**不执行**实际删除操作。
   * 默认在删除文件前进行**交互式确认**。
-  * 提供将未使用文件移动到**备份目录**的选项，而非直接永久删除。
   * 支持 Glob 模式，可在分析和清理时**排除**特定的文件或目录。
 * **可配置:** 可通过命令行选项快速执行任务，也支持通过配置文件进行更复杂的设置。
 * **使用 TypeScript 构建:** 类型安全，易于维护。
@@ -120,41 +119,37 @@ mp-analyzer graph --focus src/pages/home/index.js -o home-deps.html
 
 ### `clean`
 
-分析项目并**删除**未使用的文件。**⚠️ 使用此命令务必谨慎！**
+Analyzes the project and **deletes** unused files. **⚠️ Use this command with extreme caution!**
 
-**🚨 安全第一：**
+**🚨 Safety First:**
 
-1. **务必使用版本控制 (如 Git)**，并在运行 `clean` 前提交所有更改。
-2. **务必先运行 `mp-analyzer clean --dry-run`** 查看哪些文件将被删除。
-3. 除非你完全确定后果，否则**避免使用 `--yes` 或 `--force` 选项**。
+1. **Be sure to use version control (e.g., Git)** and commit all changes before running `clean`.
+2. **Be sure to run `mp-analyzer clean --dry-run` first** to see which files will be deleted.
+3. Unless you are absolutely sure of the consequences, **avoid using the `--yes` or `--force` options**.
 
 ```bash
-# 预览：显示哪些文件 *将* 被删除 (安全模式 - 不会实际删除)
+# Preview: Show which files *will* be deleted (Safe mode - will not actually delete)
 mp-analyzer clean --dry-run
 
-# 交互式删除未使用文件 (会列出文件并请求确认)
-mp-analyzer clean
+# Delete unused files interactively (lists files and asks for confirmation)
+mp-analyzer clean --delete
 
-# 仅交互式删除未使用的图片文件
-mp-analyzer clean --types png,jpg,gif
+# Interactively delete only unused image files
+mp-analyzer clean --delete --types png,jpg,gif
 
-# 删除未使用文件，并将它们移动到备份目录，而不是永久删除
-mp-analyzer clean --backup ./unused_backup
-
-# 危险操作：不经确认直接删除未使用文件 (不推荐)
-# mp-analyzer clean --yes
+# Dangerous operation: Delete unused files directly without confirmation (Not recommended)
+# mp-analyzer clean --delete --yes
 ```
 
-**选项:**
+**Options:**
 
-* `--types <类型1,类型2,...>`: 指定要删除的文件类型。
-* `--exclude <模式>`: 排除某些文件/目录不被删除。
-* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
-* `--dry-run`: **强烈推荐使用。** 模拟删除过程，不实际改动文件。
-* `--backup <目录>`: 将删除的文件移动到此目录作为备份，而不是永久删除。
-* `-y, --yes, --force`: **谨慎使用！** 跳过交互式确认环节。
+* `--types <type1,type2,...>`: Specify the file types to delete.
+* `--exclude <pattern>`: Exclude certain files/directories from being deleted.
+* `--essential-files <file1,file2,...>`: Specify files that should be considered essential (these files will never be deleted), separated by commas.
+* `--dry-run`: **Strongly recommended.** Simulate the deletion process without actually modifying files.
+* `-y, --yes, --force`: **Use with caution!** Skip the interactive confirmation step.
 
-## ⚙️ 配置文件
+## ⚙️ Configuration File
 
 对于复杂的配置（例如，大量的排除规则、路径别名等），可以使用配置文件 `mp-analyzer.config.json` 或 `mp-analyzer.config.js` 放置于项目根目录，或通过全局选项 `--config` 指定路径。
 
