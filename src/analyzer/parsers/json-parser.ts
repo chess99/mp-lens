@@ -10,7 +10,7 @@ export class JSONParser {
   private options: AnalyzerOptions;
 
   // Define standard extensions for different contexts
-  private readonly componentExtensions = ['.js', '.ts', '.wxml', '.json'];
+  private readonly componentExtensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
   private readonly pageAllExtensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
   private readonly imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
 
@@ -18,6 +18,57 @@ export class JSONParser {
     this.pathResolver = pathResolver;
     this.projectRoot = projectRoot;
     this.options = options;
+  }
+
+  // Helper function to add all existing related files for a given logical path
+  private addAllRelatedFiles(
+    logicalPath: string, // Original path string from the JSON (e.g., 'pages/index/index', '../../comp/card')
+    containingFile: string, // Absolute path of the JSON file being parsed
+    extensions: string[], // Allowed extensions for this type (page or component)
+    dependencies: Set<string>,
+  ): boolean {
+    let fileAdded = false;
+
+    // First, resolve the logical path to *one* concrete, absolute file path
+    // This handles aliases, relative paths, root paths, and finds the first valid extension
+    const oneResolvedPath = this.pathResolver.resolveAnyPath(
+      logicalPath,
+      containingFile,
+      extensions,
+    );
+
+    if (!oneResolvedPath) {
+      // If resolveAnyPath can't find any file, the reference is likely broken
+      if (this.options.verbose) {
+        logger.warn(`Could not resolve any file for path: ${logicalPath} from ${containingFile}`);
+      }
+      return false;
+    }
+
+    // If we found one, derive the absolute base path (without extension)
+    const resolvedBasePathWithoutExt = oneResolvedPath.replace(/\.[^./]+$/, '');
+
+    // Now check for all required extensions based on the absolute base path
+    for (const ext of extensions) {
+      const potentialFilePath = resolvedBasePathWithoutExt + ext;
+      // Use fs.existsSync now that we have a full absolute path
+      if (fs.existsSync(potentialFilePath)) {
+        // Ensure we are adding absolute paths
+        dependencies.add(potentialFilePath);
+        fileAdded = true;
+        logger.trace(`Added related file: ${potentialFilePath}`);
+      }
+    }
+
+    if (!fileAdded && this.options.verbose) {
+      // This case should be rare if oneResolvedPath was found, but log just in case
+      logger.warn(
+        `Found initial file ${oneResolvedPath}, but no files matched extensions [${extensions.join(
+          ', ',
+        )}] for base ${resolvedBasePathWithoutExt}`,
+      );
+    }
+    return fileAdded;
   }
 
   async parse(filePath: string): Promise<string[]> {
@@ -51,15 +102,15 @@ export class JSONParser {
     if (content.pages && Array.isArray(content.pages)) {
       for (const pagePath of content.pages) {
         if (typeof pagePath === 'string') {
-          const resolvedPagePath = this.pathResolver.resolveAnyPath(
+          // Use the helper to find all related files
+          const added = this.addAllRelatedFiles(
             '/' + pagePath, // Treat as root-relative
             filePath,
             this.pageAllExtensions,
+            dependencies,
           );
-          if (resolvedPagePath) {
-            dependencies.add(resolvedPagePath);
-          } else if (this.options.verbose) {
-            logger.warn(`Could not resolve page path from app.json: /${pagePath}`);
+          if (!added && this.options.verbose) {
+            logger.warn(`Could not resolve any files for page path from app.json: /${pagePath}`);
           }
         }
       }
@@ -76,16 +127,16 @@ export class JSONParser {
           for (const pagePath of subPages) {
             if (typeof pagePath === 'string') {
               const fullPagePath = '/' + path.join(root, pagePath);
-              const resolvedPagePath = this.pathResolver.resolveAnyPath(
+              // Use the helper to find all related files
+              const added = this.addAllRelatedFiles(
                 fullPagePath,
                 filePath,
                 this.pageAllExtensions,
+                dependencies,
               );
-              if (resolvedPagePath) {
-                dependencies.add(resolvedPagePath);
-              } else if (this.options.verbose) {
+              if (!added && this.options.verbose) {
                 logger.warn(
-                  `Could not resolve subpackage page path from app.json: ${fullPagePath}`,
+                  `Could not resolve any files for subpackage page path from app.json: ${fullPagePath}`,
                 );
               }
             }
@@ -122,13 +173,17 @@ export class JSONParser {
     if (content.usingComponents && typeof content.usingComponents === 'object') {
       for (const [_componentName, componentPath] of Object.entries(content.usingComponents)) {
         if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
-          const resolvedComponentPath = this.pathResolver.resolveAnyPath(
+          // Use the helper to find all related files
+          const added = this.addAllRelatedFiles(
             componentPath,
             filePath,
             this.componentExtensions,
+            dependencies,
           );
-          if (resolvedComponentPath) {
-            dependencies.add(resolvedComponentPath);
+          if (!added && this.options.verbose) {
+            logger.warn(
+              `Could not resolve any files for component path: ${componentPath} in ${filePath}`,
+            );
           }
         }
       }
@@ -146,13 +201,17 @@ export class JSONParser {
         if (genericInfo && typeof genericInfo.default === 'string') {
           const defaultComponentPath = genericInfo.default;
           if (!defaultComponentPath.startsWith('plugin://')) {
-            const resolvedDefaultPath = this.pathResolver.resolveAnyPath(
+            // Use the helper to find all related files for the default component
+            const added = this.addAllRelatedFiles(
               defaultComponentPath,
               filePath,
               this.componentExtensions,
+              dependencies,
             );
-            if (resolvedDefaultPath) {
-              dependencies.add(resolvedDefaultPath);
+            if (!added && this.options.verbose) {
+              logger.warn(
+                `Could not resolve any files for default component generic path: ${defaultComponentPath} in ${filePath}`,
+              );
             }
           }
         }

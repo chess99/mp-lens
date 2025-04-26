@@ -206,7 +206,7 @@ describe('JSONParser', () => {
   });
 
   describe('parse', () => {
-    it('should parse app.json pages', async () => {
+    it('should parse app.json pages and find all related files', async () => {
       const filePath = actualPath.resolve(projectRoot, 'app.json');
       const fileContent = `{
         "pages": [
@@ -217,46 +217,71 @@ describe('JSONParser', () => {
       }`;
       mockFileContent('app.json', fileContent);
 
-      const indexPath = actualPath.resolve(projectRoot, 'pages/index/index.js');
-      const logsPath = actualPath.resolve(projectRoot, 'pages/logs/logs.js');
-      const profilePath = actualPath.resolve(projectRoot, 'pages/user/profile.js');
+      // Define expected paths
+      const indexBasePath = actualPath.resolve(projectRoot, 'pages/index/index');
+      const logsBasePath = actualPath.resolve(projectRoot, 'pages/logs/logs');
+      const profileBasePath = actualPath.resolve(projectRoot, 'pages/user/profile');
 
-      // Mock PathResolver responses
+      const indexJSPath = indexBasePath + '.js';
+      const indexWXMLPath = indexBasePath + '.wxml';
+      const indexWXSSPath = indexBasePath + '.wxss';
+      const indexJSONPath = indexBasePath + '.json';
+
+      const logsTSPath = logsBasePath + '.ts';
+      const logsWXMLPath = logsBasePath + '.wxml';
+
+      const profileJSPath = profileBasePath + '.js';
+
+      // Mock existence of *all* related files
+      mockPathExists([indexJSPath, indexWXMLPath, indexWXSSPath, indexJSONPath]);
+      mockPathExists([logsTSPath, logsWXMLPath]);
+      mockPathExists(profileJSPath);
+
+      // Mock PathResolver to return *one* valid path for each page (e.g., the script file)
       mockResolveAnyPath.mockImplementation(
-        (importPath: string, containingFile: string, extensions: string[]) => {
-          // The implementation adds a leading slash to page paths
-          if (importPath === '/pages/index/index') return indexPath;
-          if (importPath === '/pages/logs/logs') return logsPath;
-          if (importPath === '/pages/user/profile') return profilePath;
+        (importPath: string, _containingFile: string, _extensions: string[]) => {
+          if (importPath === '/pages/index/index') return indexJSPath;
+          if (importPath === '/pages/logs/logs') return logsTSPath;
+          if (importPath === '/pages/user/profile') return profileJSPath;
           return null;
         },
       );
 
       const dependencies = await parser.parse(filePath);
 
-      expect(dependencies).toContain(indexPath);
-      expect(dependencies).toContain(logsPath);
-      expect(dependencies).toContain(profilePath);
-      expect(dependencies.length).toBeGreaterThanOrEqual(3);
+      // Assert all related files are included
+      expect(dependencies).toEqual(
+        expect.arrayContaining([
+          indexJSPath,
+          indexWXMLPath,
+          indexWXSSPath,
+          indexJSONPath,
+          logsTSPath,
+          logsWXMLPath,
+          profileJSPath,
+        ]),
+      );
+      expect(dependencies).toHaveLength(7); // Total number of expected files
 
+      // Verify resolveAnyPath was called for each page entry
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/pages/index/index',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'], // Access private member for verification
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/pages/logs/logs',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'],
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/pages/user/profile',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'],
       );
     });
 
-    it('should parse app.json subpackages', async () => {
+    it('should parse app.json subpackages and find all related files', async () => {
       const filePath = actualPath.resolve(projectRoot, 'app.json');
       const fileContent = `{
         "subpackages": [
@@ -277,46 +302,65 @@ describe('JSONParser', () => {
       }`;
       mockFileContent('app.json', fileContent);
 
-      const package1IndexPath = actualPath.resolve(projectRoot, 'package1/pages/index.js');
-      const package1DetailPath = actualPath.resolve(projectRoot, 'package1/pages/detail.js');
-      const package2ListPath = actualPath.resolve(projectRoot, 'package2/pages/list.js');
+      // Define expected paths
+      const pkg1IndexBasePath = actualPath.resolve(projectRoot, 'package1/pages/index');
+      const pkg1DetailBasePath = actualPath.resolve(projectRoot, 'package1/pages/detail');
+      const pkg2ListBasePath = actualPath.resolve(projectRoot, 'package2/pages/list');
 
-      // Mock PathResolver responses
+      const pkg1IndexJSPath = pkg1IndexBasePath + '.js';
+      const pkg1IndexWXMLPath = pkg1IndexBasePath + '.wxml';
+      const pkg1DetailTSPath = pkg1DetailBasePath + '.ts';
+      const pkg2ListJSPath = pkg2ListBasePath + '.js';
+      const pkg2ListJSONPath = pkg2ListBasePath + '.json';
+
+      // Mock existence
+      mockPathExists([pkg1IndexJSPath, pkg1IndexWXMLPath]);
+      mockPathExists(pkg1DetailTSPath);
+      mockPathExists([pkg2ListJSPath, pkg2ListJSONPath]);
+
+      // Mock PathResolver
       mockResolveAnyPath.mockImplementation(
-        (importPath: string, containingFile: string, extensions: string[]) => {
-          // The implementation adds a leading slash and joins the paths
-          if (importPath === '/package1/pages/index') return package1IndexPath;
-          if (importPath === '/package1/pages/detail') return package1DetailPath;
-          if (importPath === '/package2/pages/list') return package2ListPath;
+        (importPath: string, _containingFile: string, _extensions: string[]) => {
+          if (importPath === '/package1/pages/index') return pkg1IndexJSPath;
+          if (importPath === '/package1/pages/detail') return pkg1DetailTSPath;
+          if (importPath === '/package2/pages/list') return pkg2ListJSPath;
           return null;
         },
       );
 
       const dependencies = await parser.parse(filePath);
 
-      expect(dependencies).toContain(package1IndexPath);
-      expect(dependencies).toContain(package1DetailPath);
-      expect(dependencies).toContain(package2ListPath);
-      expect(dependencies.length).toBeGreaterThanOrEqual(3);
+      // Assert all related files are included
+      expect(dependencies).toEqual(
+        expect.arrayContaining([
+          pkg1IndexJSPath,
+          pkg1IndexWXMLPath,
+          pkg1DetailTSPath,
+          pkg2ListJSPath,
+          pkg2ListJSONPath,
+        ]),
+      );
+      expect(dependencies).toHaveLength(5);
 
+      // Verify resolveAnyPath calls
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/package1/pages/index',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'],
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/package1/pages/detail',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'],
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/package2/pages/list',
         filePath,
-        expect.arrayContaining(['.js']),
+        parser['pageAllExtensions'],
       );
     });
 
-    it('should parse app.json tabBar icon paths', async () => {
+    it('should parse app.json tabBar icon paths but not page paths', async () => {
       const filePath = actualPath.resolve(projectRoot, 'app.json');
       const fileContent = `{
         "tabBar": {
@@ -338,83 +382,237 @@ describe('JSONParser', () => {
       }`;
       mockFileContent('app.json', fileContent);
 
-      const indexPath = actualPath.resolve(projectRoot, 'pages/index/index.js');
-      const profilePath = actualPath.resolve(projectRoot, 'pages/profile/profile.js');
+      // Define icon paths
       const homeIconPath = actualPath.resolve(projectRoot, 'assets/home.png');
       const homeActiveIconPath = actualPath.resolve(projectRoot, 'assets/home-active.png');
       const profileIconPath = actualPath.resolve(projectRoot, 'assets/profile.png');
       const profileActiveIconPath = actualPath.resolve(projectRoot, 'assets/profile-active.png');
 
-      // Mock PathResolver responses
+      // Mock icon existence
+      mockPathExists([homeIconPath, homeActiveIconPath, profileIconPath, profileActiveIconPath]);
+
+      // Mock PathResolver responses for icons ONLY
       mockResolveAnyPath.mockImplementation(
-        (importPath: string, containingFile: string, extensions: string[]) => {
-          if (importPath === 'pages/index/index') return indexPath;
-          if (importPath === 'pages/profile/profile') return profilePath;
-          if (importPath === 'assets/home.png') return homeIconPath;
-          if (importPath === 'assets/home-active.png') return homeActiveIconPath;
-          if (importPath === 'assets/profile.png') return profileIconPath;
-          if (importPath === 'assets/profile-active.png') return profileActiveIconPath;
+        (importPath: string, _containingFile: string, extensions: string[]) => {
+          // Check if it's asking for an image
+          if (extensions.includes('.png')) {
+            if (importPath === 'assets/home.png') return homeIconPath;
+            if (importPath === 'assets/home-active.png') return homeActiveIconPath;
+            if (importPath === 'assets/profile.png') return profileIconPath;
+            if (importPath === 'assets/profile-active.png') return profileActiveIconPath;
+          }
+          // Return null for anything else (like the pagePaths)
           return null;
         },
       );
 
       const dependencies = await parser.parse(filePath);
 
-      expect(dependencies).toContain(homeIconPath);
-      expect(dependencies).toContain(homeActiveIconPath);
-      expect(dependencies).toContain(profileIconPath);
-      expect(dependencies).toContain(profileActiveIconPath);
-      // The page paths might also be included, so we don't test the exact length
+      // Assert ONLY icons are included
+      expect(dependencies).toEqual(
+        expect.arrayContaining([
+          homeIconPath,
+          homeActiveIconPath,
+          profileIconPath,
+          profileActiveIconPath,
+        ]),
+      );
+      expect(dependencies).toHaveLength(4);
+
+      // Verify resolveAnyPath was called for icons
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        'assets/home.png',
+        filePath,
+        parser['imageExtensions'],
+      );
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        'assets/home-active.png',
+        filePath,
+        parser['imageExtensions'],
+      );
+      // Verify it was *not* called for page paths within the tabBar processor
+      expect(mockResolveAnyPath).not.toHaveBeenCalledWith(
+        'pages/index/index', // TabBar page paths aren't resolved by processTabBar
+        filePath,
+        expect.anything(),
+      );
     });
 
-    it('should parse page.json component references', async () => {
+    it('should parse page.json component references and find all related files', async () => {
       const filePath = actualPath.resolve(projectRoot, 'pages/index/index.json');
       const fileContent = `{
         "usingComponents": {
           "custom-button": "/components/button/button",
           "user-card": "../../components/user-card/user-card",
+          "plugin-comp": "plugin://myPlugin/comp",
           "tab-bar": "../common/tab-bar"
         }
       }`;
       mockFileContent('pages/index/index.json', fileContent);
 
-      const buttonPath = actualPath.resolve(projectRoot, 'components/button/button.js');
-      const userCardPath = actualPath.resolve(projectRoot, 'components/user-card/user-card.js');
-      const tabBarPath = actualPath.resolve(projectRoot, 'pages/common/tab-bar.js');
+      // Define expected paths
+      const buttonBasePath = actualPath.resolve(projectRoot, 'components/button/button');
+      const userCardBasePath = actualPath.resolve(projectRoot, 'components/user-card/user-card');
+      const tabBarBasePath = actualPath.resolve(projectRoot, 'pages/common/tab-bar');
 
-      // Mock PathResolver responses
+      const buttonJSPath = buttonBasePath + '.js';
+      const buttonWXMLPath = buttonBasePath + '.wxml';
+      const buttonWXSSPath = buttonBasePath + '.wxss';
+      const buttonJSONPath = buttonBasePath + '.json';
+
+      const userCardTSPath = userCardBasePath + '.ts';
+      const userCardWXMLPath = userCardBasePath + '.wxml';
+      const userCardWXSSPath = userCardBasePath + '.wxss';
+
+      const tabBarJSPath = tabBarBasePath + '.js';
+
+      // Mock existence
+      mockPathExists([buttonJSPath, buttonWXMLPath, buttonWXSSPath, buttonJSONPath]);
+      mockPathExists([userCardTSPath, userCardWXMLPath, userCardWXSSPath]);
+      mockPathExists(tabBarJSPath);
+
+      // Mock PathResolver
       mockResolveAnyPath.mockImplementation(
-        (importPath: string, containingFile: string, extensions: string[]) => {
-          if (importPath === '/components/button/button') return buttonPath;
-          if (importPath === '../../components/user-card/user-card') return userCardPath;
-          if (importPath === '../common/tab-bar') return tabBarPath;
+        (importPath: string, _containingFile: string, _extensions: string[]) => {
+          if (importPath === '/components/button/button') return buttonJSPath;
+          if (importPath === '../../components/user-card/user-card') return userCardTSPath;
+          if (importPath === '../common/tab-bar') return tabBarJSPath;
+          // Return null for plugin paths or unresolved paths
           return null;
         },
       );
 
       const dependencies = await parser.parse(filePath);
 
-      expect(dependencies).toContain(buttonPath);
-      expect(dependencies).toContain(userCardPath);
-      expect(dependencies).toContain(tabBarPath);
+      // Assert all related files are included (excluding plugin)
+      expect(dependencies).toEqual(
+        expect.arrayContaining([
+          buttonJSPath,
+          buttonWXMLPath,
+          buttonJSONPath,
+          buttonWXSSPath,
+          userCardTSPath,
+          userCardWXMLPath,
+          userCardWXSSPath,
+          tabBarJSPath,
+        ]),
+      );
+      expect(dependencies).toHaveLength(8);
 
-      // Use expect.arrayContaining instead of exact array comparison because
-      // the exact extensions might vary in the implementation
+      // Verify resolveAnyPath calls (excluding plugin)
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '/components/button/button',
         filePath,
-        expect.arrayContaining(['.js', '.ts']),
+        parser['componentExtensions'],
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '../../components/user-card/user-card',
         filePath,
-        expect.arrayContaining(['.js', '.ts']),
+        parser['componentExtensions'],
       );
       expect(mockResolveAnyPath).toHaveBeenCalledWith(
         '../common/tab-bar',
         filePath,
-        expect.arrayContaining(['.js', '.ts']),
+        parser['componentExtensions'],
       );
+      // Ensure plugin path was not resolved
+      expect(mockResolveAnyPath).not.toHaveBeenCalledWith(
+        expect.stringContaining('plugin://'),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('should handle component generics and find all related files', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'components/list/list.json');
+      const fileContent = `{
+        "componentGenerics": {
+          "list-item": {
+            "default": "../generic-item/item"
+          },
+          "list-header": {
+            "default": "/components/common/header"
+          },
+          "list-footer": {
+          }
+        }
+      }`;
+      mockFileContent('components/list/list.json', fileContent);
+
+      const itemBasePath = actualPath.resolve(projectRoot, 'components/generic-item/item');
+      const headerBasePath = actualPath.resolve(projectRoot, 'components/common/header');
+
+      const itemJSPath = itemBasePath + '.js';
+      const itemWXMLPath = itemBasePath + '.wxml';
+      const itemWXSSPath = itemBasePath + '.wxss';
+      const headerTSPath = headerBasePath + '.ts';
+
+      mockPathExists([itemJSPath, itemWXMLPath, itemWXSSPath]);
+      mockPathExists(headerTSPath);
+
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, _containingFile: string, _extensions: string[]) => {
+          if (importPath === '../generic-item/item') return itemJSPath;
+          if (importPath === '/components/common/header') return headerTSPath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toEqual(
+        expect.arrayContaining([itemJSPath, itemWXMLPath, itemWXSSPath, headerTSPath]),
+      );
+      expect(dependencies).toHaveLength(4);
+
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        '../generic-item/item',
+        filePath,
+        parser['componentExtensions'],
+      );
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        '/components/common/header',
+        filePath,
+        parser['componentExtensions'],
+      );
+    });
+
+    it('should handle non-existent page gracefully', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'app.json');
+      const fileContent = `{"pages": ["pages/non-existent/page"]}`;
+      mockFileContent('app.json', fileContent);
+
+      // Mock PathResolver to return null (not resolved)
+      mockResolveAnyPath.mockReturnValue(null);
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(0);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        '/pages/non-existent/page',
+        filePath,
+        parser['pageAllExtensions'],
+      );
+      // No fs.existsSync should be called if resolveAnyPath fails
+      expect(mockFs.existsSync).not.toHaveBeenCalledWith(expect.stringContaining('non-existent'));
+    });
+
+    it('should handle non-existent component gracefully', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'page.json');
+      const fileContent = `{"usingComponents": {"missing": "../components/missing"}}`;
+      mockFileContent('page.json', fileContent);
+
+      mockResolveAnyPath.mockReturnValue(null);
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(0);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith(
+        '../components/missing',
+        filePath,
+        parser['componentExtensions'],
+      );
+      expect(mockFs.existsSync).not.toHaveBeenCalledWith(expect.stringContaining('missing'));
     });
 
     it('should handle invalid JSON gracefully', async () => {
