@@ -7,7 +7,6 @@ const { version } = require('../package.json');
 // Import command functions
 import { clean } from './commands/clean';
 import { graph } from './commands/graph';
-import { listUnused } from './commands/list-unused';
 import { logger, LogLevel } from './utils/debug-logger';
 
 // Remove the local mergeOptions function from cli.ts
@@ -59,38 +58,9 @@ program
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
 
-// list-unused command
-program
-  .command('list-unused')
-  .description('分析项目并列出检测到的未使用文件')
-  .option('--types <types>', '指定要检查的文件扩展名，用逗号分隔') // No default here, let command handle it
-  .option(
-    '--exclude <pattern>',
-    '用于排除文件/目录的 Glob 模式',
-    (value: string, previous: string[]) => previous.concat([value]),
-    [],
-  )
-  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔')
-  .option('--output-format <format>', '输出格式 (text|json)')
-  .option('-o, --output <file>', '将列表保存到文件')
-  // .option('--use-aliases', '启用路径别名解析') // Alias handled automatically by loader
-  .action(async (cmdOptions) => {
-    const globalOptions = program.opts();
-    setupLogger(globalOptions);
-    try {
-      // Pass both command and global options to the handler
-      await listUnused({ ...globalOptions, ...cmdOptions });
-    } catch (error) {
-      logger.error(`Command failed: ${(error as Error).message}`);
-      // Stack trace logged within command handlers now
-      process.exit(1);
-    }
-  });
-
 // graph command
 program
   .command('graph')
-  .alias('visualize')
   .description('生成依赖关系图的可视化文件')
   .option('-f, --format <format>', '输出格式 (html|dot|json|png|svg)')
   .option('-o, --output <file>', '保存图文件的路径')
@@ -113,17 +83,17 @@ program
 // clean command
 program
   .command('clean')
-  .description('分析项目并删除未使用的文件 (⚠️ 使用此命令务必谨慎！)')
-  .option('--types <types>', '指定要删除的文件类型')
+  .description('分析项目并删除未使用的文件。默认会先列出文件并提示确认。')
+  .option('--types <types>', '指定要分析的文件类型 (覆盖配置文件)')
   .option(
     '--exclude <pattern>',
-    '排除某些文件/目录不被删除',
+    '排除某些文件/目录 (覆盖配置文件)',
     (value: string, previous: string[]) => previous.concat([value]),
     [],
   )
-  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔')
-  .option('--dry-run', '只显示会被删除的文件，不实际执行', false)
-  .option('--yes', '跳过删除确认提示', false)
+  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
+  .option('--list', '只列出将被删除的文件，不执行任何操作', false)
+  .option('--delete', '直接删除文件，不进行确认提示', false)
   .action(async (cmdOptions) => {
     const globalOptions = program.opts();
     setupLogger(globalOptions);

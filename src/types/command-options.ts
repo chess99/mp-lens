@@ -3,6 +3,8 @@ export interface CommandOptions {
   verbose?: boolean;
   verboseLevel?: number;
   config?: string;
+  list?: boolean;
+  delete?: boolean;
 }
 
 export interface AnalyzerOptions {
@@ -37,8 +39,6 @@ export interface CleanOptions extends CommandOptions {
   types: string;
   exclude: string[];
   essentialFiles?: string;
-  dryRun: boolean;
-  yes: boolean;
   miniappRoot?: string;
   entryFile?: string;
 }
@@ -87,10 +87,6 @@ export interface ConfigFileOptions {
   includeNpm?: boolean; // 是否包含npm依赖
   npm?: boolean; // 是否包含npm依赖（替代名称）
   focus?: string; // 要关注的特定文件
-
-  // 清理相关
-  dryRun?: boolean; // 是否仅模拟删除
-  yes?: boolean; // 是否跳过确认
 
   // 高级选项
   entryContent?: any; // 自定义入口内容

@@ -80,13 +80,6 @@ module.exports = {
   // --- 特定命令的配置 (通常通过命令行参数指定，但也可在此配置) ---
 
   /**
-   * [list-unused 命令可选] 输出未使用文件列表的格式。
-   * 'text': 纯文本列表 (默认)
-   * 'json': JSON 格式输出
-   */
-  outputFormat: 'text',
-
-  /**
    * [graph 命令可选] 生成依赖图的格式。
    * 'html': 交互式 HTML 文件 (默认)
    * 'dot': Graphviz DOT 语言文件
@@ -116,20 +109,6 @@ module.exports = {
    * 例: "src/pages/home/index.js"
    */
   focus: undefined,
-
-  /**
-   * [clean 命令可选] 是否仅模拟清理操作，而不实际删除文件。
-   * 强烈建议在首次执行清理前使用。
-   * 默认: false
-   */
-  dryRun: false,
-
-  /**
-   * [clean 命令可选] 是否跳过交互式确认，直接删除文件。
-   * ⚠️ 危险操作，请谨慎使用！
-   * 默认: false
-   */
-  yes: false,
 
   /**
    * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。

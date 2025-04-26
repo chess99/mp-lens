@@ -65,36 +65,7 @@ mp-analyzer [全局选项] <命令> [命令选项]
 
 **可用命令:**
 
-### `list-unused`
-
-分析项目并列出检测到的未使用文件，此操作**不会修改**任何文件。
-
-```bash
-# 列出当前目录下所有默认类型的未使用文件
-mp-analyzer list-unused
-
-# 在指定项目中仅列出未使用的 JS 和 WXML 文件
-mp-analyzer -p ../我的项目 list-unused --types js,wxml
-
-# 排除 mock 数据文件，并将结果输出为 JSON 文件
-mp-analyzer list-unused --exclude "**/mock/*" --output-format json -o unused.json
-
-# 分析嵌套目录中的小程序项目
-mp-analyzer list-unused --miniapp-root client/app
-
-# 使用自定义入口文件
-mp-analyzer list-unused --entry-file src/app.json
-```
-
-**选项:**
-
-* `--types <类型1,类型2,...>`: 指定要检查的文件扩展名，用逗号分隔 (默认: js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs)。
-* `--exclude <模式>`: 用于排除文件/目录的 Glob 模式。可多次使用。
-* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被标记为未使用），用逗号分隔。
-* `--output-format <text|json>`: 输出格式 (默认: text)。
-* `-o, --output <文件>`: 将列表保存到文件，而非打印到控制台。
-
-### `graph` (或 `visualize`)
+### `graph`
 
 生成依赖关系图的可视化文件。
 
@@ -115,39 +86,52 @@ mp-analyzer graph --focus src/pages/home/index.js -o home-deps.html
 * `-o, --output <文件>`: 保存图文件的路径。
 * `--depth <数字>`: 限制依赖图的显示深度。
 * `--focus <文件路径>`: 高亮显示与特定文件相关的依赖。
-* `--no-npm`: 在图中排除 `node_modules` 或 `miniprogram_npm` 中的依赖。
+* `--npm`: 在图中包含 `node_modules` 或 `miniprogram_npm` 中的依赖 (默认: true)。
 
 ### `clean`
 
-Analyzes the project and **deletes** unused files. **⚠️ Use this command with extreme caution!**
+分析项目并删除未使用的文件。**⚠️ 使用此命令务必谨慎！**
 
-**🚨 Safety First:**
+**默认行为:**
 
-1. **Be sure to use version control (e.g., Git)** and commit all changes before running `clean`.
-2. **Be sure to run `mp-analyzer clean --dry-run` first** to see which files will be deleted.
-3. Unless you are absolutely sure of the consequences, **avoid using the `--yes` or `--force` options**.
+* 分析项目，找出未使用的文件。
+* 列出将被删除的文件。
+* **提示用户确认**是否继续删除。
+
+**安全提示:**
+
+1. **使用版本控制 (如 Git)** 并在运行 `clean` 前提交所有更改。
+2. 首次使用时，考虑先用 `--list` 模式查看将删除哪些文件。
+
+**用法示例:**
 
 ```bash
-# Preview: Show which files *will* be deleted (Safe mode - will not actually delete)
-mp-analyzer clean --dry-run
+# 默认模式: 列出文件并提示确认删除
+mp-analyzer clean
 
-# Delete unused files interactively (lists files and asks for confirmation)
+# 列表模式: 只列出将被删除的文件 (安全，不执行任何操作)
+mp-analyzer clean --list
+
+# 删除模式: 直接删除未使用文件，不进行确认 (谨慎使用!)
 mp-analyzer clean --delete
 
-# Interactively delete only unused image files
-mp-analyzer clean --delete --types png,jpg,gif
+# 仅清理未使用的图片文件 (会提示确认)
+mp-analyzer clean --types png,jpg,gif
 
-# Dangerous operation: Delete unused files directly without confirmation (Not recommended)
-# mp-analyzer clean --delete --yes
+# 清理时排除特定的目录 (会提示确认)
+mp-analyzer clean --exclude "**/legacy/**"
+
+# 直接删除未使用的 JS 和 WXML 文件 (谨慎使用!)
+mp-analyzer clean --delete --types js,wxml
 ```
 
-**Options:**
+**选项:**
 
-* `--types <type1,type2,...>`: Specify the file types to delete.
-* `--exclude <pattern>`: Exclude certain files/directories from being deleted.
-* `--essential-files <file1,file2,...>`: Specify files that should be considered essential (these files will never be deleted), separated by commas.
-* `--dry-run`: **Strongly recommended.** Simulate the deletion process without actually modifying files.
-* `-y, --yes, --force`: **Use with caution!** Skip the interactive confirmation step.
+* `--types <类型1,类型2,...>`: 指定要分析和删除的文件类型，用逗号分隔 (默认: js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs)。
+* `--exclude <模式>`: 用于排除文件/目录的 Glob 模式。可多次使用。
+* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
+* `--list`: **(推荐)** 只列出将被删除的文件，不实际执行任何操作。
+* `--delete`: **(谨慎使用)** 跳过交互式确认步骤，直接删除文件。
 
 ## ⚙️ Configuration File
 

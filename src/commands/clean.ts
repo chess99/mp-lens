@@ -22,14 +22,14 @@ interface RawCleanOptions {
   types?: string;
   exclude?: string[];
   essentialFiles?: string;
-  dryRun?: boolean;
-  yes?: boolean;
+  list?: boolean; // New: Replaces dryRun conceptually for listing only
+  delete?: boolean; // New: Replaces yes for direct deletion
 
   [key: string]: any;
 }
 
 /**
- * 删除未使用的文件
+ * Cleans unused files: lists, prompts for deletion, or deletes directly.
  */
 export async function clean(rawOptions: RawCleanOptions): Promise<void> {
   // 1. Resolve Project Path and Set Logger Root
@@ -56,8 +56,8 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
   const miniappRoot = mergedConfig.miniappRoot;
   const entryFile = mergedConfig.entryFile;
-  const dryRun = mergedConfig.dryRun ?? false;
-  const yes = mergedConfig.yes ?? false;
+  const listOnly = mergedConfig.list ?? false; // Use the new 'list' flag
+  const deleteDirectly = mergedConfig.delete ?? false; // Use the new 'delete' flag
 
   // Validate required options
   if (!types) {
@@ -65,10 +65,12 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
   }
 
   // Log final options
-  logger.info(`File types to clean: ${types}`);
-  if (dryRun)
-    logger.info(chalk.yellow('⚠️ Dry Run Mode: Files will be listed but NOT deleted or moved.'));
-  logger.info('🧹 Starting unused file cleanup...');
+  logger.info(`File types to analyze: ${types}`);
+  if (listOnly) logger.info(chalk.blue('ℹ️ List Mode: Files will be listed but NOT deleted.'));
+  else if (deleteDirectly)
+    logger.info(chalk.yellow('⚠️ Delete Mode: Files will be deleted WITHOUT confirmation.'));
+  else logger.info('🧹 Starting unused file cleanup (will prompt before deletion)...');
+
   logger.info(`Project path: ${projectRoot}`);
   if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
   if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
@@ -94,18 +96,29 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       return;
     }
 
-    // Log files to be processed
-    logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files to process:`));
+    // Log files found
+    logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files:`));
     unusedFiles.forEach((file) => {
       const relativePath = path.relative(projectRoot, file);
-      logger.info(`  ${dryRun ? '[Dry Run] ' : '[Delete] '}${relativePath}`);
+      // Adjust log prefix based on mode
+      let prefix = '[Action]';
+      if (listOnly) prefix = chalk.blue('[List]');
+      else if (deleteDirectly) prefix = chalk.red('[Delete]');
+      else prefix = chalk.yellow('[Delete (Pending Confirmation)]');
+      logger.info(`  ${prefix} ${relativePath}`);
     });
     console.log(); // Add spacing
 
-    // Confirmation before action (using final options)
-    let proceed = yes || dryRun;
+    // If listOnly mode, we are done after listing
+    if (listOnly) {
+      logger.info('List mode complete. No files were changed.');
+      return;
+    }
+
+    // Confirmation before action (only if not deleteDirectly)
+    let proceed = deleteDirectly;
     if (!proceed) {
-      logger.warn('Use --dry-run to preview.');
+      // Prompt only if not in direct delete mode
       const answers = await inquirer.prompt([
         {
           type: 'confirm',
@@ -122,12 +135,8 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       return;
     }
 
-    // Perform actions (using final options)
-    if (dryRun) {
-      logger.info('Dry run complete. No files were changed.');
-      return;
-    }
-
+    // Perform deletion if confirmed or if deleteDirectly was true
+    logger.info(`Deleting ${unusedFiles.length} files...`);
     let processedCount = 0;
     let errorCount = 0;
 
@@ -143,7 +152,7 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       }
     }
 
-    // Final summary (using final options)
+    // Final summary
     logger.info(chalk.green(`✅ Successfully deleted ${processedCount} files.`));
     if (errorCount > 0) {
       logger.error(chalk.red(` Encountered errors processing ${errorCount} files.`));
