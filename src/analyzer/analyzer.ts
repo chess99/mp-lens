@@ -4,6 +4,7 @@ import minimatch from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
+import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
 import { DependencyGraph } from './dependency-graph';
 import { FileParser } from './file-parser';
 
@@ -151,14 +152,26 @@ function findUnusedFiles(
   // 2. Resolve essential files using both project and miniapp roots
   const essentialFiles = resolveEssentialFiles(projectRoot, miniappRoot, essentialFilesUser);
 
-  // 3. Perform reachability analysis (BFS/DFS)
+  // 3. Find pure ambient declaration files (d.ts files that declare global types without import/export)
+  const allProjectFiles = graph.nodes();
+  const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(projectRoot, allProjectFiles);
+
+  // Add pure ambient declaration files to essential files
+  pureAmbientDtsFiles.forEach((file) => essentialFiles.add(file));
+
+  if (pureAmbientDtsFiles.length > 0) {
+    logger.debug(
+      `Added ${pureAmbientDtsFiles.length} pure ambient declaration files to essential files`,
+    );
+  }
+
+  // 4. Perform reachability analysis (BFS/DFS)
   const reachableFiles = findReachableFiles(graph, entryPoints, essentialFiles);
 
-  // 4. Determine unused files
-  const allProjectFiles = graph.nodes();
+  // 5. Determine unused files
   let unusedFiles = allProjectFiles.filter((file) => !reachableFiles.has(file));
 
-  // 5. Filter out files matching keepAssets patterns
+  // 6. Filter out files matching keepAssets patterns
   const keepPatterns = options?.keepAssets || [];
   if (keepPatterns.length > 0) {
     logger.debug(`Filtering unused files against keepAssets patterns: ${keepPatterns.join(', ')}`);

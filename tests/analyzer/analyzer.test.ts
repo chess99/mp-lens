@@ -3,6 +3,7 @@ import * as glob from 'glob';
 import * as path from 'path';
 import { analyzeProject } from '../../src/analyzer/analyzer';
 import { AnalyzerOptions } from '../../src/types/command-options';
+import { findPureAmbientDeclarationFiles } from '../../src/utils/typescript-helper';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
@@ -94,6 +95,11 @@ jest.mock('../../src/analyzer/dependency-graph', () => ({
       inDegree: jest.fn().mockReturnValue(0), // Example default mock
     };
   }),
+}));
+
+// Mock our typescript helper
+jest.mock('../../src/utils/typescript-helper', () => ({
+  findPureAmbientDeclarationFiles: jest.fn().mockReturnValue([]),
 }));
 
 describe('analyzeProject', () => {
@@ -789,6 +795,48 @@ describe('analyzeProject', () => {
       expect(fileParserInstanceChecks[currentProjectRoot]).toHaveBeenCalled();
     });
   }); // End describe 'when miniapp is in a subdirectory'
+
+  describe('findUnusedFiles with TypeScript support', () => {
+    const currentProjectRoot = trueProjectRoot;
+    const miniappRoot = currentProjectRoot; // In this test, project root is the same as miniapp root
+
+    it('should treat pure ambient declaration files as essential', async () => {
+      const appJs = actualPath.resolve(miniappRoot, 'app.js');
+      const regularFile = actualPath.resolve(miniappRoot, 'regular.js');
+      const pureDts = actualPath.resolve(miniappRoot, 'types/pure-ambient.d.ts');
+      const moduleDts = actualPath.resolve(miniappRoot, 'types/module.d.ts');
+      const allFiles = [currentProjectRoot, appJs, regularFile, pureDts, moduleDts];
+
+      // Setup our dependency graph
+      mockGlob.sync.mockReturnValue(allFiles.filter((p) => p !== currentProjectRoot));
+
+      // Mock hasNode - all files exist
+      mockHasNode.mockImplementation((node) => allFiles.includes(actualPath.resolve(node)));
+
+      // Mock parseFile - no dependencies
+      mockParseFile.mockResolvedValue([]);
+
+      // Mock pure ambient file detection - only pureDts is a pure ambient file
+      (findPureAmbientDeclarationFiles as jest.Mock).mockReturnValue([pureDts]);
+
+      // Mock nodes & outEdges which are used in findUnusedFiles
+      mockNodes.mockReturnValue(allFiles.filter((p) => p !== currentProjectRoot));
+      mockOutEdges.mockReturnValue([]);
+
+      const { unusedFiles } = await analyzeProject(currentProjectRoot, defaultOptions);
+
+      // The regular file should be unused, but the pure ambient d.ts file should be preserved
+      expect(unusedFiles).toContain(regularFile);
+      expect(unusedFiles).toContain(moduleDts); // Module-style d.ts should still be marked unused
+      expect(unusedFiles).not.toContain(pureDts); // Pure ambient d.ts should be preserved
+
+      // Verify findPureAmbientDeclarationFiles was called
+      expect(findPureAmbientDeclarationFiles).toHaveBeenCalledWith(
+        currentProjectRoot,
+        expect.any(Array),
+      );
+    });
+  });
 
   // Add more tests as needed for edge cases, options combinations etc.
 }); // End describe 'analyzeProject'
