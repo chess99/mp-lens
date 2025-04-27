@@ -275,7 +275,6 @@ describe('analyzeProject', () => {
         '**/output/unused-files.*',
         'dependency-graph.*',
         'unused-files.*',
-        '**/dist/**',
         '**/ignored/**',
         'specific-file.js',
       ];

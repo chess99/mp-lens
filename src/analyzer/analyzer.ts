@@ -120,7 +120,6 @@ function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: str
     '**/output/unused-files.*',
     'dependency-graph.*',
     'unused-files.*',
-    '**/dist/**',
   ];
 
   const globOptions: glob.IOptions = {
