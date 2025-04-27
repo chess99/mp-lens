@@ -3,6 +3,20 @@ import { AnalyzerOptions } from '../../types/command-options';
 import { logger } from '../../utils/debug-logger';
 import { PathResolver } from '../utils/path-resolver';
 
+/**
+ * Parser for WXML files that finds dependencies to other files.
+ *
+ * Path resolution rules for WeChat Mini Program WXML files:
+ * 1. Paths starting with '/' are relative to the mini program root
+ *    Example: <import src="/templates/header.wxml" />
+ *
+ * 2. Paths starting with './' or '../' are relative to the current file's directory
+ *    Example: <import src="../templates/header.wxml" />
+ *
+ * 3. Paths with no prefix (like "templates/header.wxml") should be treated as relative
+ *    to the current file's directory, equivalent to adding a './' prefix.
+ *    This parser automatically adds the './' prefix to follow Mini Program conventions.
+ */
 export class WXMLParser {
   private pathResolver: PathResolver;
   private projectRoot: string; // Needed for root-relative paths in imports/includes/wxs
@@ -61,8 +75,17 @@ export class WXMLParser {
             );
           }
         } else {
+          // Ensure non-absolute, non-relative paths are treated as relative to current dir
+          // This follows WeChat Mini Program conventions where paths like "templates/foo.wxml"
+          // are treated as "./templates/foo.wxml"
+          const normalizedPath = importPath.startsWith('.') ? importPath : './' + importPath;
+
           // Handle relative paths using resolveAnyPath
-          const depPath = this.pathResolver.resolveAnyPath(importPath, filePath, allowedExtensions);
+          const depPath = this.pathResolver.resolveAnyPath(
+            normalizedPath,
+            filePath,
+            allowedExtensions,
+          );
           if (depPath) dependencies.add(depPath);
         }
       }
@@ -77,8 +100,16 @@ export class WXMLParser {
     while ((match = wxsRegex.exec(content)) !== null) {
       if (match[1]) {
         const wxsPath = match[1];
+        // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
+        const normalizedPath =
+          wxsPath.startsWith('/') || wxsPath.startsWith('.') ? wxsPath : './' + wxsPath;
+
         // Use resolveAnyPath - it handles root-relative, relative, and alias paths
-        const depPath = this.pathResolver.resolveAnyPath(wxsPath, filePath, allowedExtensions);
+        const depPath = this.pathResolver.resolveAnyPath(
+          normalizedPath,
+          filePath,
+          allowedExtensions,
+        );
         if (depPath) {
           dependencies.add(depPath);
         }
@@ -97,7 +128,15 @@ export class WXMLParser {
       if (!src || /{{.*?}}/.test(src) || /^data:/.test(src) || /^(http|https):/.test(src)) {
         return;
       }
-      const resolvedPath = this.pathResolver.resolveAnyPath(src, filePath, allowedExtensions);
+
+      // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
+      const normalizedPath = src.startsWith('/') || src.startsWith('.') ? src : './' + src;
+
+      const resolvedPath = this.pathResolver.resolveAnyPath(
+        normalizedPath,
+        filePath,
+        allowedExtensions,
+      );
       if (resolvedPath) {
         dependencies.add(resolvedPath);
       }

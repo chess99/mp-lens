@@ -369,5 +369,50 @@ describe('WXMLParser', () => {
 
       await expect(parser.parse(filePath)).rejects.toThrow();
     });
+
+    it('should treat unprefixed paths as relative to current file directory', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'pages/index/index.wxml');
+      const fileContent = `
+        <import src="templates/header.wxml" />
+        <wxs src="scripts/utils.wxs" module="utils" />
+        <image src="images/logo.png" />
+      `;
+      mockFileContent('pages/index/index.wxml', fileContent);
+
+      const headerPath = actualPath.resolve(projectRoot, 'pages/index/templates/header.wxml');
+      const utilsPath = actualPath.resolve(projectRoot, 'pages/index/scripts/utils.wxs');
+      const logoPath = actualPath.resolve(projectRoot, 'pages/index/images/logo.png');
+
+      // Mock PathResolver responses - expect the normalized paths with './' prefix
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, containingFile: string, extensions: string[]) => {
+          if (importPath === './templates/header.wxml') return headerPath;
+          if (importPath === './scripts/utils.wxs') return utilsPath;
+          if (importPath === './images/logo.png') return logoPath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(3);
+      expect(dependencies).toContain(headerPath);
+      expect(dependencies).toContain(utilsPath);
+      expect(dependencies).toContain(logoPath);
+
+      // Verify normalization
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./templates/header.wxml', filePath, [
+        '.wxml',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./scripts/utils.wxs', filePath, ['.wxs']);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./images/logo.png', filePath, [
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.gif',
+        '.svg',
+        '.webp',
+      ]);
+    });
   });
 });
