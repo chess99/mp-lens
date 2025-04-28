@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>__TITLE__</title>
+    <!-- G6 library - switch to version 4.8.21 which has the API we need -->
+    <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.8.21/dist/g6.min.js"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+      }
+
+      #container {
+        width: 100%;
+        height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* Tree node styles */
+      .g6-node {
+        cursor: pointer;
+      }
+
+      /* Colors for node types match the original color scheme */
+      .App {
+        fill: #f46649;
+      }
+      .Package {
+        fill: #0891b2;
+      }
+      .Page {
+        fill: #f59e0b;
+      }
+      .Component {
+        fill: #9333ea;
+      }
+      .Module {
+        fill: #4d7c0f;
+      }
+      .Config {
+        fill: #ec4899;
+      }
+
+      /* Tooltip style */
+      .g6-tooltip {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 8px;
+        font-size: 12px;
+        pointer-events: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        max-width: 400px;
+        word-wrap: break-word;
+        z-index: 10;
+      }
+
+      /* Controls */
+      .controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: white;
+        border-radius: 4px;
+        padding: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        z-index: 5;
+      }
+
+      .controls label {
+        margin-right: 5px;
+      }
+
+      .search-box {
+        margin-top: 10px;
+      }
+
+      /* Graph controls */
+      .graph-control {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 100;
+      }
+
+      .graph-control button {
+        width: 30px;
+        height: 30px;
+        margin-right: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .graph-control button:hover {
+        background-color: #f0f0f0;
+      }
+
+      /* Legend */
+      .legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: white;
+        border-radius: 4px;
+        padding: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        max-width: 200px;
+        z-index: 5;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 4px;
+      }
+
+      .legend-item-color {
+        width: 12px;
+        height: 12px;
+        margin-right: 5px;
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+
+    <div class="controls">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜索节点 (ID 或 标签)..." />
+        <button id="search-button">搜索</button>
+        <button id="reset-button">重置</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <h4 style="margin-top: 0">图例</h4>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #f46649"></div>
+        <span>App</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #0891b2"></div>
+        <span>Package</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #f59e0b"></div>
+        <span>Page/Service</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #9333ea"></div>
+        <span>Component</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #4d7c0f"></div>
+        <span>Module/File</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #ec4899"></div>
+        <span>Config</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #64748b"></div>
+        <span>Root</span>
+      </div>
+      <hr />
+      <div class="legend-item">
+        <div
+          class="legend-item-color"
+          style="
+            background: none;
+            border: 1px solid #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <span style="font-size: 8px">+/-</span>
+        </div>
+        <span>点击节点展开/收起</span>
+      </div>
+    </div>
+
+    <script>
+      // This placeholder will be replaced by the generator
+      window.__GRAPH_DATA__ = {};
+    </script>
+    <!-- __RENDER_SCRIPT__ -->
+  </body>
+</html>

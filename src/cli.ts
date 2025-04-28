@@ -67,6 +67,8 @@ program
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
   .option('--npm', 'Include node_modules / miniprogram_npm in graph', false) // Default to false if flag exists
+  .option('--tree', '使用树状图可视化 (带节点展开/收起功能)', true) // Default to true
+  .option('--no-tree', '使用传统图形可视化 (D3力导向布局)')
   // Remove --no-npm, use --npm presence (default false)
   .action(async (cmdOptions) => {
     const globalOptions = program.opts();

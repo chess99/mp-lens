@@ -145,8 +145,12 @@ export function mergeOptions(
   }
   // --- End: Auto-detection logic ---
 
-  merged.output = resolvePathIfNeeded(merged.output);
+  // Only resolve focus path relative to project root
+  // Leave output path unresolved here as it should be resolved relative to cwd in the command handler
   merged.focus = resolvePathIfNeeded(merged.focus);
+
+  // Comment out this line to avoid duplicate resolution - output path will be handled in the command handlers
+  // merged.output = resolvePathIfNeeded(merged.output);
 
   // 4. Aliases/Alternative Names
   // Format (format/graphFormat)

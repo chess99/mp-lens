@@ -31,6 +31,7 @@ export interface GraphOptions extends CommandOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
+  tree?: boolean;
   miniappRoot?: string;
   entryFile?: string;
 }
@@ -86,6 +87,7 @@ export interface ConfigFileOptions {
   graphDepth?: number; // 图表依赖深度限制（替代名称）
   includeNpm?: boolean; // 是否包含npm依赖
   npm?: boolean; // 是否包含npm依赖（替代名称）
+  tree?: boolean; // 是否使用树状图可视化
   focus?: string; // 要关注的特定文件
 
   // 高级选项

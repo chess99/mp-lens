@@ -1,30 +1,63 @@
 // Import ProjectStructure and related types
-import { GraphLink, GraphNode, ProjectStructure } from '../analyzer/project-structure';
-// --- Start: Add fs import ---
 import * as fs from 'fs';
 import * as path from 'path';
-// --- End: Add fs import ---
-
-// --- Removed D3 type imports ---
-// import * as d3 from 'd3';
-// type SimulationNode = GraphNode & d3.SimulationNodeDatum;
+import { GraphLink, GraphNode, ProjectStructure } from '../analyzer/project-structure';
 
 interface HtmlGeneratorOptions {
   title: string;
-  // projectRoot: string; // Still needed for context/labels? Maybe less so if labels are pre-generated.
   maxDepth?: number;
   focusNode?: string; // This should be a node ID from the ProjectStructure
+  treeView?: boolean; // New option to toggle between tree view and graph view
+}
+
+/**
+ * Helper function to find template files in a way that works in both development and production
+ * This handles the case when we're running from /dist or from /src
+ */
+function findTemplateFile(fileName: string): string {
+  // First try to find template in the same directory as this file
+  const directPath = path.resolve(__dirname, fileName);
+  if (fs.existsSync(directPath)) {
+    return directPath;
+  }
+
+  // If we're in the /dist directory, try looking in /src/visualizer
+  if (__dirname.includes('/dist/') || __dirname.includes('\\dist\\')) {
+    const srcPath = path.resolve(__dirname).replace(/[\\/]dist[\\/]/, path.sep + 'src' + path.sep);
+    const srcFilePath = path.resolve(srcPath, fileName);
+    if (fs.existsSync(srcFilePath)) {
+      return srcFilePath;
+    }
+  }
+
+  // Final fallback - build more paths to try
+  const possiblePaths = [
+    // From project root
+    path.resolve(process.cwd(), 'src', 'visualizer', fileName),
+    path.resolve(process.cwd(), 'dist', 'visualizer', fileName),
+    // From parent dir
+    path.resolve(__dirname, '..', '..', 'src', 'visualizer', fileName),
+    path.resolve(__dirname, '..', '..', 'dist', 'visualizer', fileName),
+  ];
+
+  for (const testPath of possiblePaths) {
+    if (fs.existsSync(testPath)) {
+      return testPath;
+    }
+  }
+
+  // If no path is found, return the direct path (will cause readable error)
+  return directPath;
 }
 
 /**
  * HTML依赖图生成器
- * 使用D3.js生成交互式依赖可视化
+ * 使用AntV G6或D3.js生成交互式依赖可视化
  */
 export class HtmlGenerator {
-  private structure: ProjectStructure; // Changed from graph to structure
+  private structure: ProjectStructure;
 
   constructor(structure: ProjectStructure) {
-    // Changed parameter type
     this.structure = structure;
   }
 
@@ -32,11 +65,16 @@ export class HtmlGenerator {
    * 生成HTML格式的依赖图
    */
   generate(options: HtmlGeneratorOptions): string {
-    const { title, maxDepth, focusNode } = options;
+    const { title, maxDepth, focusNode, treeView = true } = options;
 
-    // --- Start: Read template and script ---
-    const templatePath = path.resolve(__dirname, 'template.html');
-    const scriptPath = path.resolve(__dirname, 'render-graph.js');
+    // Use different templates based on visualization type
+    const templateFileName = treeView ? 'template-tree.html' : 'template-graph.html';
+    const scriptFileName = treeView ? 'render-tree.js' : 'render-graph.js';
+
+    // Use the helper function to reliably find template files
+    const templatePath = findTemplateFile(templateFileName);
+    const scriptPath = findTemplateFile(scriptFileName);
+
     let htmlContent: string;
     let scriptContent: string;
     try {
@@ -47,30 +85,34 @@ export class HtmlGenerator {
         `Error reading HTML template or script: ${templatePath} or ${scriptPath}`,
         error,
       );
-      return '<html><body>Error loading template or script.</body></html>';
+      // Provide more detailed error message for debugging
+      return `<html><body>
+        <h1>Error loading template or script</h1>
+        <p>Could not find files at:</p>
+        <ul>
+          <li>Template: ${templatePath}</li>
+          <li>Script: ${scriptPath}</li>
+        </ul>
+        <p>Current directory: ${__dirname}</p>
+        <p>Error: ${error instanceof Error ? error.message : String(error)}</p>
+      </body></html>`;
     }
-    // --- End: Read template and script ---
 
-    // Prepare graph data using the existing method (ensure 'this.' is used)
+    // Prepare graph data using the existing method
     const graphData = this.prepareGraphData(maxDepth, focusNode);
     const graphDataJson = JSON.stringify(graphData);
-    // --- End: Read template and prepare data ---
 
-    // --- Start: Inject data and script into template ---
+    // Inject data and script into template
     htmlContent = htmlContent.replace('__TITLE__', title || 'Dependency Graph');
-    // Be careful with replacing the placeholder script content
     htmlContent = htmlContent.replace(
       'window.__GRAPH_DATA__ = {};',
       `window.__GRAPH_DATA__ = ${graphDataJson};`,
     );
-    // Embed the script content
     htmlContent = htmlContent.replace(
       '<!-- __RENDER_SCRIPT__ -->',
       `<script>\n${scriptContent}\n</script>`,
     );
-    // --- End: Inject data and script into template ---
 
-    // --- Removed embedded JS/CSS/HTML ---
     return htmlContent;
   }
 
@@ -132,7 +174,7 @@ export class HtmlGenerator {
   }
 
   /**
-   * Prepares graph data for D3 from ProjectStructure.
+   * Prepares graph data from ProjectStructure.
    * Applies filtering based on maxDepth and focusNode if provided.
    */
   private prepareGraphData(maxDepth?: number, focusNode?: string): { nodes: any[]; links: any[] } {
@@ -166,8 +208,8 @@ export class HtmlGenerator {
 
     // Map links to D3 format
     const d3Links = targetLinks.map((link) => ({
-      source: link.source, // D3 uses IDs here
-      target: link.target, // D3 uses IDs here
+      source: link.source,
+      target: link.target,
       type: link.type,
       // Determine initial highlight state based on focusNode
       highlighted: focusNode && (link.source === focusNode || link.target === focusNode),

@@ -27,6 +27,7 @@ interface RawGraphOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
+  tree?: boolean; // New option for tree visualization
 
   [key: string]: any;
 }
@@ -38,6 +39,7 @@ export interface GraphOptions extends CommandOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
+  tree?: boolean; // New option for tree visualization
   miniappRoot?: string;
   entryFile?: string;
   // Allow any config file options to be present after merge
@@ -76,13 +78,25 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   const miniappRoot = mergedConfig.miniappRoot;
   const entryFile = mergedConfig.entryFile;
   const format = mergedConfig.format ?? 'html';
-  const output = mergedConfig.output; // Resolved path or undefined
   const depth = mergedConfig.depth;
   const focus = mergedConfig.focus; // Resolved path or undefined
   const npm = mergedConfig.npm ?? false;
   // Graph-specific options from merged config
   const exclude = mergedConfig.exclude ?? [];
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
+  const tree = (mergedConfig as any).tree !== undefined ? !!(mergedConfig as any).tree : true; // Default to true for tree visualization, ensure boolean type
+
+  // Handle output path - resolve relative to current working directory, not project root
+  const output = mergedConfig.output;
+  let outputPathAbsolute = null;
+
+  if (output) {
+    // Get the absolute path based on CWD, not the project root
+    // Ensure consistent path handling by using the path module's isAbsolute check
+    outputPathAbsolute = path.isAbsolute(output) ? output : path.resolve(process.cwd(), output);
+
+    logger.info(`Resolved output path: ${outputPathAbsolute}`);
+  }
 
   // Log final options
   logger.info(`Output format: ${format}`);
@@ -90,10 +104,11 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   logger.info(`Project path: ${projectRoot}`);
   if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
   if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
-  if (output) logger.info(`Output file: ${output}`);
+  if (outputPathAbsolute) logger.info(`Output file: ${outputPathAbsolute}`);
   if (depth !== undefined) logger.info(`Max depth: ${depth}`);
   if (focus) logger.info(`Focusing on file: ${focus}`);
   if (npm) logger.info('Including npm dependencies');
+  logger.info(`Visualization type: ${tree ? 'Tree' : 'Graph'}`);
 
   try {
     logger.info('Analyzing project dependencies...');
@@ -126,6 +141,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
           title: 'Dependency Graph',
           maxDepth: depth,
           focusNode: focus,
+          treeView: tree, // Pass the tree view option
         });
         break;
       case 'dot':
@@ -162,14 +178,15 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     }
 
     // Handle output using the type guard
-    if (isString(output)) {
-      const outputDir = path.dirname(output);
+    if (outputPathAbsolute) {
+      const outputDir = path.dirname(outputPathAbsolute);
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
+
       // Write the generated content (string or buffer)
-      fs.writeFileSync(output, outputContent);
-      logger.info(`✅ Graph saved to: ${output}`);
+      fs.writeFileSync(outputPathAbsolute, outputContent);
+      logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
     } else {
       // Output to console
       if (

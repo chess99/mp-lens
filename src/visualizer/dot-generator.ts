@@ -31,7 +31,7 @@ export class DotGenerator {
     const { nodes, links } = this.prepareGraphData(maxDepth, focusNode);
 
     // 构建 DOT 字符串
-    let dot = `digraph "${title}" {\n`;
+    let dot = `digraph "${title || 'Dependency Graph'}" {\n`;
 
     // 图的全局设置
     dot += '  graph [rankdir=LR, fontname="Arial", fontsize=12, overlap=scale, splines=true];\n'; // Use overlap=scale for better layout
