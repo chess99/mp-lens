@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
+import { ProjectStructure } from '../analyzer/project-structure';
 import { CommandOptions } from '../types/command-options';
 import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
@@ -44,11 +45,9 @@ export interface GraphOptions extends CommandOptions {
 }
 
 // Function to render JSON format
-function renderJSON(graphData: {
-  nodes: { id: string }[];
-  links: { source: string; target: string }[];
-}): string {
-  return JSON.stringify(graphData, null, 2);
+function renderJSON(structure: ProjectStructure): string {
+  // Simple serialization for now. Could be enhanced later (e.g., remove redundant paths).
+  return JSON.stringify(structure, null, 2);
 }
 
 /**
@@ -82,7 +81,6 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   const focus = mergedConfig.focus; // Resolved path or undefined
   const npm = mergedConfig.npm ?? false;
   // Graph-specific options from merged config
-  const types = mergedConfig.types ?? 'js,ts,json,wxml,wxss'; // Default types for graph
   const exclude = mergedConfig.exclude ?? [];
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
 
@@ -99,11 +97,10 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
 
   try {
     logger.info('Analyzing project dependencies...');
-    const fileTypes = types.split(',').map((t) => t.trim());
+    const fileTypes = mergedConfig.types?.split(',').map((t: string) => t.trim()) ?? [];
 
     // Call analyzeProject with final options
-    const { dependencyGraph } = await analyzeProject(projectRoot, {
-      // Use projectRoot
+    const { projectStructure } = await analyzeProject(projectRoot, {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
@@ -112,21 +109,21 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       miniappRoot,
       entryFile,
       entryContent: mergedConfig.entryContent,
+      keepAssets: mergedConfig.keepAssets,
     });
 
     logger.info('Rendering graph...');
 
-    // Initialize generators for HTML and DOT formats
-    const htmlGenerator = new HtmlGenerator(dependencyGraph);
-    const dotGenerator = new DotGenerator(dependencyGraph);
+    // Initialize generators with the new ProjectStructure
+    const htmlGenerator = new HtmlGenerator(projectStructure);
+    const dotGenerator = new DotGenerator(projectStructure);
 
     // Call appropriate renderer with depth and focus parameters
     let outputContent: string | Buffer = ''; // Use Buffer for potential binary formats
     switch (format) {
       case 'html':
         outputContent = htmlGenerator.generate({
-          title: 'Project Dependency Graph',
-          projectRoot,
+          title: 'Dependency Graph',
           maxDepth: depth,
           focusNode: focus,
         });
@@ -134,49 +131,20 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       case 'dot':
         outputContent = dotGenerator.generate({
           title: 'Project Dependency Graph',
-          projectRoot,
           maxDepth: depth,
           focusNode: focus,
         });
         break;
       case 'json':
-        // For JSON, we still need to filter the graph based on depth and focus
-        // We can use the same filtering logic from the HTML generator's prepareGraphData
-        // but output JSON instead
-        if (focus && depth !== undefined) {
-          // Use the filtered graph data from HTML generator
-          const htmlOutput = htmlGenerator.generate({
-            title: 'Project Dependency Graph',
-            projectRoot,
-            maxDepth: depth,
-            focusNode: focus,
-          });
-
-          // Extract the graph data from the HTML output
-          const graphDataMatch = /const graphData = (.*?);/s.exec(htmlOutput);
-          if (graphDataMatch && graphDataMatch[1]) {
-            try {
-              const graphData = JSON.parse(graphDataMatch[1]);
-              outputContent = renderJSON(graphData);
-            } catch (e) {
-              // Fallback to unfiltered data if parsing fails
-              outputContent = renderJSON(dependencyGraph.toJSON());
-            }
-          } else {
-            // Fallback to unfiltered data
-            outputContent = renderJSON(dependencyGraph.toJSON());
-          }
-        } else {
-          // No filtering needed
-          outputContent = renderJSON(dependencyGraph.toJSON());
-        }
+        logger.warn(
+          'JSON output currently does not support depth/focus filtering. Outputting full structure.',
+        );
+        outputContent = renderJSON(projectStructure);
         break;
       case 'svg':
       case 'png':
-        // Use the DOT generator with depth and focus filtering
         outputContent = dotGenerator.generate({
           title: 'Project Dependency Graph',
-          projectRoot,
           maxDepth: depth,
           focusNode: focus,
         });
@@ -220,12 +188,9 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       } else {
         logger.warn(`Console output for format '${format}' might not be meaningful. Use --output.`);
       }
-      // Remove automatic saving for binary formats when no output is specified
-      // if (format === 'png' || format === 'svg') { ... }
     }
   } catch (error) {
     logger.error(`Graph generation failed: ${(error as Error).message}`);
-    // Add stack check here too
     const stack = (error as Error).stack;
     if (stack) {
       logger.debug(stack);

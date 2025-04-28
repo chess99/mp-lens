@@ -1,32 +1,111 @@
 import * as fs from 'fs';
-import * as glob from 'glob';
 import minimatch from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
 import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
-import { DependencyGraph } from './dependency-graph';
-import { FileParser } from './file-parser';
+import { GraphLink, ProjectStructure } from './project-structure';
+import { ProjectStructureBuilder } from './project-structure-builder';
 
 interface AnalysisResult {
-  dependencyGraph: DependencyGraph;
+  projectStructure: ProjectStructure;
   unusedFiles: string[];
 }
 
+// --- Start: New Helper Function --- //
 /**
- * 分析微信小程序项目，构建依赖图并找出未使用的文件
+ * Resolves the app.json path and content based on options and defaults.
+ */
+function resolveAppJson(
+  miniappRoot: string,
+  entryFile?: string,
+  entryContent?: any,
+): { appJsonPath: string | null; appJsonContent: any } {
+  let appJsonPath: string | null = null;
+  let resolvedContent: any = entryContent || null;
+
+  // Attempt 1: User-provided entry file
+  if (entryFile) {
+    const customEntryPath = path.resolve(miniappRoot, entryFile);
+    if (fs.existsSync(customEntryPath)) {
+      if (path.basename(customEntryPath) === 'app.json') {
+        appJsonPath = customEntryPath;
+        logger.info(`Using custom entry file as app.json: ${appJsonPath}`);
+        if (!resolvedContent) {
+          try {
+            resolvedContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+          } catch (e) {
+            logger.warn(`Failed to read/parse content from custom app.json: ${appJsonPath}`);
+          }
+        }
+      } else {
+        logger.warn(
+          `Custom entry file '${entryFile}' is not app.json. Its content won't be used for app structure unless provided via entryContent.`, // Clarified warning
+        );
+      }
+    } else {
+      logger.warn(`Custom entry file specified but does not exist: ${customEntryPath}`);
+    }
+  }
+
+  // Attempt 2: Use provided entryContent if path wasn't found via entryFile
+  if (resolvedContent && !appJsonPath) {
+    logger.debug('Using provided entry content.');
+    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
+    if (fs.existsSync(defaultAppJsonPath)) {
+      appJsonPath = defaultAppJsonPath; // Associate content with default path
+      logger.debug(`Associated entryContent with existing default app.json: ${appJsonPath}`);
+    } else {
+      logger.debug('Using provided entryContent without a corresponding app.json file.');
+    }
+  }
+
+  // Attempt 3: Find default app.json if no path or content yet
+  if (!appJsonPath && !resolvedContent) {
+    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
+    if (fs.existsSync(defaultAppJsonPath)) {
+      appJsonPath = defaultAppJsonPath;
+      logger.info(`Found default app.json: ${appJsonPath}`);
+      try {
+        resolvedContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+      } catch (e) {
+        logger.warn(`Failed to read/parse content from default app.json: ${appJsonPath}`);
+      }
+    }
+  }
+
+  // Final check and return
+  if (!appJsonPath && !resolvedContent) {
+    throw new Error(
+      'Failed to determine app.json path or content (checked custom entry, entryContent, and default app.json). Cannot analyze structure.',
+    );
+  }
+
+  if (!resolvedContent) {
+    logger.warn(
+      `Proceeding with app.json path (${appJsonPath}) but no valid content could be parsed/found. Structure analysis might be incomplete.`,
+    );
+    resolvedContent = {}; // Ensure content is always an object
+  }
+
+  return { appJsonPath, appJsonContent: resolvedContent };
+}
+// --- End: New Helper Function --- //
+
+/**
+ * Main analysis function.
  */
 export async function analyzeProject(
   trueProjectRoot: string,
   options: AnalyzerOptions,
 ): Promise<AnalysisResult> {
   const {
-    fileTypes,
     excludePatterns = [],
     essentialFiles = [],
     miniappRoot: miniappRootRelative,
     entryFile,
     entryContent,
+    keepAssets = [],
   } = options;
 
   // Determine the absolute path for the miniapp root
@@ -37,19 +116,19 @@ export async function analyzeProject(
   logger.debug('Project Root:', trueProjectRoot);
   logger.debug('MiniApp Root:', actualMiniappRoot);
   logger.verbose('Analyzer received options:', options);
-  logger.debug('File types:', fileTypes);
   logger.debug('Exclude patterns:', excludePatterns);
+  logger.debug('Keep assets patterns:', keepAssets);
 
   if (essentialFiles.length > 0) {
     logger.debug('Essential files:', essentialFiles);
   }
 
   if (entryFile) {
-    logger.debug('Using custom entry file:', entryFile);
+    logger.debug('Using custom entry file hint:', entryFile);
   }
 
   if (entryContent) {
-    logger.debug('Using provided entry content');
+    logger.debug('Using provided entry content hint');
   }
 
   // Validate the MiniApp root path
@@ -57,133 +136,118 @@ export async function analyzeProject(
     throw new Error(`小程序目录不存在: ${actualMiniappRoot}`);
   }
 
-  // Get all files within the MiniApp root
-  const allFiles = findAllFiles(actualMiniappRoot, fileTypes, excludePatterns);
-
-  logger.info(`Found ${allFiles.length} files for analysis within ${actualMiniappRoot}`);
-
-  // Build dependency graph based on MiniApp root
-  const dependencyGraph = new DependencyGraph();
-  const fileParser = new FileParser(trueProjectRoot, {
-    ...options,
-    miniappRoot: actualMiniappRoot,
-  });
-
-  // First step: Add all found files (from MiniApp root) to the graph
-  for (const file of allFiles) {
-    dependencyGraph.addNode(file);
-  }
-
-  // Second step: Analyze dependencies for each file
-  for (const file of allFiles) {
-    try {
-      const dependencies = await fileParser.parseFile(file);
-
-      for (const dep of dependencies) {
-        if (allFiles.includes(dep)) {
-          dependencyGraph.addEdge(file, dep);
-        }
-      }
-    } catch (error) {
-      logger.warn(`Unable to parse file ${file}: ${(error as Error).message}`);
-    }
-  }
-
-  // Find unused files, passing both roots now
-  const unusedFiles = findUnusedFiles(
-    dependencyGraph,
-    trueProjectRoot,
+  // --- Resolve App.json Config --- //
+  const { appJsonPath, appJsonContent } = resolveAppJson(
     actualMiniappRoot,
-    essentialFiles,
     entryFile,
     entryContent,
+  );
+
+  // --- Build Project Structure ---
+  const builder = new ProjectStructureBuilder(
+    trueProjectRoot,
+    actualMiniappRoot,
+    appJsonPath,
+    appJsonContent,
     options,
   );
 
+  const projectStructure = await builder.build();
+
+  // --- Find Unused Files using the New Structure ---
+  const unusedFiles = findUnusedFiles(
+    projectStructure,
+    trueProjectRoot,
+    actualMiniappRoot,
+    essentialFiles,
+    keepAssets,
+  );
+
   return {
-    dependencyGraph,
+    projectStructure,
     unusedFiles,
   };
 }
 
 /**
- * 在指定目录中查找所有符合条件的文件
- */
-function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: string[]): string[] {
-  const globPattern = `**/*.{${fileTypes.join(',')}}`;
-
-  // 默认排除的模式
-  const defaultIgnorePatterns = [
-    '**/node_modules/**',
-    '**/miniprogram_npm/**',
-    '**/output/dependency-graph.*',
-    '**/output/unused-files.*',
-    'dependency-graph.*',
-    'unused-files.*',
-  ];
-
-  const globOptions: glob.IOptions = {
-    cwd: rootDir,
-    absolute: true,
-    ignore: [...defaultIgnorePatterns, ...excludePatterns],
-    nodir: true,
-  };
-
-  return glob.sync(globPattern, globOptions);
-}
-
-/**
- * 查找未被使用的文件
- * 使用可达性分析：从入口文件开始，标记所有可达的文件，剩余的即为未使用的文件
+ * Finds unused files using the ProjectStructure.
  */
 function findUnusedFiles(
-  graph: DependencyGraph,
+  structure: ProjectStructure,
   projectRoot: string,
   miniappRoot: string,
   essentialFilesUser: string[] = [],
-  entryFileUser?: string,
-  entryContent?: any,
-  options?: AnalyzerOptions,
+  keepAssetsPatterns: string[] = [],
 ): string[] {
-  // 1. Resolve entry points relative to the miniapp root
-  const entryPoints = resolveEntryPoints(graph, miniappRoot, entryFileUser, entryContent);
+  // 1. Identify Entry Nodes from the Structure
+  const entryNodes: Set<string> = new Set();
+  if (structure.rootNodeId) {
+    entryNodes.add(structure.rootNodeId);
+  } else {
+    logger.warn('Project structure has no root node ID defined.');
+  }
 
-  // 2. Resolve essential files using both project and miniapp roots
-  const essentialFiles = resolveEssentialFiles(projectRoot, miniappRoot, essentialFilesUser);
+  // 2. Resolve essential FILE paths (convert user input to absolute paths)
+  const essentialFilePaths = resolveEssentialFiles(projectRoot, miniappRoot, essentialFilesUser);
 
-  // 3. Find pure ambient declaration files (d.ts files that declare global types without import/export)
-  const allProjectFiles = graph.nodes();
-  const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(projectRoot, allProjectFiles);
+  // Add essential file paths to the entry points for traversal
+  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
+  essentialFilePaths.forEach((filePath) => {
+    if (nodeMap.has(filePath)) {
+      entryNodes.add(filePath);
+      logger.verbose(`Adding essential file node to entry points: ${filePath}`);
+    } else {
+      logger.warn(`Essential file specified but not found in structure: ${filePath}`);
+    }
+  });
 
-  // Add pure ambient declaration files to essential files
-  pureAmbientDtsFiles.forEach((file) => essentialFiles.add(file));
+  // 3. Find pure ambient declaration files (d.ts) - Logic remains the same
+  const allFilePathsInStructure = structure.nodes
+    .filter((n) => n.type === 'Module' && n.properties?.absolutePath)
+    .map((n) => n.properties!.absolutePath as string);
+
+  const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(projectRoot, allFilePathsInStructure);
+
+  // Add pure ambient d.ts files to entry nodes for traversal
+  pureAmbientDtsFiles.forEach((filePath) => {
+    if (nodeMap.has(filePath)) {
+      entryNodes.add(filePath);
+      logger.verbose(`Adding ambient d.ts node to entry points: ${filePath}`);
+    } else {
+      logger.warn(`Ambient d.ts file found but not present as node in structure: ${filePath}`);
+    }
+  });
 
   if (pureAmbientDtsFiles.length > 0) {
     logger.debug(
-      `Added ${pureAmbientDtsFiles.length} pure ambient declaration files to essential files`,
+      `Added ${pureAmbientDtsFiles.length} pure ambient declaration files to traversal entry points`,
     );
   }
 
-  // 4. Perform reachability analysis (BFS/DFS)
-  const reachableFiles = findReachableFiles(graph, entryPoints, essentialFiles);
+  // 4. Perform reachability analysis using the ProjectStructure (BFS/DFS)
+  const reachableNodeIds = findReachableNodes(structure, Array.from(entryNodes));
 
-  // 5. Determine unused files
-  let unusedFiles = allProjectFiles.filter((file) => !reachableFiles.has(file));
+  // 5. Determine unused FILES
+  const allModuleNodes = structure.nodes.filter((n) => n.type === 'Module');
+
+  const unusedModuleNodes = allModuleNodes.filter((node) => !reachableNodeIds.has(node.id));
+
+  let unusedFiles = unusedModuleNodes
+    .map((node) => node.properties?.absolutePath as string | undefined)
+    .filter((filePath): filePath is string => !!filePath);
 
   // 6. Filter out files matching keepAssets patterns
-  const keepPatterns = options?.keepAssets || [];
-  if (keepPatterns.length > 0) {
-    logger.debug(`Filtering unused files against keepAssets patterns: ${keepPatterns.join(', ')}`);
-    // We need to match relative paths from the project root against the patterns
-    // Use imported minimatch function
-
+  if (keepAssetsPatterns.length > 0) {
+    logger.debug(
+      `Filtering unused files against keepAssets patterns: ${keepAssetsPatterns.join(', ')}`,
+    );
     unusedFiles = unusedFiles.filter((absolutePath) => {
       const relativePath = path.relative(projectRoot, absolutePath);
-      const shouldKeep = keepPatterns.some((pattern) => minimatch(relativePath, pattern));
+      const shouldKeep = keepAssetsPatterns.some((pattern) => minimatch(relativePath, pattern));
       if (shouldKeep) {
         logger.verbose(
-          `Keeping file due to keepAssets match (${relativePath} matches ${keepPatterns.find((p) =>
-            minimatch(relativePath, p),
+          `Keeping file due to keepAssets match (${relativePath} matches ${keepAssetsPatterns.find(
+            (p) => minimatch(relativePath, p),
           )}): ${absolutePath}`,
         );
       }
@@ -192,250 +256,26 @@ function findUnusedFiles(
   }
 
   // Debugging output
-  logger.verbose('All Project Files:', allProjectFiles.length);
-  logger.verbose('Entry Points:', entryPoints);
-  logger.verbose('Essential Files:', Array.from(essentialFiles));
-  logger.verbose('Reachable Files:', reachableFiles.size);
-  logger.info('Unused Files:', unusedFiles.length);
+  logger.verbose('All Module Nodes:', allModuleNodes.length);
+  logger.verbose('Entry Node IDs:', Array.from(entryNodes));
+  logger.verbose('Reachable Node IDs:', reachableNodeIds.size);
+  logger.info('Unused Files Found:', unusedFiles.length);
 
   return unusedFiles;
 }
 
 /**
- * Resolves the actual entry points for the analysis based on user input and defaults.
- */
-function resolveEntryPoints(
-  graph: DependencyGraph,
-  miniappRoot: string,
-  entryFileUser?: string,
-  entryContent?: any,
-): string[] {
-  const entryFiles: Set<string> = new Set();
-  let appJsonPath: string | null = null;
-  let appJsonContent: any | null = entryContent || null;
-
-  // --- Step 1: Identify app.json (location and content) ---
-
-  // Attempt 1a: User-provided entry file might BE app.json
-  if (entryFileUser) {
-    const customEntryPath = path.resolve(miniappRoot, entryFileUser);
-    if (fs.existsSync(customEntryPath) && graph.hasNode(customEntryPath)) {
-      if (path.basename(customEntryPath) === 'app.json') {
-        appJsonPath = customEntryPath;
-        logger.info(`Using custom entry file as app.json: ${appJsonPath}`);
-        // Try reading content if not already provided
-        if (!appJsonContent) {
-          try {
-            appJsonContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-          } catch (e) {
-            logger.warn(`Failed to read or parse content from custom app.json: ${appJsonPath}`);
-          }
-        }
-      } else {
-        // If user specified a non-app.json file, treat it as a direct entry point
-        entryFiles.add(customEntryPath);
-        logger.info(`Using custom entry file (non-app.json): ${customEntryPath}`);
-      }
-    } else {
-      logger.warn(
-        `Warning: Custom entry file does not exist or not found in graph: ${customEntryPath}`,
-      );
-    }
-  }
-
-  // Attempt 1b: Use provided entryContent if available and app.json path not found yet
-  if (appJsonContent && !appJsonPath) {
-    logger.debug('Using provided entry content (likely app.json structure).');
-    // We have content, but might not know the exact path if not passed via entryFileUser
-    // Try finding the default app.json path to associate with this content
-    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
-    if (fs.existsSync(defaultAppJsonPath) && graph.hasNode(defaultAppJsonPath)) {
-      appJsonPath = defaultAppJsonPath;
-    }
-  }
-
-  // Attempt 1c: Find default app.json if no specific one was identified yet
-  if (!appJsonPath) {
-    const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
-    if (fs.existsSync(defaultAppJsonPath) && graph.hasNode(defaultAppJsonPath)) {
-      appJsonPath = defaultAppJsonPath;
-      logger.info(`Found default app.json: ${appJsonPath}`);
-      // Try reading content if not already provided
-      if (!appJsonContent) {
-        try {
-          appJsonContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-        } catch (e) {
-          logger.warn(`Failed to read or parse content from default app.json: ${appJsonPath}`);
-        }
-      }
-    }
-  }
-
-  // --- Step 2: Add Runtime Entry Points (app.js/ts) ---
-  // Always look for app.js/app.ts relative to the miniapp root, as the runtime does.
-  findImplicitGlobalFiles(miniappRoot, graph, entryFiles);
-
-  // --- Step 3: Add Entry Points from app.json Content ---
-  // If we have identified app.json content (from any source), parse it for pages, components etc.
-  if (appJsonContent) {
-    logger.debug('Parsing app.json content for pages, components, etc...');
-    parseEntryContent(appJsonContent, miniappRoot, graph, entryFiles);
-    // Also add the app.json file itself as an entry/essential node if found
-    if (appJsonPath && graph.hasNode(appJsonPath)) {
-      entryFiles.add(appJsonPath);
-    }
-  } else {
-    logger.warn(
-      'Could not find or parse app.json content. Analysis might miss pages/components defined there.',
-    );
-  }
-
-  // --- Step 4: Validate ---
-  if (entryFiles.size === 0) {
-    const errorMsg =
-      'Failed to determine any valid entry points (app.js/ts, app.json pages/components).';
-    logger.warn(`${errorMsg} Analysis might be incomplete.`);
-    // Only throw error if absolutely nothing could be found
-    throw new Error(errorMsg);
-  }
-
-  return Array.from(entryFiles);
-}
-
-/**
- * Parses entry points from structured content (like app.json).
- */
-function parseEntryContent(
-  content: any,
-  miniappRoot: string,
-  graph: DependencyGraph,
-  entryFiles: Set<string>,
-): void {
-  try {
-    // Helper to find and add all related component files for a given base path
-    const addAllRelatedFilesIfExists = (baseRelativePath: string) => {
-      const normalizedRelativePath = baseRelativePath.replace(/\\\\/g, '/');
-      const absoluteBasePath = path.resolve(miniappRoot, normalizedRelativePath);
-      let fileAdded = false; // Track if at least one related file was found
-
-      const extensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
-
-      for (const ext of extensions) {
-        const potentialFilePath = absoluteBasePath + ext;
-        if (fs.existsSync(potentialFilePath) && graph.hasNode(potentialFilePath)) {
-          // Check if it exists and is part of the initial file scan
-          entryFiles.add(potentialFilePath);
-          fileAdded = true;
-        }
-      }
-      return fileAdded;
-    };
-
-    // Helper to add a single file path if it exists (used for direct references like icons)
-    const addSingleFileIfExists = (filePathRelative: string) => {
-      const normalizedRelativePath = filePathRelative.replace(/\\\\/g, '/');
-      const absolutePath = path.resolve(miniappRoot, normalizedRelativePath);
-      if (fs.existsSync(absolutePath) && graph.hasNode(absolutePath)) {
-        entryFiles.add(absolutePath);
-        return true;
-      }
-      return false;
-    };
-
-    // Process Pages (add all related files)
-    if (content.pages && Array.isArray(content.pages)) {
-      content.pages.forEach((page: string) => addAllRelatedFilesIfExists(page));
-    }
-
-    // Process Subpackages (add all related files for pages)
-    const subpackages = content.subpackages || content.subPackages || [];
-    if (Array.isArray(subpackages)) {
-      subpackages.forEach((pkg: any) => {
-        if (pkg.root && pkg.pages && Array.isArray(pkg.pages)) {
-          pkg.pages.forEach((page: string) => {
-            const pagePath = path.join(pkg.root, page);
-            addAllRelatedFilesIfExists(pagePath);
-          });
-          // Check for subpackage-specific app.js/ts (add single file)
-          addSingleFileIfExists(path.join(pkg.root, 'app.js'));
-          addSingleFileIfExists(path.join(pkg.root, 'app.ts'));
-        }
-      });
-    }
-
-    // Process TabBar (pagePath needs all related, icons are single files)
-    if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
-      content.tabBar.list.forEach((item: any) => {
-        if (item.pagePath) addAllRelatedFilesIfExists(item.pagePath); // Page path
-        if (item.iconPath) addSingleFileIfExists(item.iconPath); // Icon file
-        if (item.selectedIconPath) addSingleFileIfExists(item.selectedIconPath); // Icon file
-      });
-    }
-
-    // Process Global usingComponents (add all related files for components)
-    // Note: Component-specific usingComponents are handled during file parsing,
-    // This section handles those defined globally in app.json
-    if (content.usingComponents && typeof content.usingComponents === 'object') {
-      Object.entries(content.usingComponents).forEach(([_componentName, componentPath]) => {
-        if (typeof componentPath === 'string' && !componentPath.startsWith('plugin://')) {
-          // Treat component paths like page paths - add all related files
-          addAllRelatedFilesIfExists(componentPath as string);
-        }
-      });
-    }
-
-    // Add theme.json if present
-    if (content.themeLocation) {
-      addSingleFileIfExists(content.themeLocation);
-    }
-    addSingleFileIfExists('theme.json'); // Default location
-
-    // Add workers if present (they are entry points)
-    if (content.workers && typeof content.workers === 'string') {
-      addSingleFileIfExists(content.workers);
-    }
-  } catch (error) {
-    logger.error(`Failed to parse entry content: ${(error as Error).message}`);
-  }
-}
-
-/**
- * Finds implicitly loaded global files (app.js, app.ts, app.wxss).
- * These are loaded automatically by the runtime if they exist.
- */
-function findImplicitGlobalFiles(
-  miniappRoot: string,
-  graph: DependencyGraph,
-  entryFiles: Set<string>, // Modified in place
-): void {
-  const possibleImplicitFiles = [
-    'app.js', // Global script
-    'app.ts', // Global script (TypeScript)
-    'app.wxss', // Global stylesheet
-  ];
-
-  logger.debug('Searching for implicit global files (app.js/ts/wxss)...');
-  for (const entryFileName of possibleImplicitFiles) {
-    const entryFilePath = path.resolve(miniappRoot, entryFileName);
-    if (fs.existsSync(entryFilePath) && graph.hasNode(entryFilePath)) {
-      if (entryFiles.has(entryFilePath)) {
-        logger.trace(`Implicit global file already added: ${entryFilePath}`);
-      } else {
-        entryFiles.add(entryFilePath);
-        logger.info(`Found and added implicit global file: ${entryFilePath}`);
-      }
-    }
-  }
-}
-
-/**
- * Resolves essential files that are always considered reachable.
+ * Resolves essential files provided by the user to absolute paths.
+ * (Implementation likely remains the same - it deals with file paths)
  */
 function resolveEssentialFiles(
   projectRoot: string,
   miniappRoot: string,
   essentialFilesUser: string[],
 ): Set<string> {
+  const essentialFiles = new Set<string>();
+
+  // --- Start: Added Default Essential Files ---
   const projectLevelFiles = [
     'tsconfig.json',
     'jsconfig.json',
@@ -451,7 +291,7 @@ function resolveEssentialFiles(
   ];
 
   const miniappLevelFiles = [
-    'app.json',
+    'app.json', // Often the source of truth for entries, essential itself
     'project.config.json',
     'project.private.config.json',
     'sitemap.json',
@@ -459,65 +299,89 @@ function resolveEssentialFiles(
     'ext.json',
   ];
 
-  const essentialFiles = new Set<string>();
-
+  // Add default project-level files
   projectLevelFiles.forEach((file) => {
     const absPath = path.resolve(projectRoot, file);
+    // Check existence? Optional, depends if we want to add only existing ones.
+    // Adding regardless simplifies logic, reachability check will handle non-existent nodes later.
+    // if (fs.existsSync(absPath)) {
     essentialFiles.add(absPath);
+    // }
   });
 
+  // Add default miniapp-level files
   miniappLevelFiles.forEach((file) => {
     const absPath = path.resolve(miniappRoot, file);
+    // if (fs.existsSync(absPath)) {
     essentialFiles.add(absPath);
+    // }
   });
+  logger.verbose(
+    `Added ${projectLevelFiles.length + miniappLevelFiles.length} default essential file paths.`,
+  );
+  // --- End: Added Default Essential Files ---
 
+  // Add user-specified essential files
   essentialFilesUser.forEach((file) => {
-    const absPath = path.resolve(miniappRoot, file);
-    essentialFiles.add(absPath);
-  });
+    // Try resolving relative to miniapp root first, then project root
+    const pathFromMiniApp = path.resolve(miniappRoot, file);
+    const pathFromProject = path.resolve(projectRoot, file);
 
+    if (fs.existsSync(pathFromMiniApp)) {
+      essentialFiles.add(pathFromMiniApp);
+      logger.verbose(`Resolved essential file (from miniapp root): ${file} -> ${pathFromMiniApp}`);
+    } else if (fs.existsSync(pathFromProject)) {
+      essentialFiles.add(pathFromProject);
+      logger.verbose(`Resolved essential file (from project root): ${file} -> ${pathFromProject}`);
+    } else {
+      logger.warn(`Specified essential file not found: ${file}`);
+    }
+  });
   return essentialFiles;
 }
 
 /**
- * Performs a Depth-First Search (DFS) or Breadth-First Search (BFS)
- * starting from entry points to find all reachable files.
+ * Performs reachability analysis (BFS) on the ProjectStructure graph.
  */
-function findReachableFiles(
-  graph: DependencyGraph,
-  entryPoints: string[],
-  essentialFiles: Set<string>,
-): Set<string> {
+function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[]): Set<string> {
   const reachable = new Set<string>();
   const queue: string[] = [];
+  const linksFrom = new Map<string, GraphLink[]>();
 
-  essentialFiles.forEach((file) => {
-    if (graph.hasNode(file)) {
-      if (!reachable.has(file)) {
-        reachable.add(file);
-        queue.push(file);
-      }
+  // Precompute outgoing links for faster lookup
+  structure.links.forEach((link) => {
+    if (!linksFrom.has(link.source)) {
+      linksFrom.set(link.source, []);
     }
+    linksFrom.get(link.source)!.push(link);
   });
 
-  entryPoints.forEach((entry) => {
-    if (graph.hasNode(entry) && !reachable.has(entry)) {
-      reachable.add(entry);
-      queue.push(entry);
+  // Initialize queue with entry points that exist in the graph
+  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
+  entryNodeIds.forEach((id) => {
+    if (nodeMap.has(id)) {
+      queue.push(id);
+      reachable.add(id);
+    } else {
+      logger.warn(`Entry node ID specified but not found in graph: ${id}`);
     }
   });
 
   while (queue.length > 0) {
-    const node = queue.shift()!;
+    const currentNodeId = queue.shift()!;
 
-    const neighbors = graph.outEdges(node);
-    for (const neighbor of neighbors) {
-      if (graph.hasNode(neighbor) && !reachable.has(neighbor)) {
-        reachable.add(neighbor);
-        queue.push(neighbor);
+    // Find nodes reachable from the current node
+    const outgoingLinks = linksFrom.get(currentNodeId) || [];
+
+    for (const link of outgoingLinks) {
+      const targetNodeId = link.target;
+      if (nodeMap.has(targetNodeId) && !reachable.has(targetNodeId)) {
+        reachable.add(targetNodeId);
+        queue.push(targetNodeId);
       }
     }
   }
 
+  logger.debug(`Reachability analysis complete. Found ${reachable.size} reachable nodes.`);
   return reachable;
 }
