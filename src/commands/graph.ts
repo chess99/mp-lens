@@ -27,7 +27,6 @@ interface RawGraphOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
-  tree?: boolean; // New option for tree visualization
 
   [key: string]: any;
 }
@@ -39,7 +38,6 @@ export interface GraphOptions extends CommandOptions {
   depth?: number;
   focus?: string;
   npm?: boolean;
-  tree?: boolean; // New option for tree visualization
   miniappRoot?: string;
   entryFile?: string;
   // Allow any config file options to be present after merge
@@ -84,7 +82,6 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   // Graph-specific options from merged config
   const exclude = mergedConfig.exclude ?? [];
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
-  const tree = (mergedConfig as any).tree !== undefined ? !!(mergedConfig as any).tree : true; // Default to true for tree visualization, ensure boolean type
 
   // Handle output path - resolve relative to current working directory, not project root
   const output = mergedConfig.output;
@@ -108,7 +105,6 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   if (depth !== undefined) logger.info(`Max depth: ${depth}`);
   if (focus) logger.info(`Focusing on file: ${focus}`);
   if (npm) logger.info('Including npm dependencies');
-  logger.info(`Visualization type: ${tree ? 'Tree' : 'Graph'}`);
 
   try {
     logger.info('Analyzing project dependencies...');
@@ -141,7 +137,6 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
           title: 'Dependency Graph',
           maxDepth: depth,
           focusNode: focus,
-          treeView: tree, // Pass the tree view option
         });
         break;
       case 'dot':

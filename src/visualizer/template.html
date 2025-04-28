@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>__TITLE__</title>
+    <!-- Ensure G6 library is loaded -->
+    <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.8.21/dist/g6.min.js"></script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+        display: flex; /* Use flexbox for layout */
+        flex-direction: column; /* Stack elements vertically */
+        height: 100vh; /* Full viewport height */
+      }
+
+      #controls-bar {
+        background: #eee;
+        padding: 8px 15px;
+        border-bottom: 1px solid #ccc;
+        display: flex;
+        align-items: center;
+        gap: 20px; /* Spacing between control groups */
+        flex-shrink: 0; /* Prevent controls bar from shrinking */
+      }
+
+      #controls-bar .control-group {
+        display: flex;
+        align-items: center;
+        gap: 5px; /* Spacing within a control group */
+      }
+
+      #controls-bar label {
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      #controls-bar input[type='text'],
+      #controls-bar select,
+      #controls-bar button {
+        padding: 4px 8px;
+        font-size: 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      #controls-bar button {
+        cursor: pointer;
+        background-color: #f0f0f0;
+      }
+      #controls-bar button:hover {
+        background-color: #e0e0e0;
+      }
+
+      #container {
+        /* width: 100%; */ /* Flex item takes remaining space */
+        /* height: calc(100vh - 50px); */ /* Adjust based on controls bar height */
+        flex-grow: 1; /* Allow container to grow and fill remaining space */
+        overflow: hidden;
+        position: relative; /* Needed for absolute positioning of G6 controls */
+      }
+
+      /* G6 Tooltip style */
+      .g6-tooltip {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        font-size: 12px;
+        pointer-events: none;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        max-width: 450px;
+        word-wrap: break-word;
+        z-index: 10;
+      }
+
+      /* G6 Controls positioning */
+      .graph-control {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 4px;
+        padding: 5px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        z-index: 5;
+        display: flex;
+        gap: 3px;
+      }
+
+      .graph-control button {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+
+      .graph-control button:hover {
+        background-color: #f0f0f0;
+        border-color: #bbb;
+      }
+
+      /* Position specific control groups */
+      .graph-control-zoom {
+        top: 15px;
+        right: 15px;
+      }
+      /* Add class for layout switcher if needed */
+      /* .graph-control-layout { top: 60px; right: 15px; } */
+
+      /* Legend styles */
+      .legend {
+        position: absolute;
+        bottom: 15px;
+        left: 15px;
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 4px;
+        padding: 10px 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        max-width: 180px;
+        z-index: 5;
+        font-size: 12px;
+      }
+
+      .legend h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+
+      .legend-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .legend-item-color {
+        width: 12px;
+        height: 12px;
+        margin-right: 8px;
+        border-radius: 3px; /* Use square/rounded rect instead of circle */
+        border: 1px solid rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Controls Bar -->
+    <div id="controls-bar">
+      <div class="control-group">
+        <label for="search-input">Search:</label>
+        <input type="text" id="search-input" placeholder="Node ID or Label..." size="30" />
+        <button id="search-button">Find</button>
+        <button id="reset-button">Reset</button>
+      </div>
+      <div class="control-group" id="layout-control-placeholder">
+        <!-- Layout switcher will be created here by JS -->
+      </div>
+    </div>
+
+    <!-- G6 Container -->
+    <div id="container">
+      <!-- Zoom controls will be created here by JS -->
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <h4>Legend</h4>
+      <!-- Legend items will be generated dynamically or manually listed -->
+      <!-- Example Item (update colors) -->
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #e65038"></div>
+        <span>App</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #1aa0b3"></div>
+        <span>Package</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #f0932b"></div>
+        <span>Page/Service</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #8e44ad"></div>
+        <span>Component</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #27ae60"></div>
+        <span>Module/File</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #e84393"></div>
+        <span>Config</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #7f8c8d"></div>
+        <span>Root</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #34495e"></div>
+        <span>Worker</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-item-color" style="background-color: #bdc3c7"></div>
+        <span>Unknown</span>
+      </div>
+      <!-- Add other types as needed -->
+    </div>
+
+    <script>
+      // Data placeholders - these will be replaced by the generator
+      // window.__GRAPH_DATA__ = {}; // Removed
+      // __TREE_DATA_PLACEHOLDER__
+      // __DEFAULT_LAYOUT_PLACEHOLDER__ // Removed
+    </script>
+    <!-- Render script placeholder - will be replaced by the generator -->
+    <!-- __RENDER_SCRIPT__ -->
+    <script id="render-script-container">
+      // __RENDER_SCRIPT_CONTENT__
+    </script>
+  </body>
+</html>
