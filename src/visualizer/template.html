@@ -6,6 +6,8 @@
     <title>__TITLE__</title>
     <!-- Ensure G6 library is loaded -->
     <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.8.21/dist/g6.min.js"></script>
+    <!-- Add Chart.js for statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
@@ -13,222 +15,383 @@
         margin: 0;
         padding: 0;
         background-color: #f8f9fa;
-        display: flex; /* Use flexbox for layout */
-        flex-direction: column; /* Stack elements vertically */
-        height: 100vh; /* Full viewport height */
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
       }
 
-      #controls-bar {
-        background: #eee;
-        padding: 8px 15px;
-        border-bottom: 1px solid #ccc;
+      #header {
+        background: #1a7bff;
+        color: white;
+        padding: 10px 20px;
         display: flex;
         align-items: center;
-        gap: 20px; /* Spacing between control groups */
-        flex-shrink: 0; /* Prevent controls bar from shrinking */
+        justify-content: space-between;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
 
-      #controls-bar .control-group {
-        display: flex;
-        align-items: center;
-        gap: 5px; /* Spacing within a control group */
-      }
-
-      #controls-bar label {
-        font-size: 13px;
+      #header h1 {
+        margin: 0;
+        font-size: 18px;
         font-weight: 500;
       }
 
-      #controls-bar input[type='text'],
-      #controls-bar select,
-      #controls-bar button {
-        padding: 4px 8px;
-        font-size: 12px;
-        border: 1px solid #ccc;
+      #search-container {
+        display: flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.2);
         border-radius: 4px;
+        padding: 0 10px;
       }
 
-      #controls-bar button {
-        cursor: pointer;
-        background-color: #f0f0f0;
-      }
-      #controls-bar button:hover {
-        background-color: #e0e0e0;
+      #search-input {
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 8px;
+        width: 250px;
+        outline: none;
       }
 
-      #container {
-        /* width: 100%; */ /* Flex item takes remaining space */
-        /* height: calc(100vh - 50px); */ /* Adjust based on controls bar height */
-        flex-grow: 1; /* Allow container to grow and fill remaining space */
+      #search-input::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      #main-container {
+        display: flex;
+        flex: 1;
         overflow: hidden;
-        position: relative; /* Needed for absolute positioning of G6 controls */
       }
 
-      /* G6 Tooltip style */
-      .g6-tooltip {
-        position: absolute;
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid #ddd;
-        border-radius: 4px;
+      #sidebar {
+        width: 300px;
+        background: #fff;
+        border-right: 1px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      #overview {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      .stat-item {
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .stat-label {
+        color: #666;
+      }
+
+      .stat-value {
+        font-weight: 500;
+      }
+
+      #tree-container {
+        flex: 1;
+        overflow: auto;
         padding: 10px;
-        font-size: 12px;
-        pointer-events: none;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-        max-width: 450px;
-        word-wrap: break-word;
-        z-index: 10;
       }
 
-      /* G6 Controls positioning */
-      .graph-control {
-        position: absolute;
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 4px;
-        padding: 5px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        z-index: 5;
+      #content {
+        flex: 1;
         display: flex;
-        gap: 3px;
+        flex-direction: column;
+        overflow: hidden;
       }
 
-      .graph-control button {
-        width: 28px;
-        height: 28px;
-        font-size: 14px;
-        font-weight: bold;
+      #content-header {
+        padding: 15px;
+        background: #f5f5f5;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      #content-body {
+        flex: 1;
+        padding: 0;
+        overflow: auto;
+        position: relative;
+      }
+
+      #graph-container {
+        width: 100%;
+        height: 100%;
+      }
+
+      #stats-container {
+        display: flex;
+        flex-wrap: wrap;
+        padding: 15px;
+        gap: 15px;
+      }
+
+      .stat-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        padding: 15px;
+        min-width: 200px;
+        flex: 1;
+      }
+
+      .stat-card h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 16px;
+        color: #333;
+      }
+
+      .stat-chart {
+        height: 200px;
+      }
+
+      /* Tree Styles */
+      .tree-node {
+        padding: 8px 0 8px 8px;
         cursor: pointer;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
         display: flex;
+        align-items: center;
+        border-radius: 4px;
+      }
+
+      .tree-node:hover {
+        background-color: #f5f7fa;
+      }
+
+      .tree-node.active {
+        background-color: #e6f2ff;
+        font-weight: 500;
+      }
+
+      .node-icon {
+        margin-right: 8px;
+        width: 16px;
+        height: 16px;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0;
+        border-radius: 3px;
+        color: white;
+        font-size: 10px;
+        flex-shrink: 0;
       }
 
-      .graph-control button:hover {
-        background-color: #f0f0f0;
-        border-color: #bbb;
+      .node-content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
       }
 
-      /* Position specific control groups */
-      .graph-control-zoom {
-        top: 15px;
-        right: 15px;
-      }
-      /* Add class for layout switcher if needed */
-      /* .graph-control-layout { top: 60px; right: 15px; } */
-
-      /* Legend styles */
-      .legend {
-        position: absolute;
-        bottom: 15px;
-        left: 15px;
-        background: rgba(255, 255, 255, 0.85);
-        border-radius: 4px;
-        padding: 10px 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        max-width: 180px;
-        z-index: 5;
-        font-size: 12px;
-      }
-
-      .legend h4 {
-        margin-top: 0;
-        margin-bottom: 8px;
-        font-size: 13px;
-      }
-
-      .legend-item {
+      .node-header {
         display: flex;
         align-items: center;
-        margin-bottom: 5px;
+        justify-content: space-between;
       }
 
-      .legend-item:last-child {
-        margin-bottom: 0;
+      .node-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
       }
 
-      .legend-item-color {
-        width: 12px;
-        height: 12px;
-        margin-right: 8px;
-        border-radius: 3px; /* Use square/rounded rect instead of circle */
-        border: 1px solid rgba(0, 0, 0, 0.1);
+      .node-stats {
+        font-size: 11px;
+        color: #666;
+        margin-left: 8px;
+      }
+
+      .node-meta {
+        font-size: 11px;
+        color: #888;
+        margin-top: 2px;
+      }
+
+      .tree-children {
+        margin-left: 16px;
+        border-left: 1px dashed #e0e0e0;
+        padding-left: 8px;
+      }
+
+      .node-toggle {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 4px;
+        color: #999;
+        transition: transform 0.2s;
+      }
+
+      .node-toggle.collapsed {
+        transform: rotate(-90deg);
+      }
+
+      .node-toggle.leaf {
+        visibility: hidden;
+      }
+
+      /* Type-specific styling */
+      .node-icon.app {
+        background-color: #e65038;
+      }
+
+      .node-icon.package {
+        background-color: #1aa0b3;
+      }
+
+      .node-icon.page {
+        background-color: #f0932b;
+      }
+
+      .node-icon.component {
+        background-color: #8e44ad;
+      }
+
+      .node-icon.module {
+        background-color: #27ae60;
+      }
+
+      .node-icon.config {
+        background-color: #e84393;
+      }
+
+      .node-icon.root {
+        background-color: #7f8c8d;
+      }
+
+      .node-icon.worker {
+        background-color: #34495e;
+      }
+
+      .node-icon.unknown {
+        background-color: #bdc3c7;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        border-bottom: 1px solid #e0e0e0;
+        background: #f5f5f5;
+      }
+
+      .tab {
+        padding: 10px 20px;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+      }
+
+      .tab.active {
+        border-bottom-color: #1a7bff;
+        font-weight: 500;
+      }
+
+      .tab-content {
+        display: none;
+        height: 100%;
+      }
+
+      .tab-content.active {
+        display: block;
       }
     </style>
   </head>
   <body>
-    <!-- Controls Bar -->
-    <div id="controls-bar">
-      <div class="control-group">
-        <label for="search-input">Search:</label>
-        <input type="text" id="search-input" placeholder="Node ID or Label..." size="30" />
-        <button id="search-button">Find</button>
-        <button id="reset-button">Reset</button>
-      </div>
-      <div class="control-group" id="layout-control-placeholder">
-        <!-- Layout switcher will be created here by JS -->
+    <!-- Header with Search -->
+    <div id="header">
+      <h1>__TITLE__</h1>
+      <div id="search-container">
+        <input type="text" id="search-input" placeholder="搜索文件、页面或组件..." />
       </div>
     </div>
 
-    <!-- G6 Container -->
-    <div id="container">
-      <!-- Zoom controls will be created here by JS -->
-    </div>
+    <!-- Main Container with Sidebar and Content -->
+    <div id="main-container">
+      <!-- Sidebar with Tree -->
+      <div id="sidebar">
+        <div id="overview">
+          <h3>项目概览</h3>
+          <div class="stat-item">
+            <div class="stat-label">文件总数:</div>
+            <div class="stat-value" id="total-files">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">代码总量:</div>
+            <div class="stat-value" id="total-code-size">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">页面数:</div>
+            <div class="stat-value" id="total-pages">--</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">组件数:</div>
+            <div class="stat-value" id="total-components">--</div>
+          </div>
+        </div>
+        <div id="tree-container">
+          <!-- Tree will be generated here -->
+        </div>
+      </div>
 
-    <!-- Legend -->
-    <div class="legend">
-      <h4>Legend</h4>
-      <!-- Legend items will be generated dynamically or manually listed -->
-      <!-- Example Item (update colors) -->
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #e65038"></div>
-        <span>App</span>
+      <!-- Main Content Area -->
+      <div id="content">
+        <div id="content-header">
+          <h2 id="selected-item-title">概览</h2>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" data-tab="overview">概览</div>
+          <div class="tab" data-tab="graph">依赖图</div>
+          <div class="tab" data-tab="stats">统计</div>
+        </div>
+
+        <div id="content-body">
+          <!-- Overview Tab -->
+          <div class="tab-content active" id="overview-tab">
+            <div id="item-details">
+              <p>选择左侧的项目节点以查看详细信息。</p>
+            </div>
+          </div>
+
+          <!-- Graph Tab -->
+          <div class="tab-content" id="graph-tab">
+            <div id="graph-container"></div>
+          </div>
+
+          <!-- Stats Tab -->
+          <div class="tab-content" id="stats-tab">
+            <div id="stats-container">
+              <div class="stat-card">
+                <h3>文件类型分布</h3>
+                <div class="stat-chart">
+                  <canvas id="file-types-chart"></canvas>
+                </div>
+              </div>
+              <div class="stat-card">
+                <h3>代码量分布</h3>
+                <div class="stat-chart">
+                  <canvas id="code-size-chart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #1aa0b3"></div>
-        <span>Package</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #f0932b"></div>
-        <span>Page/Service</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #8e44ad"></div>
-        <span>Component</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #27ae60"></div>
-        <span>Module/File</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #e84393"></div>
-        <span>Config</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #7f8c8d"></div>
-        <span>Root</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #34495e"></div>
-        <span>Worker</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-item-color" style="background-color: #bdc3c7"></div>
-        <span>Unknown</span>
-      </div>
-      <!-- Add other types as needed -->
     </div>
 
     <script>
       // Data placeholders - these will be replaced by the generator
-      // window.__GRAPH_DATA__ = {}; // Removed
+      window.__TREE_DATA__ = null;
       // __TREE_DATA_PLACEHOLDER__
-      // __DEFAULT_LAYOUT_PLACEHOLDER__ // Removed
     </script>
-    <!-- Render script placeholder - will be replaced by the generator -->
-    <!-- __RENDER_SCRIPT__ -->
     <script id="render-script-container">
       // __RENDER_SCRIPT_CONTENT__
     </script>

@@ -7,7 +7,7 @@
     "mp-lens": "dist/cli.js"
   },
   "scripts": {
-    "build": "tsc && mkdir -p dist/visualizer && cp src/visualizer/template-tree.html src/visualizer/template-graph.html src/visualizer/render-tree.js src/visualizer/render-graph.js dist/visualizer/",
+    "build": "tsc && mkdir -p dist/visualizer && cp src/visualizer/template.html src/visualizer/render.js dist/visualizer/",
     "watch": "tsc --watch",
     "lint": "eslint 'src/**/*.{js,ts}'",
     "test": "jest",

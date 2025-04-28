@@ -389,12 +389,27 @@ export class ProjectStructureBuilder {
       return existingNode;
     }
 
+    // 获取文件信息统计
+    const fileExt = path.extname(absolutePath).toLowerCase().substring(1) || 'unknown';
+    let fileSize = 0;
+    try {
+      // 获取文件大小
+      const stats = fs.statSync(absolutePath);
+      fileSize = stats.size;
+    } catch (error) {
+      logger.warn(`Failed to get file size for ${absolutePath}:`, error);
+    }
+
     return this.addNode(
       {
         id: nodeId,
         type: type,
         label: relativePath,
-        properties: { absolutePath: absolutePath }, // Store absolute path
+        properties: {
+          absolutePath: absolutePath,
+          fileSize,
+          fileExt,
+        },
       },
       log,
     );
