@@ -20,28 +20,48 @@ export class ProjectStructureBuilder {
   private appJsonContent: any;
   // --- End: Added appJson details ---
 
+  // --- Start: Add allFiles ---
+  private allFiles: string[];
+  // --- End: Add allFiles ---
+
+  // --- Start: Add tracking for parsed dependencies --- //
+  private parsedModules: Set<string> = new Set();
+  // --- End: Add tracking for parsed dependencies --- //
+
   constructor(
     projectRoot: string,
     miniappRoot: string,
-    // --- Start: Added appJson params ---
     appJsonPath: string | null,
     appJsonContent: any,
-    // --- End: Added appJson params ---
+    // --- Start: Added allFiles param ---
+    allFiles: string[],
+    // --- End: Added allFiles param ---
     options: AnalyzerOptions,
   ) {
     this.projectRoot = projectRoot;
     this.miniappRoot = miniappRoot;
     this.options = options;
-    // --- Start: Store appJson details ---
     this.appJsonPath = appJsonPath;
     this.appJsonContent = appJsonContent;
-    // --- End: Store appJson details ---
+    // --- Start: Store allFiles ---
+    this.allFiles = allFiles;
+    // --- End: Store allFiles ---
 
     // Pass necessary options to FileParser
     this.fileParser = new FileParser(projectRoot, {
       ...options,
       miniappRoot: miniappRoot,
     });
+
+    logger.info('Starting project structure analysis...');
+
+    // --- Start: Initialize all nodes first --- //
+    logger.debug(`Initializing nodes for ${this.allFiles.length} found files.`);
+    for (const filePath of this.allFiles) {
+      this.addNodeForFile(filePath, 'Module', false); // Add as Module, don't log yet
+    }
+    logger.info(`Initialized ${this.nodes.size} nodes from file scan.`);
+    // --- End: Initialize all nodes first --- //
   }
 
   async build(): Promise<ProjectStructure> {
@@ -86,6 +106,27 @@ export class ProjectStructureBuilder {
 
     // 4. Process implicit global files (app.js/ts/wxss)
     this.processImplicitGlobalFiles();
+
+    // --- Start: Final pass to parse all remaining files --- //
+    logger.info(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);
+    const initialParsedCount = this.parsedModules.size;
+    for (const node of this.nodes.values()) {
+      // Only parse modules that haven't been touched yet by the recursive build
+      if (
+        node.type === 'Module' &&
+        node.properties?.absolutePath &&
+        !this.parsedModules.has(node.properties.absolutePath)
+      ) {
+        // Use node.properties.absolutePath which is the ID and the key for parsedModules
+        await this.parseModuleDependencies(node);
+      }
+    }
+    logger.info(
+      `Final pass complete. Parsed an additional ${
+        this.parsedModules.size - initialParsedCount
+      } modules.`,
+    );
+    // --- End: Final pass to parse all remaining files --- //
 
     // Structure is built, return it
     const structure: ProjectStructure = {
@@ -255,11 +296,20 @@ export class ProjectStructureBuilder {
 
   // Parses a module file (js, ts, wxml, wxss) for its dependencies
   private async parseModuleDependencies(moduleNode: GraphNode): Promise<void> {
-    const filePath = moduleNode.properties?.absolutePath || moduleNode.id; // Prefer absolute path if stored
+    const filePath = moduleNode.properties?.absolutePath || moduleNode.id;
     if (!filePath || typeof filePath !== 'string') {
       logger.warn(`Cannot parse dependencies for node without path: ${moduleNode.id}`);
       return;
     }
+
+    // --- Start: Check if already parsed --- //
+    if (this.parsedModules.has(filePath)) {
+      logger.trace(`Skipping already parsed module: ${filePath}`);
+      return;
+    }
+    this.parsedModules.add(filePath); // Mark as parsed
+    logger.debug(`Parsing dependencies for: ${filePath}`);
+    // --- End: Check if already parsed --- //
 
     try {
       const dependencies = await this.fileParser.parseFile(filePath);
@@ -279,9 +329,14 @@ export class ProjectStructureBuilder {
 
             this.addLink(moduleNode.id, depNode.id, linkType);
 
-            // Potentially recurse if the dependency is a module we haven't parsed?
-            // Be careful with recursion depth / cycles here.
-            // For now, assume dependencies are found modules, but not structure entry points.
+            // --- Start: Recurse into dependency --- //
+            // Only recurse if it's a module type we typically parse (JS/TS/WXML/WXSS?)
+            // Avoid recursing into JSON, images etc. unless necessary
+            const depExt = path.extname(depPath).toLowerCase();
+            if (['.js', '.ts', '.wxml', '.wxss', '.wxs'].includes(depExt)) {
+              await this.parseModuleDependencies(depNode); // Await the recursive call
+            }
+            // --- End: Recurse into dependency --- //
           }
         }
       }
@@ -306,25 +361,43 @@ export class ProjectStructureBuilder {
   }
 
   // Helper to add a node, ensuring uniqueness by ID
-  private addNode(node: GraphNode): GraphNode {
+  private addNode(node: GraphNode, log = true): GraphNode {
     if (!this.nodes.has(node.id)) {
-      logger.verbose(`Adding node (${node.type}): ${node.label} [${node.id}]`);
+      if (log) {
+        logger.verbose(`Adding node (${node.type}): ${node.label} [${node.id}]`);
+      }
       this.nodes.set(node.id, node);
+    } else if (log) {
+      // Optionally log if trying to add again, maybe update type?
+      // logger.trace(`Node already exists: ${node.id}. Current type: ${this.nodes.get(node.id)?.type}, Attempted type: ${node.type}`);
     }
     return this.nodes.get(node.id)!;
   }
 
   // Helper to create/add a node specifically for a file path
-  private addNodeForFile(absolutePath: string, type: NodeType): GraphNode | null {
+  private addNodeForFile(absolutePath: string, type: NodeType, log = true): GraphNode | null {
     if (!fs.existsSync(absolutePath)) return null;
-    const relativePath = path.relative(this.miniappRoot, absolutePath);
+    const relativePath = path.relative(this.projectRoot, absolutePath);
     const nodeId = absolutePath; // Use absolute path as unique ID for file modules
-    return this.addNode({
-      id: nodeId,
-      type: type,
-      label: relativePath,
-      properties: { absolutePath: absolutePath }, // Store absolute path
-    });
+
+    // Check if node exists, potentially update type if more specific?
+    const existingNode = this.nodes.get(nodeId);
+    if (existingNode) {
+      // If we find a Page/Component later, should we update the type from 'Module'?
+      // For now, let's just return the existing node.
+      // Maybe update the label if it was just a placeholder?
+      return existingNode;
+    }
+
+    return this.addNode(
+      {
+        id: nodeId,
+        type: type,
+        label: relativePath,
+        properties: { absolutePath: absolutePath }, // Store absolute path
+      },
+      log,
+    );
   }
 
   // Helper to add a link, preventing duplicates

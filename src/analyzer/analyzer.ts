@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as glob from 'glob';
 import minimatch from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
@@ -92,6 +93,53 @@ function resolveAppJson(
 }
 // --- End: New Helper Function --- //
 
+// --- Start: Re-added findAllFiles --- //
+/**
+ * 在指定目录中查找所有符合条件的文件
+ */
+function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: string[]): string[] {
+  // Ensure fileTypes are valid for glob pattern
+  const safeFileTypes = fileTypes.filter((t) => t && /^[a-zA-Z0-9]+$/.test(t));
+  if (safeFileTypes.length === 0) {
+    logger.warn('No valid file types specified for glob search.');
+    return [];
+  }
+  const globPattern = `**/*.{${safeFileTypes.join(',')}}`;
+
+  // Default ignore patterns (consider refining these)
+  const defaultIgnorePatterns = [
+    '**/node_modules/**',
+    '**/miniprogram_npm/**',
+    // Add other common build/output dirs if necessary, e.g., '**/dist/**'?
+    // Keep output patterns from original
+    '**/output/dependency-graph.*',
+    '**/output/unused-files.*',
+    'dependency-graph.*',
+    'unused-files.*',
+  ];
+
+  const globOptions: glob.IOptions = {
+    cwd: rootDir,
+    absolute: true,
+    ignore: [...defaultIgnorePatterns, ...excludePatterns],
+    nodir: true,
+    dot: true, // Include hidden files/folders if not excluded
+  };
+
+  logger.debug(`Glob pattern: ${globPattern}`);
+  logger.debug(`Glob options:`, globOptions);
+
+  try {
+    const files = glob.sync(globPattern, globOptions);
+    logger.info(`Found ${files.length} files via initial scan in ${rootDir}`);
+    return files;
+  } catch (error) {
+    logger.error(`Error during initial file scan:`, error);
+    return [];
+  }
+}
+// --- End: Re-added findAllFiles --- //
+
 /**
  * Main analysis function.
  */
@@ -143,13 +191,37 @@ export async function analyzeProject(
     entryContent,
   );
 
+  // --- Start: Add initial file scan --- //
+  const fileTypes = (options.fileTypes as string[] | undefined) ?? [
+    // Default types, align with builder/parser if possible
+    'js',
+    'ts',
+    'json',
+    'wxml',
+    'wxss',
+    'wxs',
+    // Include common assets by default?
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'svg',
+  ];
+  const allFoundFiles = findAllFiles(
+    actualMiniappRoot, // Scan within miniapp root
+    fileTypes,
+    options.excludePatterns ?? [],
+  );
+  // --- End: Add initial file scan --- //
+
   // --- Build Project Structure ---
   const builder = new ProjectStructureBuilder(
     trueProjectRoot,
     actualMiniappRoot,
     appJsonPath,
     appJsonContent,
-    options,
+    allFoundFiles, // Pass the list of all files
+    options, // Pass remaining options
   );
 
   const projectStructure = await builder.build();
@@ -179,59 +251,70 @@ function findUnusedFiles(
   essentialFilesUser: string[] = [],
   keepAssetsPatterns: string[] = [],
 ): string[] {
-  // 1. Identify Entry Nodes from the Structure
-  const entryNodes: Set<string> = new Set();
+  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
+
+  // --- Step 1: Identify Entry FILE Node IDs --- //
+  const entryNodeIds: Set<string> = new Set();
   if (structure.rootNodeId) {
-    entryNodes.add(structure.rootNodeId);
+    entryNodeIds.add(structure.rootNodeId);
   } else {
     logger.warn('Project structure has no root node ID defined.');
   }
 
-  // 2. Resolve essential FILE paths (convert user input to absolute paths)
+  // --- Step 2: Identify Essential Node IDs --- //
+  const essentialNodeIds: Set<string> = new Set();
+  logger.trace('--- Identifying Essential Nodes ---');
+  // 3a. Resolve essential file paths specified by user + defaults
   const essentialFilePaths = resolveEssentialFiles(projectRoot, miniappRoot, essentialFilesUser);
-
-  // Add essential file paths to the entry points for traversal
-  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
   essentialFilePaths.forEach((filePath) => {
     if (nodeMap.has(filePath)) {
-      entryNodes.add(filePath);
-      logger.verbose(`Adding essential file node to entry points: ${filePath}`);
+      essentialNodeIds.add(filePath);
+      // Add essential file path node to the entry points for traversal
+      entryNodeIds.add(filePath);
+      logger.trace(`Added essential node ID to entries: ${filePath}`);
+      logger.verbose(`Adding essential file node to entry points: ${nodeMap.get(filePath)?.label}`);
     } else {
-      logger.warn(`Essential file specified but not found in structure: ${filePath}`);
+      logger.trace(`Essential file path specified but not found as node: ${filePath}`);
     }
   });
 
-  // 3. Find pure ambient declaration files (d.ts) - Logic remains the same
+  // 3b. Find pure ambient declaration files
   const allFilePathsInStructure = structure.nodes
     .filter((n) => n.type === 'Module' && n.properties?.absolutePath)
     .map((n) => n.properties!.absolutePath as string);
-
   const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(projectRoot, allFilePathsInStructure);
-
-  // Add pure ambient d.ts files to entry nodes for traversal
+  logger.debug(
+    `Found ${pureAmbientDtsFiles.length} pure ambient declaration files that will be preserved`,
+  );
   pureAmbientDtsFiles.forEach((filePath) => {
     if (nodeMap.has(filePath)) {
-      entryNodes.add(filePath);
-      logger.verbose(`Adding ambient d.ts node to entry points: ${filePath}`);
+      essentialNodeIds.add(filePath);
+      // Add ambient d.ts file path node to the entry points for traversal
+      entryNodeIds.add(filePath);
+      logger.trace(`Added ambient node ID to entries: ${filePath}`);
+      logger.verbose(`Adding ambient d.ts node to entry points: ${nodeMap.get(filePath)?.label}`);
     } else {
       logger.warn(`Ambient d.ts file found but not present as node in structure: ${filePath}`);
     }
   });
+  logger.debug(`Identified ${essentialNodeIds.size} essential nodes (configs, ambient d.ts).`);
 
-  if (pureAmbientDtsFiles.length > 0) {
-    logger.debug(
-      `Added ${pureAmbientDtsFiles.length} pure ambient declaration files to traversal entry points`,
-    );
-  }
+  // --- Step 4: Perform Reachability Analysis from Combined Starting Points --- //
+  logger.debug(
+    `Starting reachability analysis from ${entryNodeIds.size} nodes (App + essential/ambient).`,
+  );
+  logger.trace('--- Initial Reachable Queue (Before BFS) ---');
+  entryNodeIds.forEach((id) =>
+    logger.trace(`Queue initial add: ${nodeMap.get(id)?.label} [${id}]`),
+  );
+  logger.trace('--- End Initial Queue ---');
 
-  // 4. Perform reachability analysis using the ProjectStructure (BFS/DFS)
-  const reachableNodeIds = findReachableNodes(structure, Array.from(entryNodes));
+  const reachableNodeIds = findReachableNodes(structure, Array.from(entryNodeIds));
+  logger.debug(`Found ${reachableNodeIds.size} total reachable nodes.`);
 
-  // 5. Determine unused FILES
+  // --- Step 5: Determine Unused FILES --- //
   const allModuleNodes = structure.nodes.filter((n) => n.type === 'Module');
-
   const unusedModuleNodes = allModuleNodes.filter((node) => !reachableNodeIds.has(node.id));
-
   let unusedFiles = unusedModuleNodes
     .map((node) => node.properties?.absolutePath as string | undefined)
     .filter((filePath): filePath is string => !!filePath);
@@ -257,7 +340,7 @@ function findUnusedFiles(
 
   // Debugging output
   logger.verbose('All Module Nodes:', allModuleNodes.length);
-  logger.verbose('Entry Node IDs:', Array.from(entryNodes));
+  logger.verbose('Entry Node IDs for BFS (App + essential/ambient):', entryNodeIds.size);
   logger.verbose('Reachable Node IDs:', reachableNodeIds.size);
   logger.info('Unused Files Found:', unusedFiles.length);
 
@@ -347,6 +430,7 @@ function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[])
   const reachable = new Set<string>();
   const queue: string[] = [];
   const linksFrom = new Map<string, GraphLink[]>();
+  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
 
   // Precompute outgoing links for faster lookup
   structure.links.forEach((link) => {
@@ -357,7 +441,6 @@ function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[])
   });
 
   // Initialize queue with entry points that exist in the graph
-  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
   entryNodeIds.forEach((id) => {
     if (nodeMap.has(id)) {
       queue.push(id);
@@ -367,17 +450,29 @@ function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[])
     }
   });
 
+  logger.trace(`findReachableNodes: Starting BFS with initial queue size ${queue.length}`);
   while (queue.length > 0) {
     const currentNodeId = queue.shift()!;
+    logger.trace(`BFS: Processing node ${nodeMap.get(currentNodeId)?.label} [${currentNodeId}]`);
 
     // Find nodes reachable from the current node
     const outgoingLinks = linksFrom.get(currentNodeId) || [];
+    logger.trace(`BFS: Found ${outgoingLinks.length} outgoing links from ${currentNodeId}`);
 
     for (const link of outgoingLinks) {
       const targetNodeId = link.target;
+      const targetNodeLabel = nodeMap.get(targetNodeId)?.label;
+      logger.trace(
+        `BFS: Checking neighbor ${targetNodeLabel} [${targetNodeId}] via link type ${link.type}`,
+      );
       if (nodeMap.has(targetNodeId) && !reachable.has(targetNodeId)) {
         reachable.add(targetNodeId);
         queue.push(targetNodeId);
+        logger.trace(`BFS: Added ${targetNodeLabel} [${targetNodeId}] to reachable set and queue.`);
+      } else if (!nodeMap.has(targetNodeId)) {
+        logger.trace(`BFS: Neighbor node not found in map: ${targetNodeId}`);
+      } else if (reachable.has(targetNodeId)) {
+        logger.trace(`BFS: Neighbor already reachable: ${targetNodeLabel} [${targetNodeId}]`);
       }
     }
   }
