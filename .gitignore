@@ -23,6 +23,12 @@ coverage/
 *.swp
 *.swo
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Environment variables
 .env
@@ -44,4 +50,16 @@ yarn.lock
 # Output of dependency analysis (be specific to not ignore source files)
 /dependency-graph.*
 /unused-files.*
-/output/ 
+/output/
+
+# Node
+node_modules
+
+# Env files
+.env.*
+!.env.example
+
+# Misc
+*.tsbuildinfo
+graph-output*.html 
+mp-lens-graph.html

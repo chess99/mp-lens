@@ -1,72 +1,22 @@
-// Import ProjectStructure and related types
 import * as fs from 'fs';
 import * as path from 'path';
-import { GraphLink, GraphNode, ProjectStructure } from '../analyzer/project-structure';
+import { ProjectStructure } from '../analyzer/project-structure';
+import { TreeNodeData } from '../ui/types';
+import { logger } from '../utils/debug-logger';
 
-// Define the structure for G6 hierarchical data
-interface G6TreeData {
-  id: string; // Always required
-  label: string; // Always required
-  type: string; // Always required
-  properties?: any;
-  children?: G6TreeData[];
-  parent?: string;
-  collapsed?: boolean;
-}
-
-interface HtmlGeneratorOptions {
+/**
+ * HtmlGenerator选项
+ */
+export interface HtmlGeneratorOptions {
   title: string;
   maxDepth?: number;
-  focusNode?: string; // This should be a node ID from the ProjectStructure
-  // treeView is removed, layout is handled dynamically client-side
-  // tree?: boolean; // Removed - always tree now
+  focusNode?: string;
 }
 
 /**
- * Helper function to find template files in a way that works in both development and production
- * This handles the case when we're running from /dist or from /src
+ * Generates a static HTML file with embedded data and pre-built UI assets.
  */
-function findTemplateFile(fileName: string): string {
-  // First try to find template in the same directory as this file
-  const directPath = path.resolve(__dirname, fileName);
-  if (fs.existsSync(directPath)) {
-    return directPath;
-  }
-
-  // If we're in the /dist directory, try looking in /src/visualizer
-  if (__dirname.includes('/dist/') || __dirname.includes('\\dist\\')) {
-    const srcPath = path.resolve(__dirname).replace(/[\\/]dist[\\/]/, path.sep + 'src' + path.sep);
-    const srcFilePath = path.resolve(srcPath, fileName);
-    if (fs.existsSync(srcFilePath)) {
-      return srcFilePath;
-    }
-  }
-
-  // Final fallback - build more paths to try
-  const possiblePaths = [
-    // From project root
-    path.resolve(process.cwd(), 'src', 'visualizer', fileName),
-    path.resolve(process.cwd(), 'dist', 'visualizer', fileName),
-    // From parent dir
-    path.resolve(__dirname, '..', '..', 'src', 'visualizer', fileName),
-    path.resolve(__dirname, '..', '..', 'dist', 'visualizer', fileName),
-  ];
-
-  for (const testPath of possiblePaths) {
-    if (fs.existsSync(testPath)) {
-      return testPath;
-    }
-  }
-
-  // If no path is found, return the direct path (will cause readable error)
-  return directPath;
-}
-
-/**
- * HTML依赖图生成器
- * 使用AntV G6或D3.js生成交互式依赖可视化
- */
-export class HtmlGenerator {
+export class HtmlGeneratorPreact {
   private structure: ProjectStructure;
   private nodeStatistics: Map<
     string,
@@ -80,8 +30,87 @@ export class HtmlGenerator {
   }
 
   /**
-   * 计算每个节点的统计信息，包括文件数量、大小和文件类型分布
-   * 确保文件数量统计准确，避免重复计数
+   * Generates the static HTML page.
+   */
+  async generate(options: HtmlGeneratorOptions): Promise<string> {
+    // 1. Define hardcoded asset paths relative to dist/ui-assets
+    const jsAssetRelative = 'assets/main.js';
+    const cssAssetRelative = 'assets/style.css';
+
+    // 2. Construct full paths relative to this compiled file (__dirname)
+    // __dirname = dist/cli/visualizer/
+    // Target = dist/ui-assets/assets/
+    // Path = ../../ui-assets/assets/...
+    const jsAssetPath = path.resolve(__dirname, `../../ui-assets/${jsAssetRelative}`);
+    const cssAssetPath = path.resolve(__dirname, `../../ui-assets/${cssAssetRelative}`);
+
+    // 3. Read asset file contents
+    let jsContent = '';
+    let cssContent = '';
+    try {
+      logger.debug(`Reading JS content from: ${jsAssetPath}`);
+      jsContent = fs.readFileSync(jsAssetPath, 'utf-8');
+      logger.debug(`Reading CSS content from: ${cssAssetPath}`);
+      if (fs.existsSync(cssAssetPath)) {
+        cssContent = fs.readFileSync(cssAssetPath, 'utf-8');
+      } else {
+        logger.warn(`CSS asset not found at ${cssAssetPath}, continuing without CSS.`);
+        cssContent = '/* CSS file not found */';
+      }
+      logger.debug('Asset contents read successfully.');
+    } catch (error: unknown) {
+      // Check if it's an error object with a path property
+      const hasPath = typeof error === 'object' && error !== null && 'path' in error;
+
+      if (hasPath && (error as { path: string }).path === jsAssetPath) {
+        logger.error(`Failed to read JS asset file at ${jsAssetPath}:`, error);
+        throw new Error(
+          'Failed to read built UI JS asset file. Ensure UI build completed successfully.',
+        );
+      } else {
+        logger.error('Error reading asset file contents:', error);
+        jsContent = 'console.error("Failed to load UI JS content");';
+      }
+    }
+
+    // 4. Prepare data
+    const treeData = this.prepareAndConvertData(options.maxDepth, options.focusNode);
+    const dataJson = JSON.stringify(treeData).replace(/</g, '\\u003c');
+
+    // 5. Define HTML Template - Embed content, don't link
+    const htmlTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${options.title || 'MP-Lens 项目可视化'}</title>
+  <style>
+    ${cssContent}
+    body { margin: 0; font-family: sans-serif; background-color: #f8f9fa; color: #212529; }
+    #app { padding: 20px; }
+  </style>
+</head>
+<body>
+  <div id="app"><noscript>You need to enable JavaScript to run this app.</noscript></div>
+  <script>
+    window.__MP_LENS_DATA__ = ${dataJson};
+  </script>
+  <script type="module">
+    ${jsContent}
+  </script>
+</body>
+</html>`;
+
+    // 6. Save the generated HTML
+    const outputPath = path.resolve(process.cwd(), 'mp-lens-graph.html');
+    fs.writeFileSync(outputPath, htmlTemplate);
+    logger.info(`✅ Static HTML graph saved to: ${outputPath}`);
+
+    return outputPath;
+  }
+
+  /**
+   * 计算节点统计信息
    */
   private calculateNodeStatistics(): void {
     let totalSizeSum = 0;
@@ -238,69 +267,11 @@ export class HtmlGenerator {
   }
 
   /**
-   * 递归更新父节点的统计信息
-   * 该方法已被拓扑排序版本的calculateNodeStatistics替代
-   * 保留此方法用于兼容性，但不再使用
+   * 准备数据并转换为树形结构
    */
-  private updateParentStatistics(
-    nodeId: string,
-    fileSize: number,
-    fileExt: string,
-    _visited: Set<string> = new Set(),
-  ): void {
-    // 此方法已被替代，不再使用
-    return;
-  }
-
-  /**
-   * Generates HTML for dependency visualization.
-   */
-  generate(options: HtmlGeneratorOptions): string {
-    const { title, maxDepth, focusNode } = options;
-
-    // Always use the same template and script files
-    const templateFileName = 'template.html'; // Renamed from template-tree/graph
-    const scriptFileName = 'render.js'; // Renamed from render-tree/graph
-
-    const templatePath = findTemplateFile(templateFileName);
-    const scriptPath = findTemplateFile(scriptFileName);
-
-    let htmlContent: string;
-    let scriptContent: string;
-    try {
-      htmlContent = fs.readFileSync(templatePath, 'utf-8');
-      scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-    } catch (error) {
-      console.error(
-        `Error reading HTML template or script: ${templatePath} or ${scriptPath}`,
-        error,
-      );
-      return `<html><body><h1>Error loading template or script</h1>...</body></html>`; // Simplified error html
-    }
-
-    // Prepare only hierarchical tree data
-    const treeData = this.prepareAndConvertData(maxDepth, focusNode);
-    const treeDataJson = JSON.stringify(treeData); // Stringify the tree data
-
-    // Inject data and script into template
-    htmlContent = htmlContent.replace('__TITLE__', title || 'Dependency Graph');
-    htmlContent = htmlContent.replace(
-      '// __TREE_DATA_PLACEHOLDER__', // Add a placeholder for tree data
-      `window.__TREE_DATA__ = ${treeDataJson};`,
-    );
-    // Replace the inner placeholder within the existing script tag
-    htmlContent = htmlContent.replace('// __RENDER_SCRIPT_CONTENT__', scriptContent);
-
-    return htmlContent;
-  }
-
-  /**
-   * Filters the structure and prepares hierarchical tree data.
-   * Enriches nodes with statistics data.
-   */
-  private prepareAndConvertData(maxDepth?: number, focusNode?: string): G6TreeData {
-    let targetNodes: GraphNode[];
-    let targetLinks: GraphLink[];
+  private prepareAndConvertData(maxDepth?: number, focusNode?: string): TreeNodeData {
+    let targetNodes: any[];
+    let targetLinks: any[];
     let includedNodeIds: Set<string> | null = null;
 
     // 如果未指定maxDepth，设置为一个很大的值，确保能展示完整层级
@@ -403,20 +374,18 @@ export class HtmlGenerator {
   }
 
   /**
-   * Filters the ProjectStructure based on focusNode and maxDepth using BFS.
-   * Returns the set of node IDs to include.
+   * 根据焦点节点过滤结构
    */
   private filterStructureByFocus(maxDepth: number, focusNodeId: string): Set<string> {
+    // 检查focus节点是否存在
+    if (!this.structure.nodes.some((n: any) => n.id === focusNodeId)) {
+      // 如果不存在，返回所有节点
+      return new Set(this.structure.nodes.map((n: any) => n.id));
+    }
+
     const includedNodes = new Set<string>();
     const queue: { nodeId: string; depth: number }[] = [{ nodeId: focusNodeId, depth: 0 }];
     const visited = new Set<string>(); // Keep track of visited nodes to avoid redundant processing
-
-    // Check if focus node exists
-    if (!this.structure.nodes.some((n) => n.id === focusNodeId)) {
-      console.warn(`Focus node "${focusNodeId}" not found in the project structure.`);
-      // Return all nodes if focus node not found, or handle as needed
-      return new Set(this.structure.nodes.map((n) => n.id));
-    }
 
     while (queue.length > 0) {
       const { nodeId, depth } = queue.shift()!;
@@ -443,12 +412,11 @@ export class HtmlGenerator {
   }
 
   /**
-   * Converts flat graph data to hierarchical tree data.
-   * This handles cycles in the graph and creates a proper tree structure.
+   * 将平面图数据转换为层次树结构
    */
-  private convertGraphToTreeInternal(graphData: { nodes: any[]; links: any[] }): G6TreeData {
+  private convertGraphToTreeInternal(graphData: { nodes: any[]; links: any[] }): TreeNodeData {
     // Create a map of all nodes by ID for quick access
-    const nodeMap = new Map<string, G6TreeData>();
+    const nodeMap = new Map<string, TreeNodeData>();
     for (const node of graphData.nodes) {
       nodeMap.set(node.id, {
         id: node.id,
@@ -497,69 +465,35 @@ export class HtmlGenerator {
       }
     }
 
-    // Find root node (no incoming edges or starts with 'app')
-    let rootNode: G6TreeData | null = null;
+    // Find the root node (node with no parent)
+    let rootId = graphData.nodes.find((node) => {
+      const nodeObj = nodeMap.get(node.id);
+      return nodeObj && !nodeObj.parent;
+    })?.id;
 
-    // First, prefer the designated app node if present
-    if (this.structure.rootNodeId) {
-      rootNode = nodeMap.get(this.structure.rootNodeId) || null;
+    // If no root node found, use the first node as root
+    if (!rootId && graphData.nodes.length > 0) {
+      rootId = graphData.nodes[0].id;
     }
 
-    // If not found, try to find a node with ID 'app' which is common in miniapp projects
-    if (!rootNode) {
-      rootNode = nodeMap.get('app') || null;
-    }
-
-    // As a last resort, find a node with no parents (no incoming links)
-    if (!rootNode) {
-      // Build a set of all target nodes (nodes that have incoming links)
-      const targetNodes = new Set<string>();
-      for (const link of graphData.links) {
-        targetNodes.add(link.target);
-      }
-
-      // Find nodes that aren't targets (no incoming links)
-      const potentialRoots = Array.from(nodeMap.keys()).filter((id) => !targetNodes.has(id));
-
-      // Use the first non-target node as root, or any node if all have incoming links
-      if (potentialRoots.length > 0) {
-        rootNode = nodeMap.get(potentialRoots[0]) || null;
-      } else if (nodeMap.size > 0) {
-        // Fallback to the first node if all have incoming links
-        const firstKey = nodeMap.keys().next().value;
-        if (firstKey) {
-          rootNode = nodeMap.get(firstKey) || null;
-        }
-      }
-    }
-
-    // If still no root found and we have nodes, just use the first one
-    if (!rootNode && nodeMap.size > 0) {
-      const firstKey = nodeMap.keys().next().value;
-      if (firstKey) {
-        rootNode = nodeMap.get(firstKey) || null;
-      }
-    }
-
-    if (!rootNode) {
-      // Handle empty graph case
-      return {
-        id: 'empty',
-        label: 'Empty Graph',
+    // If still no root node, create a dummy root
+    if (!rootId) {
+      rootId = 'root';
+      nodeMap.set(rootId, {
+        id: rootId,
+        label: 'Root',
         type: 'Unknown',
-      };
+        children: [],
+      });
     }
-
-    // 确保rootNode.id一定存在
-    const rootId = rootNode.id || 'root';
 
     // Recursive helper to build subtree
     function buildSubtreeHelper(
       nodeId: string,
       builtSet: Set<string>,
-      nodeMapRef: Map<string, G6TreeData>,
+      nodeMapRef: Map<string, TreeNodeData>,
       childrenMapRef: Map<string, Set<string>>,
-    ): G6TreeData | null {
+    ): TreeNodeData | null {
       if (builtSet.has(nodeId)) {
         // Already processed this node, avoid cycle
         return null;
@@ -570,7 +504,7 @@ export class HtmlGenerator {
       if (!node) return null;
 
       // Create a copy of the node to avoid modifying the original
-      const resultNode: G6TreeData = {
+      const resultNode: TreeNodeData = {
         ...node,
         children: [], // We'll fill this with real children
       };
@@ -578,7 +512,6 @@ export class HtmlGenerator {
       // Add children
       const childIds = childrenMapRef.get(nodeId);
       if (childIds) {
-        // 使用非递归方式处理子节点，不再限制子节点数量
         // 先创建所有子节点的列表
         const childrenToProcess = Array.from(childIds);
 
@@ -602,7 +535,7 @@ export class HtmlGenerator {
           return aOrderValue - bOrderValue;
         });
 
-        // 处理排序后的子节点，不再限制数量
+        // 处理排序后的子节点
         for (const childId of childrenToProcess) {
           // Skip if this would create a cycle
           if (builtSet.has(childId)) continue;

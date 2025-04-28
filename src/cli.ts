@@ -1,8 +1,31 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import * as fs from 'fs'; // Import fs
+import * as path from 'path';
 
+// --- Robust package.json finder ---
+function findPackageJson(startDir: string): string {
+  let currentDir = path.resolve(startDir);
+  // Loop indefinitely, but break or throw inside
+  for (;;) {
+    const filePath = path.join(currentDir, 'package.json');
+    if (fs.existsSync(filePath)) {
+      return filePath; // Found it
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached root, not found
+      throw new Error('Could not find package.json traversing up from ' + startDir);
+    }
+    currentDir = parentDir; // Move up for next iteration
+  }
+}
+// --- End finder ---
+
+// Use the finder function
+const packageJsonPath = findPackageJson(__dirname);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { version } = require('../package.json');
+const { version } = require(packageJsonPath);
 
 // Import command functions
 import { clean } from './commands/clean';

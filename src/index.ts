@@ -2,9 +2,16 @@
 import { analyzeProject } from './analyzer/analyzer';
 import { DependencyGraph } from './analyzer/dependency-graph';
 import { DotGenerator } from './visualizer/dot-generator';
-import { HtmlGenerator } from './visualizer/html-generator';
+// import { HtmlGenerator } from './visualizer/html-generator'; // Removed old
+import { HtmlGeneratorPreact } from './visualizer/html-renderer'; // Added new
 
-export { analyzeProject, DependencyGraph, DotGenerator, HtmlGenerator };
+export {
+  analyzeProject,
+  DependencyGraph,
+  DotGenerator,
+  // HtmlGenerator, // Removed old
+  HtmlGeneratorPreact,
+};
 
 // 在直接引入包时提供用法说明
 if (require.main === module) {

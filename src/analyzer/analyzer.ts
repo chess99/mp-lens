@@ -118,7 +118,7 @@ function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: str
     'unused-files.*',
   ];
 
-  const globOptions: glob.IOptions = {
+  const globOptions = {
     cwd: rootDir,
     absolute: true,
     ignore: [...defaultIgnorePatterns, ...excludePatterns],

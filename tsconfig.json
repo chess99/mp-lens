@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "./dist",
+    "outDir": "./dist/cli",
     "rootDir": "./src",
     "esModuleInterop": true,
     "strict": true,
@@ -12,8 +12,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "lib": ["ES2019", "DOM"]
+    "lib": ["ES2019", "DOM"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   },
   "include": ["src/**/*", ".eslintrc.js"],
-  "exclude": ["node_modules", "**/*.test.ts", "dist"]
+  "exclude": ["node_modules", "**/*.test.ts", "dist", ".ui-build-temp", "scripts/**/*.js"]
 }

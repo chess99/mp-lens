@@ -8,7 +8,7 @@ import { ConfigLoader } from '../utils/config-loader';
 import { logger } from '../utils/debug-logger';
 import { isString, mergeOptions } from '../utils/options-merger';
 import { DotGenerator } from '../visualizer/dot-generator';
-import { HtmlGenerator } from '../visualizer/html-generator';
+import { HtmlGeneratorPreact } from '../visualizer/html-renderer';
 
 // Define the shape of the raw options passed from cli.ts
 interface RawGraphOptions {
@@ -126,18 +126,19 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     logger.info('Rendering graph...');
 
     // Initialize generators with the new ProjectStructure
-    const htmlGenerator = new HtmlGenerator(projectStructure);
+    const htmlGenerator = new HtmlGeneratorPreact(projectStructure);
     const dotGenerator = new DotGenerator(projectStructure);
 
     // Call appropriate renderer with depth and focus parameters
     let outputContent: string | Buffer = ''; // Use Buffer for potential binary formats
     switch (format) {
       case 'html':
-        outputContent = htmlGenerator.generate({
-          title: 'Dependency Graph',
+        outputContent = await htmlGenerator.generate({
+          title: 'Dependency Graph (Preact)',
           maxDepth: depth,
           focusNode: focus,
         });
+        outputPathAbsolute = outputContent;
         break;
       case 'dot':
         outputContent = dotGenerator.generate({
@@ -172,33 +173,27 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
         throw new Error(`Unsupported output format: ${format}`);
     }
 
-    // Handle output using the type guard
+    // Handle output
     if (outputPathAbsolute) {
-      const outputDir = path.dirname(outputPathAbsolute);
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // Write the generated content (string or buffer)
-      fs.writeFileSync(outputPathAbsolute, outputContent);
-      logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
-    } else {
-      // Output to console
-      if (
-        format === 'json' ||
-        format === 'dot' ||
-        format === 'html' ||
-        format === 'svg' ||
-        format === 'png'
-      ) {
-        // Only log string content to console
-        if (typeof outputContent === 'string') {
-          console.log(outputContent);
-        } else {
-          logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
-        }
+      if (format === 'html') {
+        logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
       } else {
-        logger.warn(`Console output for format '${format}' might not be meaningful. Use --output.`);
+        const outputDir = path.dirname(outputPathAbsolute);
+        if (!fs.existsSync(outputDir)) {
+          fs.mkdirSync(outputDir, { recursive: true });
+        }
+        fs.writeFileSync(outputPathAbsolute, outputContent);
+        logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
+      }
+    } else {
+      if (format !== 'html' && typeof outputContent === 'string') {
+        console.log(outputContent);
+      } else if (format !== 'html') {
+        logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
+      } else {
+        logger.info(
+          `HTML graph saved to: ${outputPathAbsolute}. Use --output to specify a different location.`,
+        );
       }
     }
   } catch (error) {

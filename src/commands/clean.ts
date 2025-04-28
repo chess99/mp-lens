@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
-import * as inquirer from 'inquirer';
+import inquirer from 'inquirer';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { ConfigLoader } from '../utils/config-loader';
