@@ -34,29 +34,41 @@ export class HtmlGenerator {
   generate(options: HtmlGeneratorOptions): string {
     const { title, maxDepth, focusNode } = options;
 
-    // --- Start: Read template and prepare data ---
+    // --- Start: Read template and script ---
     const templatePath = path.resolve(__dirname, 'template.html');
+    const scriptPath = path.resolve(__dirname, 'render-graph.js');
     let htmlContent: string;
+    let scriptContent: string;
     try {
       htmlContent = fs.readFileSync(templatePath, 'utf-8');
+      scriptContent = fs.readFileSync(scriptPath, 'utf-8');
     } catch (error) {
-      console.error(`Error reading HTML template: ${templatePath}`, error);
-      return '<html><body>Error loading template.</body></html>';
+      console.error(
+        `Error reading HTML template or script: ${templatePath} or ${scriptPath}`,
+        error,
+      );
+      return '<html><body>Error loading template or script.</body></html>';
     }
+    // --- End: Read template and script ---
 
     // Prepare graph data using the existing method (ensure 'this.' is used)
     const graphData = this.prepareGraphData(maxDepth, focusNode);
     const graphDataJson = JSON.stringify(graphData);
     // --- End: Read template and prepare data ---
 
-    // --- Start: Inject data into template ---
+    // --- Start: Inject data and script into template ---
     htmlContent = htmlContent.replace('__TITLE__', title || 'Dependency Graph');
     // Be careful with replacing the placeholder script content
     htmlContent = htmlContent.replace(
       'window.__GRAPH_DATA__ = {};',
       `window.__GRAPH_DATA__ = ${graphDataJson};`,
     );
-    // --- End: Inject data into template ---
+    // Embed the script content
+    htmlContent = htmlContent.replace(
+      '<!-- __RENDER_SCRIPT__ -->',
+      `<script>\n${scriptContent}\n</script>`,
+    );
+    // --- End: Inject data and script into template ---
 
     // --- Removed embedded JS/CSS/HTML ---
     return htmlContent;
