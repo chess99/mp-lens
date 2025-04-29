@@ -3,7 +3,6 @@ import { ProjectStructure } from '../../analyzer/project-structure';
 import { AppProps, TreeNodeData } from '../types';
 import { DependencyGraph } from './DependencyGraph';
 import { NodeDetails } from './NodeDetails';
-import { Statistics } from './Statistics';
 import { Tabs } from './Tabs';
 import { TreeView } from './TreeView';
 
@@ -93,11 +92,6 @@ export function App({ data }: AppProps) {
                 content: (
                   <DependencyGraph selectedNode={selectedNode} fullGraphData={fullGraphData} />
                 ),
-              },
-              {
-                id: 'stats',
-                label: '节点统计',
-                content: <Statistics node={selectedNode} />,
               },
             ]}
           />

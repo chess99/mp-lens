@@ -226,59 +226,235 @@ body {
   background-color: #fff;
 }
 
-/* Statistics / Charts */
-.charts-container {
+/* Node Details - Redesigned */
+.node-details {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.details-grid {
+  display: grid;
+  /* Adjust grid to allow children card to span full width */
+  grid-template-columns: 1fr 1fr; /* Make first two columns take equal space */
+  gap: 20px;
+}
+
+.details-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.details-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 4px solid #4285f4;
+  grid-column: 1 / -1; /* Header spans full width */
+}
+
+.detail-title-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-title {
+  margin: 0;
+  font-size: 1.5em;
+  word-break: break-word;
+}
+
+.node-type-badge {
+  display: inline-block;
+  background-color: #eaf2ff;
+  color: #4285f4;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-bottom: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.node-stats {
   display: flex;
   gap: 20px;
-  flex-wrap: wrap; /* Allow wrapping if needed */
 }
 
-.chart-wrapper {
-  flex: 1; /* Try to take equal space */
-  min-width: 250px; /* Minimum width */
-  border: 1px solid #e9ecef;
-  padding: 15px;
-  border-radius: 4px;
-  background-color: #fff;
+.node-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.chart-wrapper h3 {
-  margin-top: 0;
-  text-align: center;
-  margin-bottom: 15px;
+.stat-value {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #424242;
 }
 
-.chart-canvas {
-  max-width: 100%; /* Ensure canvas doesn't overflow */
-  height: 250px !important; /* Set explicit height for canvas container */
+.stat-label {
+  font-size: 0.8em;
+  color: #757575;
 }
 
-.file-types-list {
-  margin-top: 15px;
+.card-title {
+  margin: 0 0 16px 0;
+  font-size: 1.1em;
+  color: #424242;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Styles for Distribution Lists (File Type / Size) */
+.distribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Space between rows */
+}
+
+.distribution-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.9em;
 }
 
-.file-type-row {
+.dist-label {
+  flex: 0 0 60px; /* Fixed width for labels */
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dist-bar-container {
+  flex: 1; /* Take remaining space */
+  height: 10px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dist-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.dist-value {
+  flex: 0 0 50px; /* Fixed width for value/percentage */
+  text-align: right;
+  font-weight: 500;
+  color: #424242;
+}
+
+.dist-sub-value {
+  flex: 0 0 70px; /* Slightly wider for size value */
+  text-align: right;
+  font-size: 0.85em;
+  color: #757575;
+  margin-left: 5px;
+}
+
+/* Children table styling - Ensure it spans full width */
+.children-card {
+  grid-column: 1 / -1; /* Make children card span all columns */
+}
+
+.children-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.child-header {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-  padding: 3px 0;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-weight: 500;
+  color: #666;
+  background-color: #f9f9f9;
 }
 
-.file-type-color {
+.child-row {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  align-items: center;
+}
+
+.child-row:hover {
+  background-color: #f5f5f5;
+}
+
+.child-type-col {
+  flex: 0 0 80px;
+  padding: 0 8px;
+}
+
+.child-name-col {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.child-files-col {
+  flex: 0 0 80px;
+  text-align: right;
+  padding: 0 8px;
+}
+
+.child-size-col {
+  flex: 0 0 80px;
+  text-align: right;
+  padding: 0 8px;
+}
+
+.child-type-badge {
   display: inline-block;
-  width: 12px;
-  height: 12px;
-  margin-right: 8px;
-  border: 1px solid #ccc;
-  vertical-align: middle;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  color: #666;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
-.file-type-name {
-  flex-grow: 1;
-  margin-right: 10px;
+.children-rows {
+  max-height: 250px;
+  overflow-y: auto;
 }
 
-.file-type-value {
-  font-weight: bold;
+/* Remove Basic Info and Custom Properties styles */
+.details-info,
+.info-item,
+.info-label,
+.info-value,
+.node-id,
+.parent-id,
+.custom-properties,
+.property-item,
+.property-key,
+.property-value {
+  /* Properties are removed */
+  display: none !important;
+}
+
+.node-path {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 4px;
+  font-family: monospace;
+  word-break: break-all;
 }
