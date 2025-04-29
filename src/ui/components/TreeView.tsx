@@ -23,27 +23,6 @@ function TreeNode({
   const isSelected = node.id === selectedNodeId;
   const hasChildren = node.children && node.children.length > 0;
 
-  // Basic styling (move to CSS later)
-  const nodeStyle = {
-    marginLeft: '10px',
-    cursor: 'pointer',
-    fontWeight: isSelected ? 'bold' : 'normal',
-    color: isSelected ? '#007bff' : 'inherit',
-    listStyle: 'none',
-    padding: '2px 0',
-  };
-  const childrenStyle = {
-    paddingLeft: '15px',
-    borderLeft: '1px dashed #ccc',
-    listStyle: 'none',
-  };
-  const toggleStyle = {
-    display: 'inline-block',
-    width: '15px',
-    textAlign: 'center' as const,
-    marginRight: '5px',
-  };
-
   const handleNodeClick = () => {
     onNodeSelect(node);
   };
@@ -54,19 +33,24 @@ function TreeNode({
   };
 
   return (
-    <li style={{ listStyle: 'none' }}>
-      <div onClick={handleNodeClick} style={nodeStyle} title={`ID: ${node.id}`}>
+    <li className="tree-node">
+      <div
+        onClick={handleNodeClick}
+        className={`tree-node-item ${isSelected ? 'selected' : ''}`}
+        title={`ID: ${node.id}`}
+      >
         {hasChildren && (
-          <span style={toggleStyle} onClick={handleToggleClick}>
+          <span className="toggle" onClick={handleToggleClick}>
             {isExpanded ? '▼' : '▶'}
           </span>
         )}
-        {!hasChildren && <span style={toggleStyle}>&nbsp;</span>} {/* Placeholder */}
-        {node.label} ({node.properties?.files || 0} files)
+        {!hasChildren && <span className="toggle">&nbsp;</span>} {/* Placeholder */}
+        <span className="label">{node.label}</span>
+        <span className="stats">({node.properties?.fileCount || 0} files)</span>
         {/* Optionally display size: formatBytes(node.properties?.size || 0) */}
       </div>
       {hasChildren && isExpanded && (
-        <ul style={childrenStyle}>
+        <ul className="tree-children">
           {node.children?.map((child) => (
             <TreeNode
               key={child.id}
@@ -104,15 +88,17 @@ export function TreeView({ data, onNodeSelect, selectedNodeId }: TreeViewProps) 
   const isNodeExpanded = (nodeId: string) => expandedNodes.has(nodeId);
 
   return (
-    <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
-      <TreeNode
-        node={data}
-        onNodeSelect={onNodeSelect}
-        selectedNodeId={selectedNodeId}
-        isExpanded={isNodeExpanded(data.id)}
-        toggleNode={toggleNode}
-        isNodeExpandedCheck={isNodeExpanded}
-      />
-    </ul>
+    <div className="tree-view">
+      <ul>
+        <TreeNode
+          node={data}
+          onNodeSelect={onNodeSelect}
+          selectedNodeId={selectedNodeId}
+          isExpanded={isNodeExpanded(data.id)}
+          toggleNode={toggleNode}
+          isNodeExpandedCheck={isNodeExpanded}
+        />
+      </ul>
+    </div>
   );
 }

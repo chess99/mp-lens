@@ -15,11 +15,13 @@ export function NodeDetails({ node }: NodeDetailsProps) {
   const fileCount = node.properties?.fileCount || 0;
   const totalSize = node.properties?.totalSize || 0;
   const fileTypes = node.properties?.fileTypes || {};
+  const parentId = node.parent;
+  const childrenIds = node.children?.map((c) => c.id) || [];
 
   // 构建文件类型信息
   const fileTypeInfo = Object.entries(fileTypes).map(([ext, count]) => (
     <div key={ext} className="file-type-item">
-      <span className="file-type-ext">.{ext}</span>
+      <span className="file-type-ext">.{ext}&nbsp;</span>
       <span className="file-type-count">{count} 文件</span>
     </div>
   ));
@@ -36,8 +38,18 @@ export function NodeDetails({ node }: NodeDetailsProps) {
         <div className="details-info">
           <div className="info-item">
             <span className="info-label">ID:</span>
-            <span className="info-value">{node.id}</span>
+            <span className="info-value" style={{ wordBreak: 'break-all' }}>
+              {node.id}
+            </span>
           </div>
+          {parentId && (
+            <div className="info-item">
+              <span className="info-label">Parent ID:</span>
+              <span className="info-value" style={{ wordBreak: 'break-all' }}>
+                {parentId}
+              </span>
+            </div>
+          )}
           {fileCount > 0 && (
             <div className="info-item">
               <span className="info-label">文件数:</span>
@@ -52,6 +64,19 @@ export function NodeDetails({ node }: NodeDetailsProps) {
           )}
         </div>
       </div>
+
+      {childrenIds.length > 0 && (
+        <div className="details-section">
+          <h3>Children IDs ({childrenIds.length})</h3>
+          <ul className="details-list">
+            {childrenIds.map((id) => (
+              <li key={id} style={{ wordBreak: 'break-all' }}>
+                {id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {fileTypeInfo.length > 0 && (
         <div className="details-section">
@@ -73,7 +98,19 @@ export function NodeDetails({ node }: NodeDetailsProps) {
                   <div key={key} className="property-item">
                     <span className="property-key">{key}:</span>
                     <span className="property-value">
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      {key === 'sizeByType' && typeof value === 'object' && value !== null ? (
+                        <ul style={{ margin: 0, paddingLeft: '15px' }}>
+                          {Object.entries(value).map(([type, size]) => (
+                            <li key={type}>
+                              {type}: {formatBytes(size as number)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : typeof value === 'object' ? (
+                        JSON.stringify(value)
+                      ) : (
+                        String(value)
+                      )}
                     </span>
                   </div>
                 ))}
@@ -83,3 +120,16 @@ export function NodeDetails({ node }: NodeDetailsProps) {
     </div>
   );
 }
+
+/* Add to index.css or component style
+.details-list {
+  list-style: none;
+  padding-left: 15px;
+  font-size: 0.9em;
+  max-height: 150px; 
+  overflow-y: auto;
+}
+.details-list li {
+  margin-bottom: 4px;
+}
+*/

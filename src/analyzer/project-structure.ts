@@ -1,6 +1,6 @@
 export type NodeType = 'App' | 'Package' | 'Page' | 'Component' | 'Module';
 export type LinkType =
-  | 'Structure'
+  | 'Structure' // Hierarchical relationship between components (App->Pages->Components) defined in configuration
   | 'Import'
   | 'Style'
   | 'Template'

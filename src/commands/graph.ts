@@ -111,7 +111,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     const fileTypes = mergedConfig.types?.split(',').map((t: string) => t.trim()) ?? [];
 
     // Call analyzeProject with final options
-    const { projectStructure } = await analyzeProject(projectRoot, {
+    const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
       fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
@@ -126,7 +126,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     logger.info('Rendering graph...');
 
     // Initialize generators with the new ProjectStructure
-    const htmlGenerator = new HtmlGeneratorPreact(projectStructure);
+    const htmlGenerator = new HtmlGeneratorPreact(projectStructure, reachableNodeIds);
     const dotGenerator = new DotGenerator(projectStructure);
 
     // Call appropriate renderer with depth and focus parameters

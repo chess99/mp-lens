@@ -1,0 +1,246 @@
+/* src/ui/index.css */
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f8f9fa;
+  color: #212529;
+  height: 100vh;
+  overflow: hidden; /* Prevent body scroll */
+}
+
+#app {
+  height: 100%; /* Make sure root element takes full height */
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  padding: 10px 20px;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.header h1 {
+  margin: 0 0 5px 0;
+  font-size: 1.5em;
+}
+
+.overview-stats {
+  display: flex;
+  gap: 20px;
+  font-size: 0.9em;
+}
+
+.stat-item {
+  background-color: #f8f9fa;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.stat-label {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.main-container {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden; /* Important for child scrolling */
+}
+
+.sidebar {
+  width: 350px; /* Slightly wider */
+  border-right: 1px solid #dee2e6;
+  padding: 15px;
+  overflow-y: auto; /* Allow sidebar to scroll */
+  flex-shrink: 0;
+}
+
+.content {
+  flex-grow: 1;
+  padding: 15px;
+  overflow-y: auto; /* Allow content to scroll */
+}
+
+/* TreeView Specific */
+.tree-view ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+.tree-node {
+  list-style: none;
+}
+
+.tree-node-item {
+  padding: 3px 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.tree-node-item:hover {
+  background-color: #e9ecef;
+}
+
+.tree-node-item.selected {
+  background-color: #007bff;
+  color: white;
+}
+
+.tree-node-item .toggle {
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  margin-right: 4px;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.tree-node-item .label {
+  /* Main label styling */
+}
+
+.tree-node-item .stats {
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-left: 8px;
+}
+
+.tree-node-item.selected .stats {
+  color: #e0e0e0;
+}
+
+.tree-children {
+  padding-left: 20px; /* Indentation */
+  border-left: 1px dashed #ccc;
+  list-style: none;
+}
+
+/* Tabs Specific */
+.tabs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 15px 0;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+}
+
+.tab-item button {
+  padding: 10px 15px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1em;
+  border-bottom: 3px solid transparent; /* Placeholder for active state */
+  margin-bottom: -1px; /* Overlap border */
+}
+
+.tab-item button.active {
+  border-bottom-color: #007bff;
+  font-weight: bold;
+  color: #007bff;
+}
+
+.tab-item button:hover {
+  background-color: #f8f9fa;
+}
+
+.tab-content {
+  /* Styling for the content area */
+}
+
+/* Placeholder */
+.graph-container {
+  min-height: 300px;
+  border: 1px dashed #ccc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #6c757d;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+/* Node Details Specific */
+.details-list {
+  list-style: none;
+  padding-left: 15px;
+  font-size: 0.9em;
+  max-height: 150px; /* Limit height and allow scroll */
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+.details-list li {
+  margin-bottom: 4px;
+  padding: 2px 5px;
+}
+.details-list li:nth-child(even) {
+  background-color: #fff;
+}
+
+/* Statistics / Charts */
+.charts-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap; /* Allow wrapping if needed */
+}
+
+.chart-wrapper {
+  flex: 1; /* Try to take equal space */
+  min-width: 250px; /* Minimum width */
+  border: 1px solid #e9ecef;
+  padding: 15px;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.chart-wrapper h3 {
+  margin-top: 0;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.chart-canvas {
+  max-width: 100%; /* Ensure canvas doesn't overflow */
+  height: 250px !important; /* Set explicit height for canvas container */
+}
+
+.file-types-list {
+  margin-top: 15px;
+  font-size: 0.9em;
+}
+
+.file-type-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  padding: 3px 0;
+}
+
+.file-type-color {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 1px solid #ccc;
+  vertical-align: middle;
+}
+
+.file-type-name {
+  flex-grow: 1;
+  margin-right: 10px;
+}
+
+.file-type-value {
+  font-weight: bold;
+}

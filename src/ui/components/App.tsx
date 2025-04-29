@@ -1,5 +1,7 @@
 import { useState } from 'preact/hooks';
+import { ProjectStructure } from '../../analyzer/project-structure';
 import { AppProps, TreeNodeData } from '../types';
+import { DependencyGraph } from './DependencyGraph';
 import { NodeDetails } from './NodeDetails';
 import { Statistics } from './Statistics';
 import { Tabs } from './Tabs';
@@ -16,6 +18,21 @@ function formatBytes(bytes: number, decimals = 2): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
 }
 
+declare global {
+  interface Window {
+    __MP_LENS_DATA__?: TreeNodeData;
+    __MP_LENS_GRAPH_DATA__?: ProjectStructure;
+  }
+}
+
+// Define a default empty structure matching the type
+const emptyProjectStructure: ProjectStructure = {
+  nodes: [],
+  links: [],
+  rootNodeId: null,
+  miniappRoot: '',
+};
+
 export function App({ data }: AppProps) {
   // State for the currently selected node
   const [selectedNode, setSelectedNode] = useState<TreeNodeData>(data); // Default to root node
@@ -25,6 +42,9 @@ export function App({ data }: AppProps) {
     setSelectedNode(node);
   };
 
+  // Use the defined default structure
+  const fullGraphData = window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure;
+
   // Calculate root stats (remains the same)
   const rootStats = {
     totalFiles: data.properties?.fileCount || 0,
@@ -32,76 +52,56 @@ export function App({ data }: AppProps) {
   };
 
   return (
-    <>
-      <style>
-        {`
-          /* Basic Layout Styles - replace or augment with actual CSS file later */
-          .app-container { display: flex; flex-direction: column; height: 100vh; }
-          .header { padding: 10px 20px; background-color: #e9ecef; border-bottom: 1px solid #dee2e6; }
-          .header h1 { margin: 0 0 5px 0; font-size: 1.5em; }
-          .overview-stats { display: flex; gap: 20px; font-size: 0.9em; }
-          .stat-item { background-color: #f8f9fa; padding: 5px 10px; border-radius: 4px; }
-          .stat-label { font-weight: bold; margin-right: 5px; }
-          .main-container { display: flex; flex-grow: 1; overflow: hidden; /* Prevent overall scroll */ }
-          .sidebar { width: 300px; border-right: 1px solid #dee2e6; padding: 15px; overflow-y: auto; }
-          .content { flex-grow: 1; padding: 15px; overflow-y: auto; }
-          .tree-container { /* Add specific styles if needed */ }
-          .graph-container { min-height: 300px; border: 1px dashed #ccc; display:flex; justify-content: center; align-items: center; color: #6c757d; }
-        `}
-      </style>
-      <div className="app-container">
-        <header className="header">
-          <h1>MP-Lens 项目可视化</h1>
-          <div className="overview-stats">
-            <div className="stat-item">
-              <span className="stat-label">总文件数:</span>
-              <span className="stat-value">{rootStats.totalFiles}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">总代码量:</span>
-              <span className="stat-value">{formatBytes(rootStats.totalSize)}</span>
-            </div>
+    <div className="app-container">
+      <header className="header">
+        <h1>MP-Lens 项目可视化</h1>
+        <div className="overview-stats">
+          <div className="stat-item">
+            <span className="stat-label">总文件数:</span>
+            <span className="stat-value">{rootStats.totalFiles}</span>
           </div>
-        </header>
+          <div className="stat-item">
+            <span className="stat-label">总代码量:</span>
+            <span className="stat-value">{formatBytes(rootStats.totalSize)}</span>
+          </div>
+        </div>
+      </header>
 
-        <main className="main-container">
-          <aside className="sidebar">
-            <div className="tree-container">
-              <TreeView
-                data={data}
-                onNodeSelect={handleNodeSelect}
-                selectedNodeId={selectedNode.id}
-              />
-            </div>
-          </aside>
-
-          <section className="content">
-            <Tabs
-              tabs={[
-                {
-                  id: 'details',
-                  label: '节点详情',
-                  content: <NodeDetails node={selectedNode} />,
-                },
-                {
-                  id: 'graph',
-                  label: '依赖图 (TODO)',
-                  content: (
-                    <div id="graph-container" className="graph-container">
-                      <div className="placeholder">依赖图: {selectedNode?.label || 'N/A'}</div>
-                    </div>
-                  ),
-                },
-                {
-                  id: 'stats',
-                  label: '节点统计',
-                  content: <Statistics node={selectedNode} />,
-                },
-              ]}
+      <main className="main-container">
+        <aside className="sidebar">
+          <div className="tree-container">
+            <TreeView
+              data={data}
+              onNodeSelect={handleNodeSelect}
+              selectedNodeId={selectedNode.id}
             />
-          </section>
-        </main>
-      </div>
-    </>
+          </div>
+        </aside>
+
+        <section className="content">
+          <Tabs
+            tabs={[
+              {
+                id: 'details',
+                label: '节点详情',
+                content: <NodeDetails node={selectedNode} />,
+              },
+              {
+                id: 'graph',
+                label: '依赖图',
+                content: (
+                  <DependencyGraph selectedNode={selectedNode} fullGraphData={fullGraphData} />
+                ),
+              },
+              {
+                id: 'stats',
+                label: '节点统计',
+                content: <Statistics node={selectedNode} />,
+              },
+            ]}
+          />
+        </section>
+      </main>
+    </div>
   );
 }

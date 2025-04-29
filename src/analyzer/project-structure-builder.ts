@@ -428,6 +428,7 @@ export class ProjectStructureBuilder {
       (l) => l.source === sourceId && l.target === targetId && l.type === type,
     );
     if (!exists) {
+      // Structure links define the hierarchical relationship of app components
       logger.verbose(`Adding link (${type}): ${sourceId} -> ${targetId}`);
       this.links.push({ source: sourceId, target: targetId, type: type });
     }

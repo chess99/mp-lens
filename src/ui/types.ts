@@ -7,6 +7,7 @@ export interface TreeNodeData {
     fileCount?: number;
     totalSize?: number;
     fileTypes?: Record<string, number>;
+    sizeByType?: Record<string, number>;
     [key: string]: any;
   };
   children?: TreeNodeData[];

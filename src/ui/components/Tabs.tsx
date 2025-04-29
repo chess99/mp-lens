@@ -2,29 +2,36 @@ import { useState } from 'preact/hooks';
 import { TabsProps } from '../types';
 
 export function Tabs({ tabs }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(tabs[0]?.id || '');
+  const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || '');
 
   return (
     <div className="tabs-container">
-      <div className="tabs-header">
+      <ul className="tabs-list">
         {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={`tab-item ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </div>
+          <li key={tab.id} className="tab-item">
+            <button
+              onClick={() => setActiveTabId(tab.id)}
+              className={activeTabId === tab.id ? 'active' : ''}
+              role="tab"
+              aria-selected={activeTabId === tab.id}
+              aria-controls={`tab-content-${tab.id}`}
+            >
+              {tab.label}
+            </button>
+          </li>
         ))}
-      </div>
-      <div className="tabs-content">
+      </ul>
+      <div className="tab-content-area">
         {tabs.map((tab) => (
           <div
             key={tab.id}
-            className={`tab-content ${activeTab === tab.id ? 'active' : ''}`}
-            style={{ display: activeTab === tab.id ? 'block' : 'none' }}
+            id={`tab-content-${tab.id}`}
+            className={`tab-content ${activeTabId === tab.id ? 'active' : ''}`}
+            style={{ display: activeTabId === tab.id ? 'block' : 'none' }}
+            role="tabpanel"
+            aria-labelledby={`tab-${tab.id}`}
           >
-            {tab.content}
+            {activeTabId === tab.id ? tab.content : null}
           </div>
         ))}
       </div>

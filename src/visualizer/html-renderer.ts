@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ProjectStructure } from '../analyzer/project-structure';
 import { TreeNodeData } from '../ui/types';
+import { AssetResolver } from '../utils/asset-resolver';
 import { logger } from '../utils/debug-logger';
 
 /**
@@ -18,66 +19,34 @@ export interface HtmlGeneratorOptions {
  */
 export class HtmlGeneratorPreact {
   private structure: ProjectStructure;
-  private nodeStatistics: Map<
-    string,
-    { files: number; size: number; fileTypes: Record<string, number> }
-  >;
+  private reachableNodeIds: Set<string>;
 
-  constructor(structure: ProjectStructure) {
+  constructor(structure: ProjectStructure, reachableNodeIds: Set<string>) {
     this.structure = structure;
-    this.nodeStatistics = new Map();
-    this.calculateNodeStatistics();
+    this.reachableNodeIds = reachableNodeIds;
   }
 
   /**
    * Generates the static HTML page.
    */
   async generate(options: HtmlGeneratorOptions): Promise<string> {
-    // 1. Define hardcoded asset paths relative to dist/ui-assets
+    // 1. 定义资源文件的相对路径
     const jsAssetRelative = 'assets/main.js';
     const cssAssetRelative = 'assets/style.css';
 
-    // 2. Construct full paths relative to this compiled file (__dirname)
-    // __dirname = dist/cli/visualizer/
-    // Target = dist/ui-assets/assets/
-    // Path = ../../ui-assets/assets/...
-    const jsAssetPath = path.resolve(__dirname, `../../ui-assets/${jsAssetRelative}`);
-    const cssAssetPath = path.resolve(__dirname, `../../ui-assets/${cssAssetRelative}`);
+    // 2. 使用AssetResolver获取资源内容
+    const jsContent =
+      AssetResolver.getJsAsset(jsAssetRelative) || 'console.error("无法加载UI资源");';
+    const cssContent = AssetResolver.getCssAsset(cssAssetRelative) || '/* 无法加载样式 */';
 
-    // 3. Read asset file contents
-    let jsContent = '';
-    let cssContent = '';
-    try {
-      logger.debug(`Reading JS content from: ${jsAssetPath}`);
-      jsContent = fs.readFileSync(jsAssetPath, 'utf-8');
-      logger.debug(`Reading CSS content from: ${cssAssetPath}`);
-      if (fs.existsSync(cssAssetPath)) {
-        cssContent = fs.readFileSync(cssAssetPath, 'utf-8');
-      } else {
-        logger.warn(`CSS asset not found at ${cssAssetPath}, continuing without CSS.`);
-        cssContent = '/* CSS file not found */';
-      }
-      logger.debug('Asset contents read successfully.');
-    } catch (error: unknown) {
-      // Check if it's an error object with a path property
-      const hasPath = typeof error === 'object' && error !== null && 'path' in error;
-
-      if (hasPath && (error as { path: string }).path === jsAssetPath) {
-        logger.error(`Failed to read JS asset file at ${jsAssetPath}:`, error);
-        throw new Error(
-          'Failed to read built UI JS asset file. Ensure UI build completed successfully.',
-        );
-      } else {
-        logger.error('Error reading asset file contents:', error);
-        jsContent = 'console.error("Failed to load UI JS content");';
-      }
-    }
-
-    // 4. Prepare data
+    // 3. 准备数据
+    // 树状视图数据
     const treeData = this.prepareAndConvertData(options.maxDepth, options.focusNode);
-    const dataJson = JSON.stringify(treeData).replace(/</g, '\\u003c');
+    const treeDataJson = JSON.stringify(treeData).replace(/</g, '\\u003c');
+    // 完整结构数据（用于图形视图）
+    const graphDataJson = JSON.stringify(this.structure).replace(/</g, '\\u003c');
 
-    // 5. Define HTML Template - Embed content, don't link
+    // 4. 定义HTML模板 - 嵌入两种数据集
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -93,7 +62,10 @@ export class HtmlGeneratorPreact {
 <body>
   <div id="app"><noscript>You need to enable JavaScript to run this app.</noscript></div>
   <script>
-    window.__MP_LENS_DATA__ = ${dataJson};
+    // Embed tree data for TreeView and other components
+    window.__MP_LENS_DATA__ = ${treeDataJson};
+    // Embed full graph data for DependencyGraph component
+    window.__MP_LENS_GRAPH_DATA__ = ${graphDataJson};
   </script>
   <script type="module">
     ${jsContent}
@@ -101,169 +73,12 @@ export class HtmlGeneratorPreact {
 </body>
 </html>`;
 
-    // 6. Save the generated HTML
+    // 5. 保存生成的HTML
     const outputPath = path.resolve(process.cwd(), 'mp-lens-graph.html');
     fs.writeFileSync(outputPath, htmlTemplate);
-    logger.info(`✅ Static HTML graph saved to: ${outputPath}`);
+    logger.info(`✅ 静态HTML图表已保存至: ${outputPath}`);
 
     return outputPath;
-  }
-
-  /**
-   * 计算节点统计信息
-   */
-  private calculateNodeStatistics(): void {
-    let totalSizeSum = 0;
-
-    // 初始化统计信息
-    for (const node of this.structure.nodes) {
-      this.nodeStatistics.set(node.id, {
-        files: 0,
-        size: 0,
-        fileTypes: {},
-      });
-    }
-
-    // 第一步：在原始节点上标记文件数据
-    const fileNodeIds = new Set<string>();
-    for (const node of this.structure.nodes) {
-      if (node.type === 'Module' && node.properties) {
-        fileNodeIds.add(node.id);
-
-        // 获取文件大小
-        const fileSize = node.properties.fileSize || 0;
-        totalSizeSum += fileSize;
-        const fileExt = node.properties.fileExt || 'unknown';
-
-        // 更新该节点统计信息
-        const stats = this.nodeStatistics.get(node.id);
-        if (stats) {
-          stats.files = 1;
-          stats.size = fileSize;
-          stats.fileTypes[fileExt] = 1;
-        }
-      }
-    }
-
-    // 第二步：构建子节点到父节点的映射（只使用Structure类型链接）
-    const childToParents = new Map<string, string[]>();
-    for (const link of this.structure.links) {
-      if (link.type === 'Structure') {
-        if (!childToParents.has(link.target)) {
-          childToParents.set(link.target, []);
-        }
-        childToParents.get(link.target)!.push(link.source);
-      }
-    }
-
-    // 第三步：使用拓扑排序方式计算文件统计，自底向上累加
-    // 创建入度映射
-    const inDegree = new Map<string, number>();
-    for (const node of this.structure.nodes) {
-      inDegree.set(node.id, 0);
-    }
-
-    // 计算每个节点的入度
-    for (const [child, parents] of childToParents.entries()) {
-      inDegree.set(child, (inDegree.get(child) || 0) + parents.length);
-    }
-
-    // 找出所有入度为0的节点（叶子节点）开始处理
-    const queue: string[] = [];
-    for (const [nodeId, degree] of inDegree.entries()) {
-      if (degree === 0) {
-        queue.push(nodeId);
-      }
-    }
-
-    // 处理队列
-    while (queue.length > 0) {
-      const nodeId = queue.shift()!;
-      const nodeStats = this.nodeStatistics.get(nodeId);
-
-      // 如果有父节点，更新父节点的统计信息
-      const parents = childToParents.get(nodeId) || [];
-
-      if (nodeStats) {
-        for (const parentId of parents) {
-          const parentStats = this.nodeStatistics.get(parentId);
-          if (parentStats) {
-            // 累加文件数
-            parentStats.files += nodeStats.files;
-            // 累加文件大小
-            parentStats.size += nodeStats.size;
-
-            // 合并文件类型统计
-            for (const [ext, count] of Object.entries(nodeStats.fileTypes)) {
-              if (!parentStats.fileTypes[ext]) {
-                parentStats.fileTypes[ext] = 0;
-              }
-              parentStats.fileTypes[ext] += count;
-            }
-          }
-
-          // 减少父节点的入度
-          inDegree.set(parentId, (inDegree.get(parentId) || 0) - 1);
-
-          // 如果父节点入度为0，加入队列
-          if (inDegree.get(parentId) === 0) {
-            queue.push(parentId);
-          }
-        }
-      }
-    }
-
-    // 检查是否有节点没有被处理（可能存在环或孤立节点）
-    const isolatedFileNodes = [];
-
-    for (const [nodeId, degree] of inDegree.entries()) {
-      if (degree > 0) {
-        // 检查是否是文件节点
-        const stats = this.nodeStatistics.get(nodeId);
-        if (stats && stats.files > 0) {
-          isolatedFileNodes.push(nodeId);
-        }
-      }
-    }
-
-    // 关键修复：将所有未处理的文件节点直接算入根节点统计
-    // 这样确保所有文件都被计数，无论结构关系如何
-    const rootNodeId = this.structure.rootNodeId || 'app';
-    const rootStats = this.nodeStatistics.get(rootNodeId);
-
-    if (rootStats) {
-      for (const nodeId of isolatedFileNodes) {
-        const stats = this.nodeStatistics.get(nodeId);
-        if (stats) {
-          // 将孤立文件节点的统计信息加到根节点
-          rootStats.files += stats.files;
-          rootStats.size += stats.size;
-
-          for (const [ext, count] of Object.entries(stats.fileTypes)) {
-            if (!rootStats.fileTypes[ext]) {
-              rootStats.fileTypes[ext] = 0;
-            }
-            rootStats.fileTypes[ext] += count;
-          }
-        }
-      }
-    }
-
-    // 最终再检查一次：如果还有文件没有被计入根节点，强制计入
-    let totalModuleFiles = 0;
-    for (const node of this.structure.nodes) {
-      if (node.type === 'Module' && node.id !== rootNodeId) {
-        totalModuleFiles++;
-      }
-    }
-
-    if (rootStats && rootStats.files < totalModuleFiles) {
-      rootStats.files = totalModuleFiles;
-      // 同时确保总大小也被正确设置
-      if (rootStats.size < totalSizeSum) {
-        rootStats.size = totalSizeSum;
-      }
-    }
   }
 
   /**
@@ -272,102 +87,40 @@ export class HtmlGeneratorPreact {
   private prepareAndConvertData(maxDepth?: number, focusNode?: string): TreeNodeData {
     let targetNodes: any[];
     let targetLinks: any[];
-    let includedNodeIds: Set<string> | null = null;
+    let includedNodeIds: Set<string>; // No longer nullable
 
-    // 如果未指定maxDepth，设置为一个很大的值，确保能展示完整层级
+    // If maxDepth is not specified, set a large value to ensure full level display
     const effectiveMaxDepth = maxDepth !== undefined ? maxDepth : 999;
 
     // Apply filtering if focusNode and maxDepth are specified
     if (focusNode) {
+      // TODO: Re-evaluate focus filtering logic if it needs to be aware of the pre-filtered reachable set
+      // For now, assume filterStructureByFocus operates correctly or adapt it later.
       includedNodeIds = this.filterStructureByFocus(effectiveMaxDepth, focusNode);
-      targetNodes = this.structure.nodes.filter((n) => includedNodeIds!.has(n.id));
+      // Ensure focus filtering only includes nodes that are also globally reachable
+      includedNodeIds = new Set([...includedNodeIds].filter((id) => this.reachableNodeIds.has(id)));
+      logger.debug(`Focus filtering resulted in ${includedNodeIds.size} reachable nodes.`);
+      targetNodes = this.structure.nodes.filter((n) => includedNodeIds.has(n.id));
       targetLinks = this.structure.links.filter(
-        (l) => includedNodeIds!.has(l.source) && includedNodeIds!.has(l.target),
+        (l) => includedNodeIds.has(l.source) && includedNodeIds.has(l.target),
       );
     } else {
-      // 如果没有指定焦点节点，处理应用层级（展示完整层级）
-      const rootNodeId = this.structure.rootNodeId || 'app';
+      // Use the pre-calculated reachableNodeIds directly
+      includedNodeIds = this.reachableNodeIds;
+      logger.debug(`Using pre-calculated reachable nodes: ${includedNodeIds.size}`);
 
-      // 使用BFS从根节点开始，收集所有可达节点
-      includedNodeIds = new Set<string>();
-      const queue: { nodeId: string; depth: number }[] = [{ nodeId: rootNodeId, depth: 0 }];
-      const visited = new Set<string>();
+      // Filter nodes based on reachability
+      targetNodes = this.structure.nodes.filter((n) => includedNodeIds.has(n.id));
 
-      includedNodeIds.add(rootNodeId);
-      visited.add(rootNodeId);
-
-      // 按照层级计算节点，不限制深度
-      while (queue.length > 0) {
-        const { nodeId, depth } = queue.shift()!;
-
-        // 找出直接连接的Structure类型链接
-        const directLinks = this.structure.links.filter(
-          (l) => l.source === nodeId && l.type === 'Structure',
-        );
-
-        // 添加直接连接的节点到包含列表
-        for (const link of directLinks) {
-          includedNodeIds.add(link.target);
-
-          // 如果没访问过，加入队列
-          if (!visited.has(link.target)) {
-            visited.add(link.target);
-            queue.push({ nodeId: link.target, depth: depth + 1 });
-          }
-        }
-      }
-
-      // 扩展节点列表
-      targetNodes = this.structure.nodes.filter((n) => includedNodeIds!.has(n.id));
-
-      // 包含所有在includedNodeIds中的节点之间的链接
+      // Filter links based on reachability of both source and target
       targetLinks = this.structure.links.filter(
-        (l) =>
-          includedNodeIds!.has(l.source) &&
-          includedNodeIds!.has(l.target) &&
-          // 优先包含Structure类型链接，Import类型次之
-          (l.type === 'Structure' || l.type === 'Import'),
+        (l) => includedNodeIds.has(l.source) && includedNodeIds.has(l.target),
       );
     }
 
-    // Map nodes for flat graph data (D3/G6 Graph format)
-    const graphNodes = targetNodes.map((node) => {
-      // Get the statistics for this node
-      const stats = this.nodeStatistics.get(node.id);
+    const graphData = { nodes: targetNodes, links: targetLinks };
 
-      // Enrich properties with statistics
-      const enrichedProperties = {
-        ...(node.properties || {}),
-      };
-
-      // Add statistics to properties if available
-      if (stats) {
-        enrichedProperties.fileCount = stats.files;
-        enrichedProperties.totalSize = stats.size;
-        enrichedProperties.fileTypes = stats.fileTypes;
-      }
-
-      return {
-        id: node.id,
-        label: node.label || node.id,
-        type: node.type,
-        highlighted: focusNode === node.id,
-        properties: enrichedProperties,
-      };
-    });
-
-    // Map links for flat graph data
-    const graphLinks = targetLinks.map((link) => ({
-      source: link.source,
-      target: link.target,
-      type: link.type,
-      highlighted: focusNode && (link.source === focusNode || link.target === focusNode),
-      properties: link.properties || {},
-    }));
-
-    const graphData = { nodes: graphNodes, links: graphLinks };
-
-    // Convert the filtered graph data to hierarchical tree data
+    // Pass the original full nodeStatistics map, but the tree will only be built from reachable nodes
     const treeData = this.convertGraphToTreeInternal(graphData);
 
     return treeData;
@@ -412,115 +165,125 @@ export class HtmlGeneratorPreact {
   }
 
   /**
-   * 将平面图数据转换为层次树结构
+   * Converts the flat graph data into a hierarchical tree structure.
+   * Uses the pre-calculated full nodeStatistics map.
    */
-  private convertGraphToTreeInternal(graphData: { nodes: any[]; links: any[] }): TreeNodeData {
-    // Create a map of all nodes by ID for quick access
-    const nodeMap = new Map<string, TreeNodeData>();
+  private convertGraphToTreeInternal(
+    graphData: { nodes: any[]; links: any[] },
+    // No longer need fullNodeStatistics map, stats are on node properties
+    // fullNodeStatistics: typeof this.nodeStatistics,
+  ): TreeNodeData {
+    logger.debug(
+      `[convertGraphToTreeInternal] Received graphData with ${graphData.nodes.length} nodes and ${graphData.links.length} links.`,
+    );
+    // Log first few node IDs and link sources/targets for inspection
+    logger.trace(
+      '[convertGraphToTreeInternal] Sample Nodes:',
+      graphData.nodes.slice(0, 5).map((n) => n.id),
+    );
+    logger.trace(
+      '[convertGraphToTreeInternal] Sample Links:',
+      graphData.links.slice(0, 5).map((l) => `${l.source} -> ${l.target} (${l.type})`),
+    );
+
+    // Create a map for quick access to node data from the filtered graphData
+    const filteredNodeDataMap = new Map<string, any>();
     for (const node of graphData.nodes) {
-      nodeMap.set(node.id, {
-        id: node.id,
-        label: node.label,
-        type: node.type,
-        properties: node.properties,
-        children: [],
-      });
+      filteredNodeDataMap.set(node.id, node);
     }
 
-    // Create a map of parent-child relationships, based on 'Structure' links
-    // preferentially, or any link type if not found
+    // Build children map based on links (prefer Structure, fallback to all)
     const childrenMap = new Map<string, Set<string>>();
-
-    // 1. First try to use Structure links only
     const structureLinks = graphData.links.filter((link) => link.type === 'Structure');
-    let hasStructureLinks = false;
+    const linksToUse = structureLinks.length > 0 ? structureLinks : graphData.links;
 
-    for (const link of structureLinks) {
-      hasStructureLinks = true;
+    // Store parent references while building childrenMap
+    const parentMap = new Map<string, string>();
+    for (const link of linksToUse) {
       if (!childrenMap.has(link.source)) {
         childrenMap.set(link.source, new Set<string>());
       }
-      childrenMap.get(link.source)!.add(link.target);
-
-      // Set parent reference on target node
-      const targetNode = nodeMap.get(link.target);
-      if (targetNode) {
-        targetNode.parent = link.source;
-      }
-    }
-
-    // 2. If no Structure links found, use all links as fallback
-    if (!hasStructureLinks) {
-      for (const link of graphData.links) {
-        if (!childrenMap.has(link.source)) {
-          childrenMap.set(link.source, new Set<string>());
-        }
+      // Avoid adding self as child if source and target are same
+      if (link.source !== link.target) {
         childrenMap.get(link.source)!.add(link.target);
-
-        // Set parent reference on target node
-        const targetNode = nodeMap.get(link.target);
-        if (targetNode) {
-          targetNode.parent = link.source;
+        // Only set parent if target is part of the filtered nodes
+        if (filteredNodeDataMap.has(link.target)) {
+          parentMap.set(link.target, link.source);
         }
       }
     }
+    logger.debug(
+      `[convertGraphToTreeInternal] Built childrenMap (${childrenMap.size} entries) and parentMap (${parentMap.size} entries).`,
+    );
+    logger.trace("[convertGraphToTreeInternal] Children of 'app':", childrenMap.get('app'));
 
-    // Find the root node (node with no parent)
-    let rootId = graphData.nodes.find((node) => {
-      const nodeObj = nodeMap.get(node.id);
-      return nodeObj && !nodeObj.parent;
-    })?.id;
+    // --- MODIFIED ROOT FINDING ---
+    let rootId: string | undefined;
 
-    // If no root node found, use the first node as root
-    if (!rootId && graphData.nodes.length > 0) {
-      rootId = graphData.nodes[0].id;
-    }
+    // 1. Prioritize finding the 'app' node within the filtered graphData
+    const appNode = graphData.nodes.find((node) => node.id === 'app');
+    if (appNode) {
+      rootId = appNode.id;
+      logger.debug(`[convertGraphToTreeInternal] Found explicit 'app' node as root: ${rootId}`);
+    } else {
+      // 2. Fallback: Find node with no parent based on Structure links
+      rootId = graphData.nodes.find((node) => !parentMap.has(node.id))?.id;
+      logger.debug(
+        `[convertGraphToTreeInternal] Did not find 'app' node, fallback root via parentMap: ${rootId}`,
+      );
 
-    // If still no root node, create a dummy root
-    if (!rootId) {
-      rootId = 'root';
-      nodeMap.set(rootId, {
-        id: rootId,
-        label: 'Root',
-        type: 'Unknown',
-        children: [],
-      });
-    }
-
-    // Recursive helper to build subtree
-    function buildSubtreeHelper(
-      nodeId: string,
-      builtSet: Set<string>,
-      nodeMapRef: Map<string, TreeNodeData>,
-      childrenMapRef: Map<string, Set<string>>,
-    ): TreeNodeData | null {
-      if (builtSet.has(nodeId)) {
-        // Already processed this node, avoid cycle
-        return null;
+      // 3. Ultimate Fallback (if cycles hide the root or 'app' is missing)
+      if (!rootId && graphData.nodes.length > 0) {
+        // Prefer the original project root if it's included, otherwise the first node
+        const originalRootId = this.structure.rootNodeId || 'app'; // Should still be 'app' usually
+        rootId = filteredNodeDataMap.has(originalRootId) ? originalRootId : graphData.nodes[0].id;
+        logger.warn(
+          `[convertGraphToTreeInternal] Could not determine unique root via 'app' or parent links, falling back to: ${rootId}`,
+        );
       }
+    }
+    // --- END MODIFIED ROOT FINDING ---
+
+    if (!rootId) {
+      logger.warn('[convertGraphToTreeInternal] No rootId could be determined!');
+      return { id: 'empty', label: 'No Data', type: 'Unknown' };
+    }
+    logger.info(`[convertGraphToTreeInternal] Determined final rootId: ${rootId}`);
+
+    // Recursive helper - uses node properties directly for stats
+    const buildSubtreeHelper = (nodeId: string, builtSet: Set<string>): TreeNodeData | null => {
+      if (builtSet.has(nodeId)) return null;
       builtSet.add(nodeId);
+      const baseNodeData = filteredNodeDataMap.get(nodeId);
+      if (!baseNodeData) return null;
+      // Stats are now directly on baseNodeData.properties
+      // const calculatedStats = fullNodeStatistics.get(nodeId); // Removed
 
-      const node = nodeMapRef.get(nodeId);
-      if (!node) return null;
-
-      // Create a copy of the node to avoid modifying the original
       const resultNode: TreeNodeData = {
-        ...node,
-        children: [], // We'll fill this with real children
+        id: nodeId,
+        label: baseNodeData.label || nodeId,
+        type: baseNodeData.type,
+        parent: parentMap.get(nodeId), // Get parent from map
+        properties: {
+          // Base properties
+          ...(baseNodeData.properties || {}),
+          // Ensure stats from properties are included, even if potentially undefined
+          fileCount: baseNodeData.properties?.fileCount || 0,
+          totalSize: baseNodeData.properties?.totalSize || 0,
+          fileTypes: baseNodeData.properties?.fileTypes || {},
+          sizeByType: baseNodeData.properties?.sizeByType || {},
+        },
+        children: [],
       };
 
-      // Add children
-      const childIds = childrenMapRef.get(nodeId);
+      const childIds = childrenMap.get(nodeId);
       if (childIds) {
-        // 先创建所有子节点的列表
-        const childrenToProcess = Array.from(childIds);
-
-        // 按照节点类型对子节点排序：先包(Package)，再页面(Page)，然后组件(Component)，最后是普通文件(Module)
-        childrenToProcess.sort((aId, bId) => {
-          const aNode = nodeMapRef.get(aId);
-          const bNode = nodeMapRef.get(bId);
+        const childrenNodes: TreeNodeData[] = [];
+        // Sort children by type
+        const sortedChildIds = Array.from(childIds).sort((aId, bId) => {
+          const aNode = filteredNodeDataMap.get(aId);
+          const bNode = filteredNodeDataMap.get(bId);
           if (!aNode || !bNode) return 0;
-
           const typeOrder: Record<string, number> = {
             App: 0,
             Package: 1,
@@ -528,52 +291,42 @@ export class HtmlGeneratorPreact {
             Component: 3,
             Module: 4,
           };
-
           const aOrderValue = typeOrder[aNode.type] ?? 999;
           const bOrderValue = typeOrder[bNode.type] ?? 999;
-
           return aOrderValue - bOrderValue;
         });
 
-        // 处理排序后的子节点
-        for (const childId of childrenToProcess) {
-          // Skip if this would create a cycle
-          if (builtSet.has(childId)) continue;
-
-          // 创建一个新的builtSet副本，而不是共享引用
-          const childBuiltSet = new Set([...builtSet]);
-          const childNode = buildSubtreeHelper(childId, childBuiltSet, nodeMapRef, childrenMapRef);
-
-          if (childNode) {
-            resultNode.children!.push(childNode);
+        for (const childId of sortedChildIds) {
+          if (filteredNodeDataMap.has(childId)) {
+            const childNode = buildSubtreeHelper(childId, new Set(builtSet));
+            if (childNode) {
+              childrenNodes.push(childNode);
+            }
           }
         }
+        resultNode.children = childrenNodes;
       }
 
-      // 如果节点是一个组或包，默认展开
-      if (
-        (resultNode.type === 'App' || resultNode.type === 'Package') &&
-        resultNode.children &&
-        resultNode.children.length > 0
-      ) {
-        resultNode.collapsed = false;
-      }
-
+      resultNode.collapsed = !(resultNode.type === 'App' || resultNode.type === 'Package');
       return resultNode;
-    }
+    };
 
-    // Build the complete tree starting from root
-    const result = buildSubtreeHelper(rootId, new Set<string>(), nodeMap, childrenMap);
+    const result = buildSubtreeHelper(rootId, new Set<string>());
+    logger.debug(
+      `[convertGraphToTreeInternal] Final built tree root: ${result?.id}, Children count: ${result?.children?.length}`,
+    );
 
+    // Handle case where buildSubtreeHelper returns null (shouldn't happen for valid rootId, but good practice)
     if (!result) {
-      // Fallback for rare case where tree building fails completely
+      logger.error(`Failed to build subtree starting from root: ${rootId}`);
       return {
-        id: 'error',
+        id: 'error_root',
         label: 'Error Building Tree',
         type: 'Unknown',
+        children: [],
+        properties: {},
       };
     }
-
     return result;
   }
 }
