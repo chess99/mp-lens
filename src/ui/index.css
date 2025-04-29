@@ -56,11 +56,12 @@ body {
 }
 
 .sidebar {
-  width: 350px; /* Slightly wider */
+  width: 450px; /* Wider fixed width */
   border-right: 1px solid #dee2e6;
   padding: 15px;
   overflow-y: auto; /* Allow sidebar to scroll */
   flex-shrink: 0;
+  background-color: #fff; /* Optional: Give sidebar a background */
 }
 
 .content {
@@ -70,57 +71,94 @@ body {
 }
 
 /* TreeView Specific */
+.tree-view {
+  font-size: 0.9em;
+  overflow-y: auto; /* Allow vertical scroll if needed */
+  user-select: none; /* Disable text selection */
+  display: flex; /* Allow controls and list to be arranged */
+  flex-direction: column; /* Stack controls above list */
+}
+
+.tree-controls {
+  padding: 5px 8px; /* Match tree-node-item padding */
+  margin-bottom: 5px;
+  border-bottom: 1px solid #eee;
+  display: flex; /* Layout buttons */
+  gap: 10px; /* Space between buttons */
+}
+
+.tree-controls button {
+  padding: 3px 8px;
+  font-size: 0.85em;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.tree-controls button:hover {
+  background-color: #e0e0e0;
+}
+
 .tree-view ul {
   padding-left: 0;
-  list-style: none;
+  list-style-type: none;
+  margin: 0;
+  flex-grow: 1; /* Allow list to take remaining space */
+  overflow-y: auto; /* Scroll tree list independently if needed */
 }
 
-.tree-node {
-  list-style: none;
+/* REMOVED nested ul padding rule */
+/*
+.tree-view ul ul {
+  padding-left: 30px; 
 }
+*/
+
+/* Optional: Target the specific children list class if needed */
+/*
+.tree-children {
+  padding-left: 30px;
+}
+*/
 
 .tree-node-item {
-  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
   cursor: pointer;
-  border-radius: 3px;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden; /* Hide overflow */
 }
 
 .tree-node-item:hover {
-  background-color: #e9ecef;
+  background-color: #f0f0f0;
 }
 
 .tree-node-item.selected {
-  background-color: #007bff;
-  color: white;
+  background-color: #dbeafe; /* Example selected color */
+  font-weight: bold;
 }
 
 .tree-node-item .toggle {
   display: inline-block;
-  width: 20px;
+  width: 1.5em; /* Ensure space for toggle */
   text-align: center;
   margin-right: 4px;
-  font-family: monospace;
-  font-weight: bold;
 }
 
 .tree-node-item .label {
-  /* Main label styling */
+  flex-grow: 1;
+  overflow: hidden; /* Hide overflow within label span */
+  text-overflow: ellipsis; /* Add ellipsis for long labels */
+  margin-right: 8px; /* Space before stats */
 }
 
 .tree-node-item .stats {
-  font-size: 0.8em;
-  color: #6c757d;
-  margin-left: 8px;
-}
-
-.tree-node-item.selected .stats {
-  color: #e0e0e0;
-}
-
-.tree-children {
-  padding-left: 20px; /* Indentation */
-  border-left: 1px dashed #ccc;
-  list-style: none;
+  color: #666;
+  font-size: 0.9em;
+  white-space: nowrap; /* Prevent stats wrapping */
+  margin-left: auto; /* Push stats to the right */
 }
 
 /* Tabs Specific */

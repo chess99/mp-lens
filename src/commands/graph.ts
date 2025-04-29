@@ -134,7 +134,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     switch (format) {
       case 'html':
         outputContent = await htmlGenerator.generate({
-          title: 'Dependency Graph (Preact)',
+          title: path.basename(projectRoot) + ' 依赖可视化',
           maxDepth: depth,
           focusNode: focus,
         });

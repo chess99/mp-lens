@@ -52,7 +52,7 @@ export class HtmlGeneratorPreact {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${options.title || 'MP-Lens 项目可视化'}</title>
+  <title>${options.title || '依赖可视化'}</title>
   <style>
     ${cssContent}
     body { margin: 0; font-family: sans-serif; background-color: #f8f9fa; color: #212529; }
@@ -66,6 +66,8 @@ export class HtmlGeneratorPreact {
     window.__MP_LENS_DATA__ = ${treeDataJson};
     // Embed full graph data for DependencyGraph component
     window.__MP_LENS_GRAPH_DATA__ = ${graphDataJson};
+    // Set title for UI components
+    window.__MP_LENS_TITLE__ = "${options.title || '依赖可视化'}";
   </script>
   <script type="module">
     ${jsContent}
@@ -251,64 +253,53 @@ export class HtmlGeneratorPreact {
     logger.info(`[convertGraphToTreeInternal] Determined final rootId: ${rootId}`);
 
     // Recursive helper - uses node properties directly for stats
-    const buildSubtreeHelper = (nodeId: string, builtSet: Set<string>): TreeNodeData | null => {
-      if (builtSet.has(nodeId)) return null;
-      builtSet.add(nodeId);
-      const baseNodeData = filteredNodeDataMap.get(nodeId);
-      if (!baseNodeData) return null;
-      // Stats are now directly on baseNodeData.properties
-      // const calculatedStats = fullNodeStatistics.get(nodeId); // Removed
-
-      const resultNode: TreeNodeData = {
-        id: nodeId,
-        label: baseNodeData.label || nodeId,
-        type: baseNodeData.type,
-        parent: parentMap.get(nodeId), // Get parent from map
-        properties: {
-          // Base properties
-          ...(baseNodeData.properties || {}),
-          // Ensure stats from properties are included, even if potentially undefined
-          fileCount: baseNodeData.properties?.fileCount || 0,
-          totalSize: baseNodeData.properties?.totalSize || 0,
-          fileTypes: baseNodeData.properties?.fileTypes || {},
-          sizeByType: baseNodeData.properties?.sizeByType || {},
-        },
-        children: [],
-      };
-
-      const childIds = childrenMap.get(nodeId);
-      if (childIds) {
-        const childrenNodes: TreeNodeData[] = [];
-        // Sort children by type
-        const sortedChildIds = Array.from(childIds).sort((aId, bId) => {
-          const aNode = filteredNodeDataMap.get(aId);
-          const bNode = filteredNodeDataMap.get(bId);
-          if (!aNode || !bNode) return 0;
-          const typeOrder: Record<string, number> = {
-            App: 0,
-            Package: 1,
-            Page: 2,
-            Component: 3,
-            Module: 4,
-          };
-          const aOrderValue = typeOrder[aNode.type] ?? 999;
-          const bOrderValue = typeOrder[bNode.type] ?? 999;
-          return aOrderValue - bOrderValue;
-        });
-
-        for (const childId of sortedChildIds) {
-          if (filteredNodeDataMap.has(childId)) {
-            const childNode = buildSubtreeHelper(childId, new Set(builtSet));
-            if (childNode) {
-              childrenNodes.push(childNode);
-            }
-          }
-        }
-        resultNode.children = childrenNodes;
+    const buildSubtreeHelper = (currentId: string, visited: Set<string>): TreeNodeData => {
+      const nodeData = filteredNodeDataMap.get(currentId);
+      if (!nodeData) {
+        logger.warn(`[buildSubtreeHelper] Node data not found for ID: ${currentId}`);
+        return { id: currentId, label: 'Error: Not Found', type: 'Unknown' };
       }
 
-      resultNode.collapsed = !(resultNode.type === 'App' || resultNode.type === 'Package');
-      return resultNode;
+      // Prevent infinite loops in case of cycles in Structure links
+      if (visited.has(currentId)) {
+        logger.warn(
+          `[buildSubtreeHelper] Cycle detected involving node: ${currentId}, stopping recursion.`,
+        );
+        return {
+          id: nodeData.id,
+          label: nodeData.label + ' (Cycle)',
+          type: nodeData.type,
+          properties: nodeData.properties,
+        };
+      }
+      visited.add(currentId);
+
+      const childrenData: TreeNodeData[] = [];
+      const childIds = childrenMap.get(currentId) || [];
+      for (const childId of childIds) {
+        const childNode = filteredNodeDataMap.get(childId);
+        // *** FILTERING LOGIC: Only include non-Module children in the tree ***
+        if (childNode && childNode.type !== 'Module') {
+          childrenData.push(buildSubtreeHelper(childId, new Set(visited))); // Pass copy of visited set for sibling branches
+        }
+      }
+
+      // Sort children: Packages, Pages, Components, then alphabetically by label
+      childrenData.sort((a, b) => {
+        const typeOrder: Record<string, number> = { Package: 1, Page: 2, Component: 3 }; // Allow string index
+        const orderA = typeOrder[a.type] ?? 99; // Use nullish coalescing for default
+        const orderB = typeOrder[b.type] ?? 99; // Use nullish coalescing for default
+        if (orderA !== orderB) return orderA - orderB;
+        return a.label.localeCompare(b.label);
+      });
+
+      return {
+        id: nodeData.id,
+        label: nodeData.label,
+        type: nodeData.type,
+        properties: nodeData.properties,
+        children: childrenData.length > 0 ? childrenData : undefined,
+      };
     };
 
     const result = buildSubtreeHelper(rootId, new Set<string>());

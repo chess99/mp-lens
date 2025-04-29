@@ -21,6 +21,7 @@ function formatBytes(bytes: number, decimals = 2): string {
 declare global {
   interface Window {
     __MP_LENS_DATA__?: TreeNodeData;
+    __MP_LENS_TITLE__?: string;
     __MP_LENS_GRAPH_DATA__?: ProjectStructure;
   }
 }
@@ -54,7 +55,7 @@ export function App({ data }: AppProps) {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>MP-Lens 项目可视化</h1>
+        <h1>{window.__MP_LENS_TITLE__ || '依赖可视化'}</h1>
         <div className="overview-stats">
           <div className="stat-item">
             <span className="stat-label">总文件数:</span>

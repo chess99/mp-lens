@@ -43,6 +43,8 @@ export interface TreeViewProps {
   data: TreeNodeData;
   onNodeSelect: (node: TreeNodeData) => void;
   selectedNodeId?: string;
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
 }
 
 // 节点详情Props类型
