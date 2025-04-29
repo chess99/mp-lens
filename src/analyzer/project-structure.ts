@@ -13,13 +13,34 @@ export interface GraphNode {
   type: NodeType;
   label: string; // User-friendly name or path relative to miniapp root
   // Optional metadata
-  properties?: Record<string, any>;
+  properties?: {
+    // Common properties
+    absolutePath?: string; // For Module nodes
+    basePath?: string; // For Page/Component nodes
+    root?: string; // For Package nodes
+    path?: string; // For App node (path to app.json)
+    // File properties (for Module)
+    fileSize?: number;
+    fileExt?: string;
+    // Aggregated statistics (populated later)
+    fileCount?: number;
+    totalSize?: number;
+    fileTypes?: Record<string, number>; // { ext: count }
+    sizeByType?: Record<string, number>; // { ext: size }
+    // --- NEW PROPERTIES ---
+    structuralParentId?: string; // ID of the Page/Component/Package this Module primarily belongs to
+    referredBy?: string[]; // List of node IDs that import/require this node (populated during parsing)
+    // --- END NEW PROPERTIES ---
+    // Add other relevant properties as needed
+    [key: string]: any; // Allow other properties
+  };
 }
 
 export interface GraphLink {
-  source: string; // Source node id
-  target: string; // Target node id
-  type: LinkType;
+  source: string; // ID of the source node
+  target: string; // ID of the target node
+  type: LinkType; // Type of the relationship
+  dependencyType?: string; // Specific type of dependency (e.g., 'static', 'dynamic')
   // Optional metadata
   properties?: Record<string, any>;
 }

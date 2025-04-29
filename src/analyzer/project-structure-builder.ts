@@ -209,39 +209,83 @@ export class ProjectStructureBuilder {
 
   private async processComponent(
     parentId: string,
-    componentBasePath: string,
-    currentRoot: string,
+    componentBasePath: string, // Path from usingComponents (e.g., '/components/comp', '../../comp')
+    currentRoot: string, // Directory of the JSON file that declared the component
   ): Promise<GraphNode | null> {
-    const componentId = `comp:${componentBasePath}`;
-    const absoluteBasePath = path.resolve(currentRoot, componentBasePath);
-
-    // Check if already processed to avoid cycles in structure definition
-    if (this.nodes.has(componentId)) {
-      // Add link from new parent if it doesn't exist
-      this.addLink(parentId, componentId, 'Structure');
-      return this.nodes.get(componentId)!;
+    let absoluteBasePath: string;
+    // Handle absolute paths (relative to miniapp root) vs relative paths
+    if (componentBasePath.startsWith('/')) {
+      // Resolve from miniapp root, remove leading '/' for path.join/resolve
+      absoluteBasePath = path.resolve(this.miniappRoot, componentBasePath.substring(1));
+      logger.trace(
+        `[processComponent] Resolved absolute component path '${componentBasePath}' -> '${absoluteBasePath}'`,
+      );
+    } else {
+      // Resolve relative to the current JSON file's directory
+      absoluteBasePath = path.resolve(currentRoot, componentBasePath);
+      logger.trace(
+        `[processComponent] Resolved relative component path '${componentBasePath}' in '${currentRoot}' -> '${absoluteBasePath}'`,
+      );
     }
 
-    const node = this.addNode({
-      id: componentId,
-      type: 'Component',
-      label: componentBasePath,
-      properties: { basePath: absoluteBasePath },
-    });
-    this.addLink(parentId, componentId, 'Structure');
+    // Create a canonical ID relative to the miniapp root
+    const canonicalRelativePath = path.relative(this.miniappRoot, absoluteBasePath);
+    // Ensure canonical path doesn't start with '../' if resolution somehow failed
+    if (canonicalRelativePath.startsWith('..')) {
+      logger.warn(
+        `[processComponent] Calculated canonical path '${canonicalRelativePath}' seems incorrect for absolute path '${absoluteBasePath}' relative to miniapp root '${this.miniappRoot}'. Skipping component.`,
+      );
+      return null; // Or handle error differently
+    }
 
-    // Process related files (json, js, wxml, wxss)
-    await this.processRelatedFiles(componentId, componentBasePath, currentRoot);
+    const canonicalComponentId = `comp:${canonicalRelativePath}`;
+    const componentLabel = canonicalRelativePath; // Use the normalized path for label
+
+    // Check if the canonical node already exists
+    if (this.nodes.has(canonicalComponentId)) {
+      // Node exists, just add the link from the current parent
+      this.addLink(parentId, canonicalComponentId, 'Structure');
+      logger.trace(
+        `[processComponent] Linking existing component ${canonicalComponentId} to parent ${parentId}`,
+      );
+      return this.nodes.get(canonicalComponentId)!;
+    }
+
+    logger.trace(
+      `[processComponent] Creating new component node ${canonicalComponentId} with label ${componentLabel}`,
+    );
+    // Create the node using the canonical ID and label
+    const node = this.addNode({
+      id: canonicalComponentId,
+      type: 'Component',
+      label: componentLabel,
+      properties: { basePath: absoluteBasePath }, // Store absolute path for reference
+    });
+    this.addLink(parentId, canonicalComponentId, 'Structure');
+
+    // Process related files using the canonical ID as the owner
+    // Call processRelatedFiles with the *original* basePath and the context it came from (currentRoot)
+    // processRelatedFiles will re-resolve the absolute path correctly based on its context.
+    await this.processRelatedFiles(canonicalComponentId, componentBasePath, currentRoot);
+
     return node;
   }
 
   // Processes the standard set of files (.json, .js, .ts, .wxml, .wxss) for a page or component
   private async processRelatedFiles(
-    ownerId: string,
-    basePath: string,
-    currentRoot: string,
+    ownerId: string, // Canonical ID of the Page or Component
+    basePath: string, // Original base path (relative or absolute depending on caller)
+    currentRoot: string, // Context directory for resolving basePath
   ): Promise<void> {
-    const absoluteBasePath = path.resolve(currentRoot, basePath);
+    // Resolve absolute path based on the context provided by the caller
+    // Needs the same logic as processComponent to handle '/' prefix
+    let absoluteBasePath: string;
+    if (basePath.startsWith('/')) {
+      absoluteBasePath = path.resolve(this.miniappRoot, basePath.substring(1));
+    } else {
+      absoluteBasePath = path.resolve(currentRoot, basePath);
+    }
+
     const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss'];
 
     for (const ext of extensions) {
@@ -249,16 +293,22 @@ export class ProjectStructureBuilder {
       if (fs.existsSync(filePath)) {
         const moduleNode = this.addNodeForFile(filePath, 'Module');
         if (moduleNode) {
-          const linkType = ext === '.json' ? 'Config' : 'Structure'; // Or refine link types
-          this.addLink(ownerId, moduleNode.id, linkType);
+          // Assign structural parent ID (using the canonical ownerId)
+          if (!moduleNode.properties) moduleNode.properties = {};
+          moduleNode.properties.structuralParentId = ownerId;
+
+          // Link owner (Component/Page) -> Module
+          this.addLink(ownerId, moduleNode.id, 'Structure');
 
           // If it's a JSON file, parse it for components
           if (ext === '.json') {
+            // Pass the canonical ownerId and the absolute path to the JSON
             await this.parseComponentJson(ownerId, filePath);
           }
-
-          // Parse the file for its own dependencies (imports, etc.)
-          await this.parseModuleDependencies(moduleNode);
+          // If it's a script or template, parse dependencies
+          else if ('.js,.ts,.wxml,.wxss'.includes(ext)) {
+            await this.parseModuleDependencies(moduleNode);
+          }
         }
       }
     }
@@ -280,12 +330,11 @@ export class ProjectStructureBuilder {
         const componentDir = path.dirname(jsonPath);
         for (const [_name, compPath] of Object.entries(jsonContent.usingComponents)) {
           if (typeof compPath === 'string' && !compPath.startsWith('plugin://')) {
-            // Resolve relative path from component's directory
-            const absoluteCompPath = path.resolve(componentDir, compPath as string);
-            // Convert back to relative path from miniapp root for consistency
-            const relativeCompPath = path.relative(this.miniappRoot, absoluteCompPath);
-            // Use miniappRoot as currentRoot for components found in JSON
-            await this.processComponent(ownerId, relativeCompPath, this.miniappRoot);
+            // Resolve component path relative to the JSON file's directory
+            // const absoluteCompPath = path.resolve(componentDir, compPath as string);
+            // processComponent now resolves absolute path and calculates canonical ID internally
+            // We need to provide the correct context (componentDir) for resolving the relative compPath
+            await this.processComponent(ownerId, compPath as string, componentDir); // Use componentDir as currentRoot
           }
         }
       }
@@ -296,52 +345,45 @@ export class ProjectStructureBuilder {
 
   // Parses a module file (js, ts, wxml, wxss) for its dependencies
   private async parseModuleDependencies(moduleNode: GraphNode): Promise<void> {
-    const filePath = moduleNode.properties?.absolutePath || moduleNode.id;
-    if (!filePath || typeof filePath !== 'string') {
-      logger.warn(`Cannot parse dependencies for node without path: ${moduleNode.id}`);
-      return;
+    const filePath = moduleNode.properties?.absolutePath;
+    if (!filePath || this.parsedModules.has(filePath)) {
+      return; // Skip if no path or already parsed
     }
+    this.parsedModules.add(filePath);
 
-    // --- Start: Check if already parsed --- //
-    if (this.parsedModules.has(filePath)) {
-      logger.trace(`Skipping already parsed module: ${filePath}`);
-      return;
-    }
-    this.parsedModules.add(filePath); // Mark as parsed
-    logger.debug(`Parsing dependencies for: ${filePath}`);
-    // --- End: Check if already parsed --- //
-
+    const relativePath = path.relative(this.projectRoot, filePath);
+    logger.debug(`Parsing dependencies for: ${relativePath}`);
     try {
+      // Assuming parseFile gives a list of absolute paths of dependencies
       const dependencies = await this.fileParser.parseFile(filePath);
-      logger.verbose(`Dependencies for ${filePath}:`, dependencies);
-      for (const depPath of dependencies) {
-        // Check if dependency exists and is not the file itself
-        if (fs.existsSync(depPath) && depPath !== filePath) {
-          const depNode = this.addNodeForFile(depPath, 'Module');
-          if (depNode) {
-            // Determine link type based on file extensions
-            const sourceType = path.extname(filePath);
-            const targetType = path.extname(depPath);
-            let linkType: LinkType = 'Import'; // Default
-            if (sourceType === '.wxml' && targetType === '.wxml') linkType = 'Template';
-            else if (sourceType === '.wxss' && targetType === '.wxss') linkType = 'Style';
-            else if (sourceType === '.wxml' && targetType === '.wxs') linkType = 'Import'; // WXS import
 
-            this.addLink(moduleNode.id, depNode.id, linkType);
+      for (const depAbsolutePath of dependencies) {
+        const targetNode = this.addNodeForFile(depAbsolutePath, 'Module');
+        if (targetNode) {
+          // Use 'Import' as the default dependency link type
+          this.addLink(moduleNode.id, targetNode.id, 'Import');
 
-            // --- Start: Recurse into dependency --- //
-            // Only recurse if it's a module type we typically parse (JS/TS/WXML/WXSS?)
-            // Avoid recursing into JSON, images etc. unless necessary
-            const depExt = path.extname(depPath).toLowerCase();
-            if (['.js', '.ts', '.wxml', '.wxss', '.wxs'].includes(depExt)) {
-              await this.parseModuleDependencies(depNode); // Await the recursive call
-            }
-            // --- End: Recurse into dependency --- //
+          // --- Populate referredBy ---
+          if (!targetNode.properties) targetNode.properties = {};
+          if (!targetNode.properties.referredBy) targetNode.properties.referredBy = [];
+          // Ensure referredBy stores strings and check for existence
+          if (!targetNode.properties.referredBy.includes(moduleNode.id)) {
+            targetNode.properties.referredBy.push(moduleNode.id);
+          }
+          // --- End Populate referredBy ---
+
+          // Recursively parse the dependency if it hasn't been parsed yet
+          const depExt = path.extname(depAbsolutePath).toLowerCase();
+          if (
+            !'.json'.includes(depExt) && // Avoid parsing JSON again here
+            !this.parsedModules.has(depAbsolutePath)
+          ) {
+            await this.parseModuleDependencies(targetNode);
           }
         }
       }
-    } catch (error) {
-      logger.warn(`Failed to parse dependencies for file ${filePath}:`, error);
+    } catch (error: any) {
+      logger.warn(`Error parsing dependencies for ${relativePath}: ${error.message}`);
     }
   }
 
@@ -416,22 +458,27 @@ export class ProjectStructureBuilder {
   }
 
   // Helper to add a link, preventing duplicates
-  private addLink(sourceId: string, targetId: string, type: LinkType): void {
-    // Ensure nodes exist
-    if (!this.nodes.has(sourceId) || !this.nodes.has(targetId)) {
-      logger.warn(`Attempted to add link between non-existent nodes: ${sourceId} -> ${targetId}`);
+  private addLink(
+    sourceId: string,
+    targetId: string,
+    type: LinkType,
+    dependencyType?: string,
+  ): void {
+    // Avoid self-loops
+    if (sourceId === targetId) {
       return;
     }
 
-    // Check for existing link (simple check)
-    const exists = this.links.some(
-      (l) => l.source === sourceId && l.target === targetId && l.type === type,
-    );
-    if (!exists) {
-      // Structure links define the hierarchical relationship of app components
-      logger.verbose(`Adding link (${type}): ${sourceId} -> ${targetId}`);
-      this.links.push({ source: sourceId, target: targetId, type: type });
+    const link: GraphLink = { source: sourceId, target: targetId, type };
+    if (dependencyType) {
+      link.dependencyType = dependencyType;
     }
+
+    // Optional: Check for duplicates if needed
+    // const exists = this.links.some(l => l.source === sourceId && l.target === targetId && l.type === type);
+    // if (exists) return;
+
+    this.links.push(link);
   }
 
   // --- Start: Added processing functions for TabBar, Theme, Workers ---

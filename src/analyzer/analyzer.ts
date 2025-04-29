@@ -95,167 +95,143 @@ function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[])
 }
 
 /**
- * Calculates aggregate statistics (files, size, types) for each node.
- * - For App node: Aggregates stats from ALL reachable module files.
- * - For other nodes: Aggregates stats based ONLY on Structure links.
+ * Calculates aggregate statistics (files, size, types) for each node based on reachability.
+ * - For Module nodes: Stats reflect the individual file.
+ * - For App/Package/Page/Component nodes: Stats reflect all unique Module nodes reachable
+ *   from that structural node (including traversing Dependency/Import links).
  * Modifies the nodes directly within the provided structure object.
  */
-function populateNodeStatistics(structure: ProjectStructure, reachableNodeIds: Set<string>): void {
-  const nodeStatsMap = new Map<
-    string,
-    {
-      files: number;
-      size: number;
-      fileTypes: Record<string, number>;
-      sizeByType: Record<string, number>;
-    }
-  >();
-  const fileNodeIds = new Set<string>();
-  const initialModuleStats = new Map<string, { size: number; fileExt: string }>(); // Store base stats for modules
+function populateNodeStatistics(structure: ProjectStructure): void {
+  const nodeMap = new Map(structure.nodes.map((n) => [n.id, n]));
+  const linksFrom = new Map<string, GraphLink[]>();
 
-  // Step 1: Initialize statistics map and identify file nodes + store initial stats
-  for (const node of structure.nodes) {
-    const initialStats = {
-      files: 0,
-      size: 0,
-      fileTypes: {} as Record<string, number>,
-      sizeByType: {} as Record<string, number>,
-    };
-    if (node.type === 'Module' && node.properties) {
-      fileNodeIds.add(node.id);
-      const fileSize = node.properties.fileSize || 0;
-      const fileExt = node.properties.fileExt || 'unknown';
-      initialStats.files = 1;
-      initialStats.size = fileSize;
-      initialStats.fileTypes[fileExt] = 1;
-      initialStats.sizeByType[fileExt] = fileSize;
-      initialModuleStats.set(node.id, { size: fileSize, fileExt }); // Store base stats
+  // Precompute outgoing links for faster lookup
+  structure.links.forEach((link) => {
+    if (!linksFrom.has(link.source)) {
+      linksFrom.set(link.source, []);
     }
-    nodeStatsMap.set(node.id, initialStats);
-  }
-  logger.debug(`Initialized statistics map for ${structure.nodes.length} nodes.`);
-
-  // Step 2: Build child-to-parent map (only using Structure type links) for hierarchical aggregation
-  const childToParents = new Map<string, string[]>();
-  for (const link of structure.links) {
-    if (link.type === 'Structure') {
-      if (!childToParents.has(link.target)) {
-        childToParents.set(link.target, []);
-      }
-      childToParents.get(link.target)!.push(link.source);
-    }
-  }
-
-  // Step 3: Aggregate statistics upwards for non-App nodes based on Structure links
-  const parentToChildren = new Map<string, string[]>();
-  for (const link of structure.links) {
-    if (link.type === 'Structure') {
-      if (!parentToChildren.has(link.source)) {
-        parentToChildren.set(link.source, []);
-      }
-      parentToChildren.get(link.source)!.push(link.target);
-    }
-  }
-
-  const outDegree = new Map<string, number>();
-  structure.nodes.forEach((node) => outDegree.set(node.id, 0));
-  parentToChildren.forEach((children, parentId) => {
-    outDegree.set(parentId, children.length);
+    linksFrom.get(link.source)!.push(link);
   });
 
-  const queue: string[] = [];
-  structure.nodes.forEach((node) => {
-    if (outDegree.get(node.id) === 0) {
-      queue.push(node.id);
-    }
-  });
-  logger.debug(
-    `Starting Structure-based aggregation with ${queue.length} leaf nodes.`, // Clarified log
-  );
+  // Function to perform BFS from a set of start nodes and return reachable MODULE nodes
+  const findReachableModules = (startNodeIds: string[]): Set<string> => {
+    const reachableModules = new Set<string>();
+    const visited = new Set<string>();
+    const queue: string[] = [];
 
-  const processedEdges = new Map<string, Set<string>>();
-
-  while (queue.length > 0) {
-    const childId = queue.shift()!;
-    const childStats = nodeStatsMap.get(childId);
-    const parents = childToParents.get(childId) || [];
-
-    if (childStats) {
-      for (const parentId of parents) {
-        // IMPORTANT: Do not aggregate into the main App node here
-        if (parentId === structure.rootNodeId) continue;
-
-        const parentStats = nodeStatsMap.get(parentId);
-
-        if (!processedEdges.has(parentId)) processedEdges.set(parentId, new Set());
-        if (processedEdges.get(parentId)!.has(childId)) continue;
-
-        if (parentStats) {
-          parentStats.files += childStats.files;
-          parentStats.size += childStats.size;
-          for (const [ext, count] of Object.entries(childStats.fileTypes)) {
-            parentStats.fileTypes[ext] = (parentStats.fileTypes[ext] || 0) + count;
-          }
-          for (const [ext, size] of Object.entries(childStats.sizeByType)) {
-            parentStats.sizeByType[ext] = (parentStats.sizeByType[ext] || 0) + size;
-          }
-          processedEdges.get(parentId)!.add(childId);
+    // Initialize queue with valid start nodes
+    startNodeIds.forEach((id) => {
+      if (nodeMap.has(id) && !visited.has(id)) {
+        queue.push(id);
+        visited.add(id);
+        // If start node itself is a module, add it
+        if (nodeMap.get(id)?.type === 'Module') {
+          reachableModules.add(id);
         }
+      }
+    });
 
-        const currentOutDegree = (outDegree.get(parentId) || 0) - 1;
-        outDegree.set(parentId, currentOutDegree);
-        if (currentOutDegree === 0) {
-          queue.push(parentId);
+    while (queue.length > 0) {
+      const currentNodeId = queue.shift()!;
+      const outgoingLinks = linksFrom.get(currentNodeId) || [];
+
+      for (const link of outgoingLinks) {
+        const targetNodeId = link.target;
+        if (nodeMap.has(targetNodeId) && !visited.has(targetNodeId)) {
+          visited.add(targetNodeId);
+          queue.push(targetNodeId);
+          // If the target is a Module, add it to our set
+          if (nodeMap.get(targetNodeId)?.type === 'Module') {
+            reachableModules.add(targetNodeId);
+          }
         }
       }
     }
-  }
-  logger.debug(`Finished Structure-based aggregation.`);
+    return reachableModules;
+  };
 
-  // Step 4: Calculate total stats for ALL reachable module files
-  let totalReachableFiles = 0;
-  let totalReachableSize = 0;
-  const totalReachableFileTypes: Record<string, number> = {};
-  const totalReachableSizeByType: Record<string, number> = {};
-
-  for (const nodeId of reachableNodeIds) {
-    if (initialModuleStats.has(nodeId)) {
-      // Check if it's a module with initial stats
-      const moduleBaseStats = initialModuleStats.get(nodeId)!;
-      totalReachableFiles += 1;
-      totalReachableSize += moduleBaseStats.size;
-      const ext = moduleBaseStats.fileExt;
-      totalReachableFileTypes[ext] = (totalReachableFileTypes[ext] || 0) + 1;
-      totalReachableSizeByType[ext] = (totalReachableSizeByType[ext] || 0) + moduleBaseStats.size;
-    }
-  }
-  logger.debug(
-    `Calculated total reachable stats: ${totalReachableFiles} files, Size: ${totalReachableSize}`,
-  );
-
-  // Step 5: Update the actual nodes in the structure
-  const rootNodeId = structure.rootNodeId;
+  // Iterate through all nodes and calculate stats
   for (const node of structure.nodes) {
     if (!node.properties) node.properties = {};
 
-    if (node.id === rootNodeId) {
-      // Update App node with total reachable stats
-      node.properties.fileCount = totalReachableFiles;
-      node.properties.totalSize = totalReachableSize;
-      node.properties.fileTypes = totalReachableFileTypes;
-      node.properties.sizeByType = totalReachableSizeByType;
-    } else {
-      // Update other nodes with structure-aggregated stats from the map
-      const stats = nodeStatsMap.get(node.id);
-      if (stats) {
-        node.properties.fileCount = stats.files;
-        node.properties.totalSize = stats.size;
-        node.properties.fileTypes = stats.fileTypes;
-        node.properties.sizeByType = stats.sizeByType;
+    if (node.type === 'Module') {
+      // Base stats for individual modules
+      const fileSize = node.properties.fileSize || 0;
+      const fileExt = node.properties.fileExt || 'unknown';
+      node.properties.fileCount = 1;
+      node.properties.totalSize = fileSize;
+      node.properties.fileTypes = { [fileExt]: 1 };
+      node.properties.sizeByType = { [fileExt]: fileSize };
+    } else if (['App', 'Package', 'Page', 'Component'].includes(node.type)) {
+      // Aggregate stats for structural nodes
+      let totalFiles = 0;
+      let totalSize = 0;
+      const fileTypes: Record<string, number> = {};
+      const sizeByType: Record<string, number> = {};
+
+      // Find entry points for traversal: the node itself + direct module children
+      const startNodesForTraversal = new Set<string>([node.id]);
+      const directChildrenLinks = linksFrom.get(node.id) || [];
+      directChildrenLinks.forEach((link) => {
+        // Consider modules directly linked via Structure (e.g., page.js)
+        // Or config files linked via Config (e.g., app.json)
+        if (link.type === 'Structure' || link.type === 'Config') {
+          const targetNode = nodeMap.get(link.target);
+          if (targetNode?.type === 'Module') {
+            startNodesForTraversal.add(link.target);
+          }
+        }
+      });
+
+      // --- DEBUGGING START ---
+      if (node.type === 'Component') {
+        logger.debug(`[Stats Aggregation] Processing Component: ${node.id}`);
+        logger.debug(
+          `  Start Nodes for Traversal: ${Array.from(startNodesForTraversal).join(', ')}`,
+        );
       }
+      // --- DEBUGGING END ---
+
+      // Find all unique modules reachable from these starting points
+      const reachableModules = findReachableModules(Array.from(startNodesForTraversal));
+
+      // --- DEBUGGING START ---
+      if (node.type === 'Component') {
+        logger.debug(`  Reachable Modules Found: ${reachableModules.size}`);
+        // Optionally log the first few module IDs:
+        // logger.trace(`    Modules: ${Array.from(reachableModules).slice(0, 5).join(', ')}`);
+      }
+      // --- DEBUGGING END ---
+
+      // Aggregate stats from the reachable modules
+      reachableModules.forEach((moduleId) => {
+        const moduleNode = nodeMap.get(moduleId);
+        if (moduleNode && moduleNode.type === 'Module' && moduleNode.properties) {
+          const fileSize = moduleNode.properties.fileSize || 0;
+          const fileExt = moduleNode.properties.fileExt || 'unknown';
+
+          totalFiles += 1; // Each unique reachable module counts as 1 file for the container
+          totalSize += fileSize;
+          fileTypes[fileExt] = (fileTypes[fileExt] || 0) + 1;
+          sizeByType[fileExt] = (sizeByType[fileExt] || 0) + fileSize;
+        }
+      });
+
+      // --- DEBUGGING START ---
+      if (node.type === 'Component') {
+        logger.debug(`  Calculated totalFiles: ${totalFiles}`);
+      }
+      // --- DEBUGGING END ---
+
+      // Assign aggregated stats to the structural node
+      node.properties.fileCount = totalFiles;
+      node.properties.totalSize = totalSize;
+      node.properties.fileTypes = fileTypes;
+      node.properties.sizeByType = sizeByType;
     }
   }
-  logger.debug(`Updated node properties with calculated statistics.`);
+
+  logger.debug('Finished populating node statistics based on reachability.');
 }
 
 /**
@@ -503,7 +479,7 @@ export async function analyzeProject(
   logger.debug(`Found ${reachableNodeIds.size} total reachable nodes.`);
 
   // --- Populate Node Statistics (using reachable nodes for App stats) --- //
-  populateNodeStatistics(projectStructure, reachableNodeIds); // Pass reachable IDs
+  populateNodeStatistics(projectStructure);
 
   // --- Find Unused Files using the Calculated Reachable Nodes --- //
   const unusedFiles = findUnusedFiles(
@@ -640,12 +616,3 @@ function resolveEssentialFiles(
   });
   return essentialFiles;
 }
-
-// findReachableNodes function is now defined earlier in the file.
-// Keep it here for reference, but it's already defined above.
-// /**
-//  * Performs reachability analysis (BFS) on the ProjectStructure graph.
-//  */
-// function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[]): Set<string> {
-//   ...
-// }
