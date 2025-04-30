@@ -4,9 +4,9 @@ import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { ProjectStructure } from '../analyzer/project-structure';
 import { CommandOptions } from '../types/command-options';
-import { ConfigLoader } from '../utils/config-loader';
+import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
-import { isString, mergeOptions } from '../utils/options-merger';
+import { isString } from '../utils/options-merger';
 import { DotGenerator } from '../visualizer/dot-generator';
 import { HtmlGeneratorPreact } from '../visualizer/html-renderer';
 
@@ -54,53 +54,38 @@ function renderJSON(structure: ProjectStructure): string {
  * 生成项目依赖图
  */
 export async function graph(rawOptions: RawGraphOptions): Promise<void> {
-  // 1. Resolve Project Path and Set Logger Root
-  const projectRoot = path.resolve(rawOptions.project);
-  logger.setProjectRoot(projectRoot);
-  logger.info(`Resolved project root: ${projectRoot}`);
-  if (!fs.existsSync(projectRoot)) {
-    throw new Error(`Project directory does not exist: ${projectRoot}`);
-  }
+  const context = await initializeCommandContext(rawOptions, 'graph');
+  const {
+    projectRoot,
+    verbose,
+    verboseLevel,
+    miniappRoot,
+    entryFile,
+    exclude,
+    essentialFilesList,
+    fileTypes,
+    keepAssets,
+  } = context;
+  // Use the specific GraphOptions type for mergedConfig
+  const mergedConfig: GraphOptions = context.mergedConfig as GraphOptions;
 
-  // 2. Load config file
-  const fileConfig = await ConfigLoader.loadConfig(rawOptions.config, projectRoot);
-  logger.debug('Loaded config file content for graph:', fileConfig);
-
-  // 3. Merge options
-  const mergedConfig = mergeOptions(rawOptions, fileConfig, projectRoot);
-  logger.debug('Final merged options for graph:', mergedConfig);
-
-  // 4. Extract and type final options for this command
-  const verbose = mergedConfig.verbose ?? false;
-  const verboseLevel = mergedConfig.verboseLevel;
-  const miniappRoot = mergedConfig.miniappRoot;
-  const entryFile = mergedConfig.entryFile;
+  // === Extract Graph-Specific Options (Now correctly typed) ===
   const format = mergedConfig.format ?? 'html';
   const depth = mergedConfig.depth;
-  const focus = mergedConfig.focus; // Resolved path or undefined
+  const focus = mergedConfig.focus;
   const npm = mergedConfig.npm ?? false;
-  // Graph-specific options from merged config
-  const exclude = mergedConfig.exclude ?? [];
-  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
-
-  // Handle output path - resolve relative to current working directory, not project root
   const output = mergedConfig.output;
+
+  // === Handle Output Path (Graph Specific) ===
   let outputPathAbsolute = null;
-
   if (output) {
-    // Get the absolute path based on CWD, not the project root
-    // Ensure consistent path handling by using the path module's isAbsolute check
     outputPathAbsolute = path.isAbsolute(output) ? output : path.resolve(process.cwd(), output);
-
     logger.info(`Resolved output path: ${outputPathAbsolute}`);
   }
 
-  // Log final options
+  // === Log Graph-Specific Options ===
   logger.info(`Output format: ${format}`);
-  logger.info('Generating project dependency graph...');
-  logger.info(`Project path: ${projectRoot}`);
-  if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
-  if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
+  // Note: Common path logging is done in initializeCommandContext
   if (outputPathAbsolute) logger.info(`Output file: ${outputPathAbsolute}`);
   if (depth !== undefined) logger.info(`Max depth: ${depth}`);
   if (focus) logger.info(`Focusing on file: ${focus}`);
@@ -108,32 +93,25 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
 
   try {
     logger.info('Analyzing project dependencies...');
-    // Align default fileTypes with clean command for consistency
-    const defaultFileTypes = 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs';
-    const fileTypesString = mergedConfig.types ?? defaultFileTypes;
-    const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
+    // No need to recalculate fileTypes
 
-    // Capture unusedFiles from the result
+    // Call analyzeProject with options from context
     const { projectStructure, reachableNodeIds, unusedFiles } = await analyzeProject(projectRoot, {
-      fileTypes, // Use the potentially updated list
+      fileTypes,
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
       verbose,
       verboseLevel,
       miniappRoot,
       entryFile,
-      entryContent: mergedConfig.entryContent,
-      keepAssets: mergedConfig.keepAssets,
+      entryContent: mergedConfig.entryContent, // Correctly typed access
+      keepAssets,
     });
 
     logger.info('Rendering graph...');
 
-    // Pass unusedFiles to the generator
-    const htmlGenerator = new HtmlGeneratorPreact(
-      projectStructure,
-      reachableNodeIds,
-      unusedFiles, // <-- Pass the list
-    );
+    // Pass data to generators
+    const htmlGenerator = new HtmlGeneratorPreact(projectStructure, reachableNodeIds, unusedFiles);
     const dotGenerator = new DotGenerator(projectStructure);
 
     // Call appropriate renderer with depth and focus parameters

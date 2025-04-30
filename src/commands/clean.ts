@@ -3,9 +3,9 @@ import * as fs from 'fs';
 import inquirer from 'inquirer';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { ConfigLoader } from '../utils/config-loader';
+import { CommandOptions } from '../types/command-options';
+import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
-import { mergeOptions } from '../utils/options-merger';
 
 // Define the shape of the raw options passed from cli.ts
 interface RawCleanOptions {
@@ -28,57 +28,49 @@ interface RawCleanOptions {
   [key: string]: any;
 }
 
+// Define CleanOptions extending CommandOptions
+export interface CleanOptions extends CommandOptions {
+  types?: string; // Keep this if types can be specified per command
+  list?: boolean;
+  delete?: boolean;
+  // Allow any other config file options
+  [key: string]: any;
+}
+
 /**
  * Cleans unused files: lists, prompts for deletion, or deletes directly.
  */
 export async function clean(rawOptions: RawCleanOptions): Promise<void> {
-  // 1. Resolve Project Path and Set Logger Root
-  const projectRoot = path.resolve(rawOptions.project);
-  logger.setProjectRoot(projectRoot);
-  logger.info(`Resolved project root: ${projectRoot}`);
-  if (!fs.existsSync(projectRoot)) {
-    throw new Error(`Project directory does not exist: ${projectRoot}`);
-  }
+  // === Use Shared Initialization ===
+  const {
+    projectRoot,
+    mergedConfig,
+    verbose,
+    verboseLevel,
+    miniappRoot,
+    entryFile,
+    exclude,
+    essentialFilesList,
+    fileTypes, // Use fileTypes calculated by init
+    keepAssets, // Use keepAssets calculated by init
+  } = await initializeCommandContext(rawOptions, 'clean');
 
-  // 2. Load config file
-  const fileConfig = await ConfigLoader.loadConfig(rawOptions.config, projectRoot);
-  logger.debug('Loaded config file content for clean:', fileConfig);
+  // === Extract Clean-Specific Options ===
+  // Cast mergedConfig to CleanOptions for type safety
+  const cleanConfig: CleanOptions = mergedConfig as CleanOptions;
+  const listOnly = cleanConfig.list ?? false;
+  const deleteDirectly = cleanConfig.delete ?? false;
+  // Note: `types` is handled by initializeCommandContext now
 
-  // 3. Merge options
-  const mergedConfig = mergeOptions(rawOptions, fileConfig, projectRoot);
-  logger.debug('Final merged options for clean:', mergedConfig);
-
-  // 4. Extract and type final options for this command
-  const verbose = mergedConfig.verbose ?? false;
-  const verboseLevel = mergedConfig.verboseLevel;
-  const types = mergedConfig.types ?? 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs'; // Default types
-  const exclude = mergedConfig.exclude ?? [];
-  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
-  const miniappRoot = mergedConfig.miniappRoot;
-  const entryFile = mergedConfig.entryFile;
-  const listOnly = mergedConfig.list ?? false; // Use the new 'list' flag
-  const deleteDirectly = mergedConfig.delete ?? false; // Use the new 'delete' flag
-
-  // Validate required options
-  if (!types) {
-    throw new Error('Missing required option: --types must be provided via CLI or config file.');
-  }
-
-  // Log final options
-  logger.info(`File types to analyze: ${types}`);
+  // === Log Clean-Specific Info ===
+  // Common path/option logging is done in initializeCommandContext
   if (listOnly) logger.info(chalk.blue('ℹ️ List Mode: Files will be listed but NOT deleted.'));
   else if (deleteDirectly)
     logger.info(chalk.yellow('⚠️ Delete Mode: Files will be deleted WITHOUT confirmation.'));
   else logger.info('🧹 Starting unused file cleanup (will prompt before deletion)...');
 
-  logger.info(`Project path: ${projectRoot}`);
-  if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
-  if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
-  if (exclude.length > 0) logger.debug(`Exclude patterns: ${exclude.join(', ')}`);
-
   try {
-    // Analyze project using final options
-    const fileTypes = types.split(',').map((t) => t.trim());
+    // Analyze project using options from context
     logger.info('Analyzing project to find unused files...');
     const { unusedFiles } = await analyzeProject(projectRoot, {
       fileTypes,
@@ -88,7 +80,8 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       verboseLevel,
       miniappRoot,
       entryFile,
-      entryContent: mergedConfig.entryContent,
+      entryContent: cleanConfig.entryContent,
+      keepAssets,
     });
 
     if (unusedFiles.length === 0) {
