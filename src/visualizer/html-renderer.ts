@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { ProjectStructure } from '../analyzer/project-structure';
 import { TreeNodeData } from '../ui/types';
 import { AssetResolver } from '../utils/asset-resolver';
@@ -81,12 +79,7 @@ export class HtmlGeneratorPreact {
 </body>
 </html>`;
 
-    // 5. 保存生成的HTML
-    const outputPath = path.resolve(process.cwd(), 'mp-lens-graph.html');
-    fs.writeFileSync(outputPath, htmlTemplate);
-    logger.info(`✅ 静态HTML图表已保存至: ${outputPath}`);
-
-    return outputPath;
+    return htmlTemplate;
   }
 
   /**

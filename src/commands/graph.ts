@@ -32,7 +32,7 @@ interface RawGraphOptions {
 }
 
 // Define GraphOptions
-export interface GraphOptions extends CommandOptions {
+interface GraphOptions extends CommandOptions {
   format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
   output?: string;
   depth?: number;
@@ -123,7 +123,6 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
           maxDepth: depth,
           focusNode: focus,
         });
-        outputPathAbsolute = outputContent;
         break;
       case 'dot':
         outputContent = dotGenerator.generate({
@@ -158,27 +157,49 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
         throw new Error(`Unsupported output format: ${format}`);
     }
 
-    // Handle output
+    // Handle output (Now consistent for all text-based formats)
     if (outputPathAbsolute) {
-      if (format === 'html') {
-        logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
-      } else {
-        const outputDir = path.dirname(outputPathAbsolute);
-        if (!fs.existsSync(outputDir)) {
-          fs.mkdirSync(outputDir, { recursive: true });
-        }
+      const outputDir = path.dirname(outputPathAbsolute);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      // Ensure outputContent is string or buffer before writing
+      if (typeof outputContent === 'string' || Buffer.isBuffer(outputContent)) {
         fs.writeFileSync(outputPathAbsolute, outputContent);
         logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
+      } else {
+        // This case should ideally not happen with current formats
+        logger.error(`Internal error: outputContent is not writable for format ${format}`);
       }
     } else {
-      if (format !== 'html' && typeof outputContent === 'string') {
+      // Handle console output OR default HTML file saving
+      if (format === 'html') {
+        // Default behavior: Save HTML to mp-lens-graph.html in CWD if --output is not specified
+        const defaultHtmlPath = path.resolve(process.cwd(), 'mp-lens-graph.html');
+        try {
+          // Ensure outputContent is string before writing
+          if (typeof outputContent === 'string') {
+            const outputDir = path.dirname(defaultHtmlPath);
+            if (!fs.existsSync(outputDir)) {
+              // This case is unlikely for CWD, but good practice
+              fs.mkdirSync(outputDir, { recursive: true });
+            }
+            fs.writeFileSync(defaultHtmlPath, outputContent);
+            logger.info(`✅ Graph saved to: ${defaultHtmlPath}`);
+          } else {
+            logger.error('Internal error: HTML outputContent is not a string.');
+          }
+        } catch (writeError) {
+          logger.error(
+            `Failed to save default HTML graph to ${defaultHtmlPath}: ${(writeError as Error).message}`,
+          );
+        }
+      } else if (typeof outputContent === 'string') {
+        // Default behavior for other text formats: print to console
         console.log(outputContent);
-      } else if (format !== 'html') {
-        logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
       } else {
-        logger.info(
-          `HTML graph saved to: ${outputPathAbsolute}. Use --output to specify a different location.`,
-        );
+        // Handle binary formats like potential future image generation
+        logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
       }
     }
   } catch (error) {
