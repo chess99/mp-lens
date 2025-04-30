@@ -20,10 +20,12 @@ export interface HtmlGeneratorOptions {
 export class HtmlGeneratorPreact {
   private structure: ProjectStructure;
   private reachableNodeIds: Set<string>;
+  private unusedFiles: string[];
 
-  constructor(structure: ProjectStructure, reachableNodeIds: Set<string>) {
+  constructor(structure: ProjectStructure, reachableNodeIds: Set<string>, unusedFiles: string[]) {
     this.structure = structure;
     this.reachableNodeIds = reachableNodeIds;
+    this.unusedFiles = unusedFiles;
   }
 
   /**
@@ -45,6 +47,8 @@ export class HtmlGeneratorPreact {
     const treeDataJson = JSON.stringify(treeData).replace(/</g, '\\u003c');
     // 完整结构数据（用于图形视图）
     const graphDataJson = JSON.stringify(this.structure).replace(/</g, '\\u003c');
+    // Prepare unused files data
+    const unusedFilesJson = JSON.stringify(this.unusedFiles).replace(/</g, '\\u003c');
 
     // 4. 定义HTML模板 - 嵌入两种数据集
     const htmlTemplate = `<!DOCTYPE html>
@@ -66,6 +70,8 @@ export class HtmlGeneratorPreact {
     window.__MP_LENS_DATA__ = ${treeDataJson};
     // Embed full graph data for DependencyGraph component
     window.__MP_LENS_GRAPH_DATA__ = ${graphDataJson};
+    // Embed unused files list
+    window.__MP_LENS_UNUSED_FILES__ = ${unusedFilesJson};
     // Set title for UI components
     window.__MP_LENS_TITLE__ = "${options.title || '依赖可视化'}";
   </script>

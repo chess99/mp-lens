@@ -108,11 +108,14 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
 
   try {
     logger.info('Analyzing project dependencies...');
-    const fileTypes = mergedConfig.types?.split(',').map((t: string) => t.trim()) ?? [];
+    // Align default fileTypes with clean command for consistency
+    const defaultFileTypes = 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs';
+    const fileTypesString = mergedConfig.types ?? defaultFileTypes;
+    const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
 
-    // Call analyzeProject with final options
-    const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
-      fileTypes,
+    // Capture unusedFiles from the result
+    const { projectStructure, reachableNodeIds, unusedFiles } = await analyzeProject(projectRoot, {
+      fileTypes, // Use the potentially updated list
       excludePatterns: exclude,
       essentialFiles: essentialFilesList,
       verbose,
@@ -125,8 +128,12 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
 
     logger.info('Rendering graph...');
 
-    // Initialize generators with the new ProjectStructure
-    const htmlGenerator = new HtmlGeneratorPreact(projectStructure, reachableNodeIds);
+    // Pass unusedFiles to the generator
+    const htmlGenerator = new HtmlGeneratorPreact(
+      projectStructure,
+      reachableNodeIds,
+      unusedFiles, // <-- Pass the list
+    );
     const dotGenerator = new DotGenerator(projectStructure);
 
     // Call appropriate renderer with depth and focus parameters
