@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/cli/cli.ts", // Main CLI entry point
+    "src/ui/main.tsx", // UI entry point
+  ],
+  "project": ["src/**/*"],
+  "ignore": [
+    "src/ui/vite.config.mjs", // UI build config
+    "src/index.ts", // Entry point for the package, not used in the CLI or UI
+    "test-miniprogram/**/*", // Intentional unused fixture
+  ],
+  "ignoreDependencies": [
+    "@preact/preset-vite", // Used by vite.config.mjs for UI build
+  ],
+  "ignoreExportsUsedInFile": false, // Helps with types/interfaces used only within the same file
+}

@@ -23,7 +23,7 @@ export interface ChartData {
 }
 
 // 统计数据类型
-export interface Statistics {
+interface Statistics {
   totalFiles: number;
   totalCodeSize: number;
   totalPages: number;
@@ -53,7 +53,7 @@ export interface NodeDetailsProps {
 }
 
 // 图表组件Props类型
-export interface ChartProps {
+interface ChartProps {
   title: string;
   data: ChartData;
   type: 'pie' | 'bar';

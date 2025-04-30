@@ -5,7 +5,7 @@ import { logger } from './debug-logger';
 /**
  * 路径别名配置
  */
-export interface PathAliases {
+interface PathAliases {
   [key: string]: string[];
 }
 

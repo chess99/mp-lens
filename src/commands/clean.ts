@@ -29,7 +29,7 @@ interface RawCleanOptions {
 }
 
 // Define CleanOptions extending CommandOptions
-export interface CleanOptions extends CommandOptions {
+interface CleanOptions extends CommandOptions {
   types?: string; // Keep this if types can be specified per command
   list?: boolean;
   delete?: boolean;

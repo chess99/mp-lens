@@ -10,7 +10,7 @@ export function isString(value: unknown): value is string {
 }
 
 // Define a type that includes both CommandOptions and ConfigFileOptions
-export type MergedOptions = CommandOptions & ConfigFileOptions;
+type MergedOptions = CommandOptions & ConfigFileOptions;
 
 /**
  * Merges options from a configuration file and CLI arguments.

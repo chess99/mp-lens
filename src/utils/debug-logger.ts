@@ -28,7 +28,7 @@ interface LoggerOptions {
 /**
  * Debug logger utility for the analyzer
  */
-export class DebugLogger {
+class DebugLogger {
   private options: LoggerOptions;
 
   /**

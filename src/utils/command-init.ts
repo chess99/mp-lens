@@ -13,7 +13,7 @@ interface RawCommandOptions {
 }
 
 // Define the structure of the initialized context returned
-export interface CommandExecutionContext {
+interface CommandExecutionContext {
   projectRoot: string;
   mergedConfig: CommandOptions; // Contains all merged options
   verbose: boolean;

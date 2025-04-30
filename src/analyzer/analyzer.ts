@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as glob from 'glob';
-import minimatch from 'minimatch';
+import { minimatch } from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
