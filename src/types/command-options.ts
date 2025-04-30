@@ -8,7 +8,7 @@ export interface CommandOptions {
 }
 
 export interface AnalyzerOptions {
-  fileTypes: string[];
+  fileTypes?: string[];
   excludePatterns?: string[];
   verbose?: boolean;
   verboseLevel?: number;
