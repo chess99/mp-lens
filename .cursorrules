@@ -34,3 +34,9 @@ When a bug persists after two adjustment attempts, activate systematic thinking 
 3. Design methods to validate these hypotheses
 4. Develop three distinct solutions with detailed pros and cons for each
 5. Allow stakeholders to select the most appropriate solution based on context
+
+# Rules for AI behavior
+
+# Code Style
+
+- Remove commented-out code instead of leaving it.

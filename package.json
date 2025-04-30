@@ -32,7 +32,7 @@
     "analyzer",
     "unused code"
   ],
-  "author": "Zachary Chen <zchen.cs@gmail.com>",
+  "author": "chess99",
   "license": "MIT",
   "files": [
     "dist",
@@ -41,12 +41,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-repo/mp-lens.git"
+    "url": "git+https://github.com/chess99/mp-lens.git"
   },
   "bugs": {
-    "url": "https://github.com/your-repo/mp-lens/issues"
+    "url": "https://github.com/chess99/mp-lens/issues"
   },
-  "homepage": "https://github.com/your-repo/mp-lens#readme",
+  "homepage": "https://github.com/chess99/mp-lens#readme",
   "dependencies": {
     "@antv/g6": "^4.8.21",
     "chalk": "^4.1.2",

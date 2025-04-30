@@ -1,8 +1,9 @@
 # mp-lens (小程序分析工具)
 
-[![NPM 版本](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.com/package/mp-lens)
-[![许可证](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](LICENSE)
-[![构建状态](https://img.shields.io/travis/com/your-username/mp-lens.svg?style=flat)](https://travis-ci.com/your-username/mp-lens) <!-- CI/CD占位符 -->
+[![npm](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
+[![License](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](https://github.com/chess99/mp-lens/blob/master/LICENSE)
+[![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
+[![构建状态](https://img.shields.io/travis/com/chess99/mp-lens.svg?style=flat)](https://travis-ci.com/chess99/mp-lens) <!-- CI/CD占位符 -->
 
 **mp-lens** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系、分析包大小（未来）并安全地移除未使用的文件。
 
@@ -21,6 +22,19 @@
   * 支持 Glob 模式，可在分析和清理时**排除**特定的文件或目录。
 * **可配置:** 可通过命令行选项快速执行任务，也支持通过配置文件进行更复杂的设置。
 * **使用 TypeScript 构建:** 类型安全，易于维护。
+
+## 与Knip集成检测未使用的文件和组件
+
+mp-lens 提供了与 [Knip](https://knip.dev) 的集成支持，帮助你检测小程序项目中未使用的文件、组件和死代码。
+
+与mp-lens的文件级别分析不同，Knip能深入分析模块内部，找出未使用的导出（exports）、函数和变量，从而实现更加精细的代码清理。
+
+```bash
+# 安装依赖
+npm install --save-dev mp-lens knip
+```
+
+详细的集成指南和配置示例请查看 [mp-lens与Knip集成文档](docs/knip-integration.md)。
 
 ## 🚀 安装
 
@@ -174,8 +188,6 @@ mp-lens clean --delete --types js,wxml
 ## 🤝 贡献
 
 欢迎各种形式的贡献！如果你发现任何问题或有改进建议，请随时提交 Issue 或 Pull Request。
-
-*(如果你创建了 CONTRIBUTING.md，可以在此链接)*
 
 ## 📄 许可证
 

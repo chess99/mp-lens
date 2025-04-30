@@ -1,10 +1,22 @@
 // 导出公共API
 import { analyzeProject } from './analyzer/analyzer';
 import { DependencyGraph } from './analyzer/dependency-graph';
+import { findMiniProgramEntryPoints } from './knip/entry-finder';
+import { parseWxml, parseWxs, parseWxss } from './knip/parsers';
 import { DotGenerator } from './visualizer/dot-generator';
 import { HtmlGeneratorPreact } from './visualizer/html-renderer';
 
-export { analyzeProject, DependencyGraph, DotGenerator, HtmlGeneratorPreact };
+export {
+  analyzeProject,
+  DependencyGraph,
+  DotGenerator,
+  findMiniProgramEntryPoints,
+  HtmlGeneratorPreact,
+  // Export Mini Program file parsers for knip custom compilers
+  parseWxml,
+  parseWxs,
+  parseWxss,
+};
 
 // 在直接引入包时提供用法说明
 if (require.main === module) {
