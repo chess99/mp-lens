@@ -1,7 +1,8 @@
 // Import ProjectStructure and related types
 import { GraphLink, GraphNode, ProjectStructure } from '../analyzer/project-structure';
 
-interface DotGeneratorOptions {
+// --- Start: Exported DotGeneratorOptions Interface --- //
+export interface DotGeneratorOptions {
   title: string;
   // projectRoot: string; // No longer needed
   maxDepth?: number;

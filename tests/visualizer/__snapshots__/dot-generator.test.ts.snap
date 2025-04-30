@@ -1,0 +1,20 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DotGenerator should generate basic DOT output 1`] = `
+"digraph "Test Graph" {
+  graph [rankdir=LR, fontname="Arial", fontsize=12, overlap=scale, splines=true];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=10];
+  edge [color="#999999", fontname="Arial", fontsize=8];
+
+  "app" [label="App", tooltip="App: App", shape="doubleoctagon", fillcolor="#ff9896"];
+  "pageA" [label="PageA", tooltip="Page: PageA", shape="ellipse", fillcolor="#ffbb78"];
+  "compB" [label="CompB", tooltip="Component: CompB", shape="box", fillcolor="#bcbd22"];
+  "utilC" [label="UtilC", tooltip="Module: UtilC", shape="note", fillcolor="#aec7e8"];
+
+  "app" -> "pageA" [tooltip="Structure", color="#333333", penwidth="1.5", style="solid"];
+  "pageA" -> "compB" [tooltip="Structure", color="#333333", penwidth="1.5", style="solid"];
+  "pageA" -> "utilC" [tooltip="Import", color="#1f77b4", style="dashed"];
+  "compB" -> "utilC" [tooltip="Import", color="#1f77b4", style="dashed"];
+}
+"
+`;

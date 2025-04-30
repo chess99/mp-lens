@@ -71,9 +71,72 @@ describe('analyzeProject Integration Tests', () => {
     }
   });
 
+  // Test case for miniapp in a subdirectory
+  it('should handle miniapp in a subdirectory', async () => {
+    const subDirFixtureRoot = actualPath.resolve(
+      __dirname,
+      '../fixtures/miniapp-in-subdir/project-root',
+    );
+    const subDirMiniappPath = 'src'; // Relative path to the miniapp code
+
+    const options: AnalyzerOptions = {
+      ...defaultOptions,
+      miniappRoot: subDirMiniappPath,
+      entryContent: { pages: ['pages/page'] }, // Provide content to guide it
+      entryFile: undefined,
+    };
+
+    const expectedUnusedRelativePaths = ['unused.js'];
+    const expectedUnusedFiles = expectedUnusedRelativePaths.map((file) =>
+      actualPath.resolve(subDirFixtureRoot, subDirMiniappPath, file),
+    );
+
+    const { unusedFiles } = await analyzeProject(subDirFixtureRoot, options);
+
+    const sortedUnusedFiles = [...unusedFiles].sort();
+    const sortedExpectedUnused = [...expectedUnusedFiles].sort();
+
+    expect(sortedUnusedFiles).toEqual(sortedExpectedUnused);
+    // Add assertions that used files are not listed
+    expect(unusedFiles).not.toContain(
+      actualPath.resolve(subDirFixtureRoot, subDirMiniappPath, 'app.js'),
+    );
+    expect(unusedFiles).not.toContain(
+      actualPath.resolve(subDirFixtureRoot, subDirMiniappPath, 'app.json'),
+    );
+    expect(unusedFiles).not.toContain(
+      actualPath.resolve(subDirFixtureRoot, subDirMiniappPath, 'pages/page.js'),
+    );
+  });
+
+  // Test case for basic TypeScript project
+  it('should handle basic TypeScript project', async () => {
+    const tsFixtureRoot = actualPath.resolve(__dirname, '../fixtures/basic-ts');
+    const options: AnalyzerOptions = {
+      ...defaultOptions,
+      fileTypes: [...defaultOptions.fileTypes!, 'ts'], // Add ts
+      entryContent: { pages: ['pages/page'] }, // Provide content to guide it
+      entryFile: undefined,
+    };
+
+    const expectedUnusedRelativePaths = ['unused.ts'];
+    const expectedUnusedFiles = expectedUnusedRelativePaths.map((file) =>
+      actualPath.resolve(tsFixtureRoot, file),
+    );
+
+    const { unusedFiles } = await analyzeProject(tsFixtureRoot, options);
+
+    const sortedUnusedFiles = [...unusedFiles].sort();
+    const sortedExpectedUnused = [...expectedUnusedFiles].sort();
+
+    expect(sortedUnusedFiles).toEqual(sortedExpectedUnused);
+    // Add assertions that used files are not listed
+    expect(unusedFiles).not.toContain(actualPath.resolve(tsFixtureRoot, 'app.ts'));
+    expect(unusedFiles).not.toContain(actualPath.resolve(tsFixtureRoot, 'app.json'));
+    expect(unusedFiles).not.toContain(actualPath.resolve(tsFixtureRoot, 'pages/page.ts'));
+  });
+
   // Future tests could cover scenarios like:
-  // - Project with miniappRoot subdirectory
-  // - Project with TypeScript files
   // - Project using aliases
   // - Project with specific configurations (e.g., custom entry point)
 });

@@ -1,0 +1,2 @@
+// pages/page.ts
+Page({});
