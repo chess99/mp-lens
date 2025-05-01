@@ -45,35 +45,33 @@ describe('HtmlGeneratorPreact', () => {
 
     const generator = new HtmlGeneratorPreact(structure, reachableNodeIds, unusedFiles);
     const options: HtmlGeneratorOptions = { title: 'Test HTML' };
-    const outputPath = await generator.generate(options);
 
-    // Check that writeFileSync was called (generate now saves the file)
-    expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
-    const writtenHtml = mockWriteFileSync.mock.calls[0][1]; // Get the content written
+    // 修改这里：generate不再写入文件，只返回HTML内容
+    const generatedHtml = await generator.generate(options);
+
+    // 不再检查writeFileSync调用，直接验证返回的HTML内容
+    expect(generatedHtml).toBeDefined();
 
     // Verify HTML structure and embedded data
-    expect(writtenHtml).toContain('<title>Test HTML</title>');
-    expect(writtenHtml).toMatch(
+    expect(generatedHtml).toContain('<title>Test HTML</title>');
+    expect(generatedHtml).toMatch(
       /<script>[\s\S]*window\.__MP_LENS_DATA__\s*=\s*{.*}[\s\S]*;\s*<\/script>/,
     );
-    expect(writtenHtml).toMatch(
+    expect(generatedHtml).toMatch(
       /<script>[\s\S]*window\.__MP_LENS_GRAPH_DATA__\s*=\s*{.*}[\s\S]*;\s*<\/script>/,
     );
-    expect(writtenHtml).toMatch(
+    expect(generatedHtml).toMatch(
       /<script>[\s\S]*window\.__MP_LENS_UNUSED_FILES__\s*=\s*\[.*][\s\S]*;\s*<\/script>/,
     );
-    expect(writtenHtml).toMatch(
+    expect(generatedHtml).toMatch(
       /<script>[\s\S]*window\.__MP_LENS_TITLE__\s*=\s*".*"[\s\S]*;\s*<\/script>/,
     );
 
     // Check that assets were requested and included
     expect(AssetResolver.getJsAsset).toHaveBeenCalledWith('assets/main.js');
     expect(AssetResolver.getCssAsset).toHaveBeenCalledWith('assets/style.css');
-    expect(writtenHtml).toContain('// Mock JS Content');
-    expect(writtenHtml).toContain('/* Mock CSS Content */');
-
-    // Check that the returned path is the expected output path
-    expect(outputPath).toContain('mp-lens-graph.html');
+    expect(generatedHtml).toContain('// Mock JS Content');
+    expect(generatedHtml).toContain('/* Mock CSS Content */');
   });
 
   // Add more tests for options, different data structures etc.
