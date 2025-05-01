@@ -41,14 +41,29 @@ export function App({ data }: AppProps) {
   // State for the current view mode
   const [currentMode, setCurrentMode] = useState<'tree' | 'unusedFiles'>('tree');
 
-  // Callback for TreeView to update selected node AND ensure tree mode
+  // Callback for TreeView (left menu)
   const handleNodeSelect = (node: TreeNodeData) => {
     setSelectedNode(node);
-    setCurrentMode('tree'); // Already correctly sets tree mode
+    setCurrentMode('tree');
   };
 
   // Use the defined default structure
   const fullGraphData = window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure;
+
+  // *** NEW: Callback for DependencyGraph ***
+  const handleGraphNodeSelect = (nodeId: string) => {
+    // Use the state variable which has a default value
+    const nodeData = fullGraphData.nodes.find((n) => n.id === nodeId);
+    if (nodeData) {
+      console.log('[App] Graph node selected, updating state:', nodeId);
+      setSelectedNode(nodeData);
+      // Ensure we are in tree mode if a graph node is clicked
+      // (though technically it should only be visible in tree mode)
+      setCurrentMode('tree');
+    } else {
+      console.warn(`[App] Node data not found for ID: ${nodeId}`);
+    }
+  };
 
   // --- Read REAL Unused Files Data ---
   const realUnusedFiles = window.__MP_LENS_UNUSED_FILES__ || [];
@@ -134,7 +149,11 @@ export function App({ data }: AppProps) {
                   id: 'graph',
                   label: '依赖图',
                   content: (
-                    <DependencyGraph selectedNode={selectedNode} fullGraphData={fullGraphData} />
+                    <DependencyGraph
+                      selectedNode={selectedNode}
+                      fullGraphData={fullGraphData}
+                      onNodeSelect={handleGraphNodeSelect}
+                    />
                   ),
                 },
               ]}

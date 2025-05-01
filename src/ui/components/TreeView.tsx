@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { TreeNodeData, TreeViewProps } from '../types';
 
 // Define props for the recursive TreeNode component
@@ -101,6 +101,37 @@ function getAllExpandableNodeIds(node: TreeNodeData): Set<string> {
   return ids;
 }
 
+// *** NEW: Helper function to find ancestor IDs ***
+function findAncestorIds(targetId: string, rootNode: TreeNodeData): string[] {
+  const path: string[] = [];
+  function traverse(currentNode: TreeNodeData): boolean {
+    // Add current node to path temporarily
+    path.push(currentNode.id);
+
+    if (currentNode.id === targetId) {
+      // Found the target, path is complete (excluding target itself)
+      path.pop(); // Remove targetId from the path of ancestors
+      return true;
+    }
+
+    if (currentNode.children) {
+      for (const child of currentNode.children) {
+        if (traverse(child)) {
+          // Found in this subtree, keep path as is
+          return true;
+        }
+      }
+    }
+
+    // Not found in this subtree, backtrack
+    path.pop();
+    return false;
+  }
+
+  traverse(rootNode);
+  return path; // Return the collected ancestor IDs
+}
+
 // Main TreeView component - manages expansion state
 export function TreeView({
   data,
@@ -113,6 +144,28 @@ export function TreeView({
 
   // Calculate all expandable node IDs once
   const allExpandableIds = useMemo(() => getAllExpandableNodeIds(data), [data]);
+
+  // *** useEffect to expand ancestors when selectedNodeId changes ***
+  useEffect(() => {
+    if (selectedNodeId && data) {
+      // Find the path of ancestors for the selected node
+      const ancestors = findAncestorIds(selectedNodeId, data);
+      if (ancestors.length > 0) {
+        setExpandedNodes((prevExpanded) => {
+          const newExpanded = new Set(prevExpanded);
+          // Add all ancestors to the set
+          ancestors.forEach((id) => newExpanded.add(id));
+          // Avoid creating new set if no changes needed
+          if (ancestors.every((id) => prevExpanded.has(id))) {
+            return prevExpanded;
+          }
+          console.log('[TreeView] Expanding ancestors:', ancestors);
+          return newExpanded;
+        });
+      }
+    }
+    // Dependency: selectedNodeId (prop) and data (prop, unlikely to change but good practice)
+  }, [selectedNodeId, data]);
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes((prev) => {
