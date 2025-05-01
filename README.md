@@ -89,6 +89,8 @@ mp-lens graph --focus src/pages/home/index.js -o home-deps.html
 * `--focus <文件路径>`: 高亮显示与特定文件相关的依赖。
 * `--npm`: 在图中包含 `node_modules` 或 `miniprogram_npm` 中的依赖 (默认: true)。
 
+![依赖关系图示例](docs/images/dependency-graph-example.png)
+
 ### `clean`
 
 分析项目并删除未使用的文件。**⚠️ 使用此命令务必谨慎！**
@@ -133,6 +135,8 @@ mp-lens clean --delete --types js,wxml
 * `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
 * `--list`: **(推荐)** 只列出将被删除的文件，不实际执行任何操作。
 * `--delete`: **(谨慎使用)** 跳过交互式确认步骤，直接删除文件。
+
+![清理未使用文件示例](docs/images/clean-unused-files-example.png)
 
 ## 与Knip集成检测未使用的文件和组件
 
