@@ -272,6 +272,23 @@ body {
 
 /* Placeholder */
 .graph-container {
+  width: 100%;
+  height: 100%;
+  background-color: #fafafa;
+  z-index: 1;
+}
+
+/* Style for interactive graph nodes */
+.graph-container g.node {
+  cursor: pointer; /* Ensure nodes have pointer cursor */
+}
+
+/* Ensure labels within nodes also have pointer cursor */
+.graph-container g.node text {
+  cursor: pointer;
+}
+
+.graph-placeholder {
   min-height: 300px;
   border: 1px dashed #ccc;
   display: flex;

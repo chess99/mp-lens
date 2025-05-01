@@ -72,12 +72,14 @@ export function DependencyGraph({
         shadowOffsetX: 0,
         shadowOffsetY: 5,
         radius: 4, // Ensure consistent radius
+        cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
       },
       // Add label config for center node if needed (e.g., bold)
       labelCfg: {
         style: {
           fontWeight: 'bold',
           fontSize: 13,
+          cursor: 'pointer',
         },
       },
       nodeType: node.type, // Keep for potential future use or tooltip
@@ -100,6 +102,7 @@ export function DependencyGraph({
             stroke: getBorderColorByType(targetNode.type),
             lineWidth: 1, // Standard border
             radius: 4,
+            cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
           },
           nodeType: targetNode.type,
           properties: targetNode.properties,
@@ -131,6 +134,7 @@ export function DependencyGraph({
             stroke: getBorderColorByType(sourceNode.type),
             lineWidth: 1,
             radius: 4,
+            cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
           },
           nodeType: sourceNode.type,
           properties: sourceNode.properties,
@@ -211,12 +215,14 @@ export function DependencyGraph({
             lineWidth: 1,
             fill: '#f5f5f5',
             stroke: '#e0e0e0',
+            cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
           },
           // Default label config
           labelCfg: {
             style: {
               fill: '#333',
               fontSize: 11,
+              cursor: 'pointer',
             },
           },
         },
@@ -239,6 +245,7 @@ export function DependencyGraph({
             style: {
               fill: '#666',
               fontSize: 9,
+              cursor: 'default', // Keep default cursor for edge labels
               background: {
                 fill: '#fff',
                 stroke: '#efefef',
@@ -254,6 +261,7 @@ export function DependencyGraph({
             shadowColor: 'rgba(64,158,255,0.4)',
             shadowBlur: 10,
             stroke: '#40a9ff', // Highlight border on hover
+            cursor: 'pointer', // Ensure pointer cursor on hover
           },
           // Add styles for the 'selected' state if needed
         },

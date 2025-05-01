@@ -5,7 +5,7 @@
 [![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 [![构建状态](https://img.shields.io/travis/com/chess99/mp-lens.svg?style=flat)](https://travis-ci.com/chess99/mp-lens) <!-- CI/CD占位符 -->
 
-**mp-lens** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系、分析包大小（未来）并安全地移除未使用的文件。
+**mp-lens** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系、分析包大小并安全地移除未使用的文件。
 
 是否厌倦了臃肿的项目体积，以及手动寻找未使用的组件、页面、图片或工具函数的繁琐过程？ `mp-lens` 会扫描你的项目，构建依赖图，并找出可以安全移除的孤立文件。
 
@@ -22,19 +22,6 @@
   * 支持 Glob 模式，可在分析和清理时**排除**特定的文件或目录。
 * **可配置:** 可通过命令行选项快速执行任务，也支持通过配置文件进行更复杂的设置。
 * **使用 TypeScript 构建:** 类型安全，易于维护。
-
-## 与Knip集成检测未使用的文件和组件
-
-mp-lens 提供了与 [Knip](https://knip.dev) 的集成支持，帮助你检测小程序项目中未使用的文件、组件和死代码。
-
-与mp-lens的文件级别分析不同，Knip能深入分析模块内部，找出未使用的导出（exports）、函数和变量，从而实现更加精细的代码清理。
-
-```bash
-# 安装依赖
-npm install --save-dev mp-lens knip
-```
-
-详细的集成指南和配置示例请查看 [mp-lens与Knip集成文档](docs/knip-integration.md)。
 
 ## 🚀 安装
 
@@ -146,6 +133,19 @@ mp-lens clean --delete --types js,wxml
 * `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
 * `--list`: **(推荐)** 只列出将被删除的文件，不实际执行任何操作。
 * `--delete`: **(谨慎使用)** 跳过交互式确认步骤，直接删除文件。
+
+## 与Knip集成检测未使用的文件和组件
+
+mp-lens 提供了与 [Knip](https://knip.dev) 的集成支持，帮助你检测小程序项目中未使用的文件、组件和死代码。
+
+与mp-lens的文件级别分析不同，Knip能深入分析模块内部，找出未使用的导出（exports）、函数和变量，从而实现更加精细的代码清理。
+
+```bash
+# 安装依赖
+npm install --save-dev mp-lens knip
+```
+
+详细的集成指南和配置示例请查看 [mp-lens与Knip集成文档](docs/knip-integration.md)。
 
 ## ⚙️ Configuration File
 
