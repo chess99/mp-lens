@@ -12,11 +12,30 @@
 export function parseWxml(text: string, _filePath: string): string {
   const results: string[] = [];
   try {
+    const normalizePath = (p: string): string => {
+      if (
+        !p ||
+        p.startsWith('/') ||
+        p.startsWith('./') ||
+        p.startsWith('../') ||
+        /^(http|https|data):/.test(p) ||
+        /{{.*?}}/.test(p)
+      ) {
+        return p;
+      }
+      return './' + p;
+    };
+
     // Match image sources
     const imgRegex = /<image[^>]+src=["']([^"']+)["']/g;
     let match: RegExpExecArray | null = imgRegex.exec(text);
     while (match) {
-      results.push(`import '${match[1]}'`);
+      const rawPath = match[1];
+      const normalized = normalizePath(rawPath);
+      if (normalized && !/{{.*?}}/.test(normalized) && !/^(data|http|https):/.test(normalized)) {
+        // Re-check after normalization
+        results.push(`import '${normalized}'`);
+      }
       match = imgRegex.exec(text);
     }
 
@@ -24,7 +43,11 @@ export function parseWxml(text: string, _filePath: string): string {
     const importRegex = /<import\s+src=["']([^"']+)["']/g;
     match = importRegex.exec(text);
     while (match) {
-      results.push(`import '${match[1]}'`);
+      const rawPath = match[1];
+      const normalized = normalizePath(rawPath);
+      if (normalized) {
+        results.push(`import '${normalized}'`);
+      }
       match = importRegex.exec(text);
     }
 
@@ -32,7 +55,11 @@ export function parseWxml(text: string, _filePath: string): string {
     const includeRegex = /<include\s+src=["']([^"']+)["']/g;
     match = includeRegex.exec(text);
     while (match) {
-      results.push(`import '${match[1]}'`);
+      const rawPath = match[1];
+      const normalized = normalizePath(rawPath);
+      if (normalized) {
+        results.push(`import '${normalized}'`);
+      }
       match = includeRegex.exec(text);
     }
 
@@ -40,7 +67,11 @@ export function parseWxml(text: string, _filePath: string): string {
     const wxsRegex = /<wxs\s+src=["']([^"']+)["']/g;
     match = wxsRegex.exec(text);
     while (match) {
-      results.push(`import '${match[1]}'`);
+      const rawPath = match[1];
+      const normalized = normalizePath(rawPath);
+      if (normalized) {
+        results.push(`import '${normalized}'`);
+      }
       match = wxsRegex.exec(text);
     }
 
@@ -90,4 +121,14 @@ export function parseWxs(text: string, _filePath: string): string {
   } catch {
     return '';
   }
+}
+
+// We don't parse JSON files in the compiler because:
+// 1. When a component path is referenced (e.g. "./foobar"), we can't determine if it's:
+//    - "./foobar.json" (single file) or
+//    - "./foobar/index.json" (directory)
+// 2. The only purpose of this JSON compiler is to make getCompilerExtensions include
+//    JSON files as project files, so they can be analyzed for usage
+export function parseJson(text: string): string {
+  return text;
 }

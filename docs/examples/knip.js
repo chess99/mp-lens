@@ -13,7 +13,13 @@
  * - mp-lens 文档: https://github.com/chess99/mp-lens
  */
 
-const { findMiniProgramEntryPoints, parseWxml, parseWxs, parseWxss } = require('mp-lens');
+const {
+  findMiniProgramEntryPoints,
+  parseWxml,
+  parseWxs,
+  parseWxss,
+  parseJson,
+} = require('mp-lens');
 const path = require('path');
 
 // 配置小程序源码目录路径
@@ -55,6 +61,7 @@ const config = async () => {
       wxml: parseWxml, // 解析WXML文件中的依赖关系
       wxss: parseWxss, // 解析WXSS文件中的样式导入
       wxs: parseWxs, // 解析WXS文件中的模块导入
+      json: parseJson, // 将JSON文件纳入Knip分析范围，mp-lens在项目整体分析时处理其内部依赖。
     },
     // 忽略构建输出、node_modules 等
     ignore: [

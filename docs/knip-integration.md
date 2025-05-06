@@ -45,7 +45,7 @@ yarn add --dev mp-lens knip
 
 ```javascript
 // 参考示例位于 docs/examples/knip.js
-const { findMiniProgramEntryPoints, parseWxml, parseWxs, parseWxss } = require('mp-lens');
+const { findMiniProgramEntryPoints, parseWxml, parseWxs, parseWxss, parseJson } = require('mp-lens');
 const path = require('path');
 
 // 配置小程序源码目录
@@ -77,6 +77,7 @@ const config = async () => {
       wxml: parseWxml,
       wxss: parseWxss,
       wxs: parseWxs,
+      json: parseJson,
     },
     // 忽略输出和依赖目录
     ignore: [
@@ -122,11 +123,12 @@ npm run find-unused
 
 ### 自定义编译器
 
-mp-lens 提供了三个主要的小程序文件解析器：
+mp-lens 提供了以下主要的小程序文件解析器：
 
 - `parseWxml`: 解析WXML文件中的依赖关系（image src、template import、include、wxs模块）
 - `parseWxss`: 解析WXSS文件中的样式导入（@import语句）
 - `parseWxs`: 解析WXS文件中的模块导入（require语句）
+- `parseJson`: 解析JSON文件中的依赖关系，例如 `app.json` 中的页面和分包路径，页面或组件 `*.json` 文件中的 `usingComponents` 等。
 
 这些解析器帮助 Knip 正确理解小程序特有的文件类型并跟踪它们的依赖关系。
 
