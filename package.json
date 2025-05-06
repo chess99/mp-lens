@@ -1,6 +1,6 @@
 {
   "name": "mp-lens",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "微信小程序分析工具 (Unused Code, Dependencies, Visualization)",
   "main": "dist/cli/index.js",
   "types": "dist/cli/index.d.ts",
