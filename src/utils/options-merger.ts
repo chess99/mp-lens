@@ -67,14 +67,15 @@ export function mergeOptions(
     delete merged.excludePatterns;
   }
 
-  // NEW: Handle keepAssets array
-  if (cliOptions.keepAssets !== undefined && Array.isArray(cliOptions.keepAssets)) {
-    merged.keepAssets = cliOptions.keepAssets;
-  } else if (fileConf?.keepAssets && !merged.keepAssets) {
-    merged.keepAssets = fileConf.keepAssets;
+  // Handle includeAssets boolean
+  if (cliOptions.includeAssets !== undefined) {
+    merged.includeAssets = Boolean(cliOptions.includeAssets);
+  } else if (fileConf?.includeAssets !== undefined) {
+    merged.includeAssets = Boolean(fileConf.includeAssets);
+  } else {
+    // Default to false - don't include assets by default
+    merged.includeAssets = false;
   }
-  // Ensure keepAssets is always an array (even if empty)
-  merged.keepAssets = merged.keepAssets || [];
 
   // 2. Essential Files
   let essentialFilesFromCliOrConfig: string[] = [];
@@ -89,8 +90,8 @@ export function mergeOptions(
       typeof essentialFilesSource === 'string'
         ? essentialFilesSource.split(',').map((f) => f.trim())
         : Array.isArray(essentialFilesSource)
-        ? essentialFilesSource
-        : []; // Default to empty array if invalid type
+          ? essentialFilesSource
+          : []; // Default to empty array if invalid type
   }
 
   // Resolve paths from CLI/Config

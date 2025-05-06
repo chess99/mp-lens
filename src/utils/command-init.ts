@@ -23,7 +23,7 @@ interface CommandExecutionContext {
   exclude: string[];
   essentialFilesList: string[];
   fileTypes: string[];
-  keepAssets: string[];
+  includeAssets: boolean;
 }
 
 // Default file types list (consistent and comprehensive)
@@ -62,7 +62,7 @@ export async function initializeCommandContext(
   const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
   const fileTypesString = mergedConfig.types ?? DEFAULT_FILE_TYPES;
   const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
-  const keepAssets = mergedConfig.keepAssets ?? [];
+  const includeAssets = mergedConfig.includeAssets ?? false;
 
   // Basic logging (can be expanded)
   logger.info(`Project path: ${projectRoot}`);
@@ -79,6 +79,6 @@ export async function initializeCommandContext(
     exclude,
     essentialFilesList,
     fileTypes,
-    keepAssets,
+    includeAssets,
   };
 }

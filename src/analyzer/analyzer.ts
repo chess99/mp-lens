@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as glob from 'glob';
-import { minimatch } from 'minimatch';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
@@ -370,7 +369,7 @@ export async function analyzeProject(
     entryFile,
     entryContent,
     essentialFiles = [],
-    keepAssets = [],
+    includeAssets = false,
   } = options;
 
   logger.debug('Project Root:', trueProjectRoot);
@@ -392,7 +391,7 @@ export async function analyzeProject(
   }
   logger.debug('MiniApp Root:', actualMiniappRoot);
   logger.debug('Exclude patterns:', excludePatterns);
-  logger.debug('Keep assets patterns:', keepAssets);
+  logger.debug('Include assets in cleanup:', includeAssets);
   logger.debug('Essential files:', essentialFiles);
 
   // --- Resolve App.json --- //
@@ -486,7 +485,7 @@ export async function analyzeProject(
     projectStructure,
     trueProjectRoot,
     reachableNodeIds, // <-- Pass calculated reachable nodes
-    keepAssets,
+    includeAssets,
   );
 
   return {
@@ -504,7 +503,7 @@ function findUnusedFiles(
   structure: ProjectStructure,
   projectRoot: string,
   reachableNodeIds: Set<string>, // <-- Receive reachable nodes
-  keepAssetsPatterns: string[] = [],
+  includeAssets: boolean = false,
 ): string[] {
   // --- Step 1: Determine Unused FILES --- //
   const allModuleNodes = structure.nodes.filter((n) => n.type === 'Module');
@@ -513,22 +512,22 @@ function findUnusedFiles(
     .map((node) => node.properties?.absolutePath as string | undefined)
     .filter((filePath): filePath is string => !!filePath);
 
-  // --- Step 2: Filter out files matching keepAssets patterns --- //
-  if (keepAssetsPatterns.length > 0) {
-    logger.debug(
-      `Filtering unused files against keepAssets patterns: ${keepAssetsPatterns.join(', ')}`,
-    );
+  // --- Step 2: Filter out asset files unless includeAssets is true --- //
+  if (!includeAssets) {
+    const assetExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg'];
+    logger.debug(`Filtering out asset files with extensions: ${assetExtensions.join(', ')}`);
+
     unusedFiles = unusedFiles.filter((absolutePath) => {
-      const relativePath = path.relative(projectRoot, absolutePath);
-      const shouldKeep = keepAssetsPatterns.some((pattern) => minimatch(relativePath, pattern));
-      if (shouldKeep) {
-        logger.verbose(
-          `Keeping file due to keepAssets match (${relativePath} matches ${keepAssetsPatterns.find(
-            (p) => minimatch(relativePath, p),
-          )}): ${absolutePath}`,
-        );
+      const fileExt = path.extname(absolutePath).toLowerCase();
+      const isAsset = assetExtensions.includes(fileExt);
+
+      if (isAsset) {
+        const relativePath = path.relative(projectRoot, absolutePath);
+        logger.verbose(`Keeping asset file (assets are excluded by default): ${relativePath}`);
       }
-      return !shouldKeep;
+
+      // Keep the file in the unused list only if it's NOT an asset or if we explicitly want to include assets
+      return !isAsset;
     });
   }
 

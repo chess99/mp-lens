@@ -119,6 +119,7 @@ program
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
   .option('--list', '只列出将被删除的文件，不执行任何操作', false)
   .option('--delete', '直接删除文件，不进行确认提示', false)
+  .option('--includeAssets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
   .action(async (cmdOptions) => {
     const globalOptions = program.opts();
     setupLogger(globalOptions);

@@ -161,21 +161,17 @@ npm install --save-dev mp-lens knip
 {
   "miniappRoot": "src",
   "entryFile": "app.json",
-  "types": "js,ts,wxml,wxss,json,png,jpg",
-  "excludePatterns": [
+  "types": "js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg",
+  "exclude": [
     "**/node_modules/**",
-    "**/mock/**",
-    "dist/**",
-    "**/*.spec.ts"
+    "**/miniprogram_npm/**",
+    "**/*.mock.js"
   ],
   "essentialFiles": [
     "utils/init.js", // 这个文件总是被认为是必需的
     "config/theme.json"
   ],
-  "keepAssets": [
-    "images/dynamic-icons/*", // 保留所有动态加载的图标
-    "assets/vendor/**/*.png"  // 保留特定 vendor 目录下的所有 PNG
-  ]
+  "includeAssets": false // 默认不清理图片等资源文件
 }
 ```
 
@@ -186,7 +182,7 @@ npm install --save-dev mp-lens knip
 * `types`: (字符串) 要分析的文件扩展名列表，用逗号分隔。
 * `excludePatterns` 或 `exclude`: (字符串数组) 要排除的文件/目录的 Glob 模式列表。
 * `essentialFiles`: (字符串数组) 应始终被视为必需的文件路径列表（相对于 `miniappRoot`），这些文件永远不会被报告为未使用或被清理。
-* `keepAssets`: (字符串数组, 新增) Glob 模式列表，用于匹配那些**不应**被报告为未使用或被清理的文件。这对于静态分析可能无法检测到的动态加载资源（例如，来自后端 API 的图片路径）或特殊处理的文件非常有用。即使分析器没有找到这些文件的直接引用，它们也会被保留。
+* `includeAssets`: (布尔值) 是否在清理和报告中包含图片等资源文件(.png, .jpg, .jpeg, .gif, .svg)。默认为 false，表示这些资源文件不会被报告为未使用或被清理。设置为 true 表示显式包含这些资源文件在分析和清理范围内。
 * `aliases`: (对象) 路径别名配置，用于解析模块导入（通常从 `tsconfig.json` 或 `jsconfig.json` 自动加载）。
 
 ## 🤝 贡献

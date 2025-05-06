@@ -51,15 +51,11 @@ module.exports = {
   ],
 
   /**
-   * [可选] Glob 模式列表，用于匹配那些不应被报告为未使用或被清理的文件。
-   * 主要用于静态分析无法可靠检测到的动态加载资源（如来自 API 的图片）。
-   * 即使分析器没有找到这些文件的直接静态引用，它们也会被保留。
-   * 例: ["images/dynamic-icons/*", "assets/vendor/**/*.png"]
+   * [可选] 是否在清理和报告中包含图片等资源文件(.png, .jpg, .jpeg, .gif, .svg)。
+   * 默认值: false - 资源文件不会被报告为未使用或被清理。
+   * 设置为 true 表示显式包含这些资源文件在分析和清理范围内。
    */
-  keepAssets: [
-    'images/from-backend/**',
-    'assets/vendor/**/*.png',
-  ],
+  includeAssets: false,
 
   /**
    * [可选] 路径别名配置，用于解析模块导入。

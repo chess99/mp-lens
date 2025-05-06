@@ -52,7 +52,7 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     exclude,
     essentialFilesList,
     fileTypes, // Use fileTypes calculated by init
-    keepAssets, // Use keepAssets calculated by init
+    includeAssets, // Use includeAssets calculated by init
   } = await initializeCommandContext(rawOptions, 'clean');
 
   // === Extract Clean-Specific Options ===
@@ -81,7 +81,7 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       miniappRoot,
       entryFile,
       entryContent: cleanConfig.entryContent,
-      keepAssets,
+      includeAssets,
     });
 
     if (unusedFiles.length === 0) {

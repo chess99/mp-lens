@@ -64,7 +64,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
     exclude,
     essentialFilesList,
     fileTypes,
-    keepAssets,
+    includeAssets,
   } = context;
   // Use the specific GraphOptions type for mergedConfig
   const mergedConfig: GraphOptions = context.mergedConfig as GraphOptions;
@@ -105,7 +105,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       miniappRoot,
       entryFile,
       entryContent: mergedConfig.entryContent, // Correctly typed access
-      keepAssets,
+      includeAssets,
     });
 
     logger.info('Rendering graph...');
