@@ -59,6 +59,11 @@ export class WXMLParser {
       if (match[1]) {
         const importPath = match[1];
 
+        if (importPath.includes('{{')) {
+          logger.trace(`Skipping dynamic import/include path: ${importPath} in ${filePath}`);
+          continue;
+        }
+
         // Handle root-relative paths explicitly for <import> and <include>
         if (importPath.startsWith('/')) {
           // Use PathResolver.resolveAnyPath for consistency, treating it as non-relative.
@@ -100,6 +105,12 @@ export class WXMLParser {
     while ((match = wxsRegex.exec(content)) !== null) {
       if (match[1]) {
         const wxsPath = match[1];
+
+        if (wxsPath.includes('{{')) {
+          logger.trace(`Skipping dynamic wxs path: ${wxsPath} in ${filePath}`);
+          continue;
+        }
+
         // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
         const normalizedPath =
           wxsPath.startsWith('/') || wxsPath.startsWith('.') ? wxsPath : './' + wxsPath;
@@ -125,7 +136,21 @@ export class WXMLParser {
 
     matches.forEach((match) => {
       const src = match[1];
-      if (!src || /{{.*?}}/.test(src) || /^data:/.test(src) || /^(http|https):/.test(src)) {
+      if (!src || src.includes('{{') || /^data:/.test(src) || /^(http|https):/.test(src)) {
+        let reason = 'empty';
+        if (src) {
+          // src is not empty, determine other reason
+          if (src.includes('{{')) {
+            reason = 'dynamic (contains {{)';
+          } else if (/^data:/.test(src)) {
+            reason = 'data URI';
+          } else if (/^(http|https):/.test(src)) {
+            reason = 'HTTP/HTTPS URL';
+          }
+        }
+        logger.trace(
+          `Skipping image src resolution for '${src}' in file '${filePath}'. Reason: ${reason}.`,
+        );
         return;
       }
 

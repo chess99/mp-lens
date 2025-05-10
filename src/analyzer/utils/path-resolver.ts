@@ -42,6 +42,12 @@ export class PathResolver {
       )}]`,
     );
 
+    // Rule 0: Handle data URIs and remote URLs
+    if (/^data:/.test(importPath) || /^(http|https|\/\/):/.test(importPath)) {
+      logger.trace(`Skipping resolution for data URI or remote URL: ${importPath}`);
+      return null;
+    }
+
     if (this.isNpmPackageImport(importPath)) {
       logger.trace(`Skipping resolution for npm package import: ${importPath}`);
       return null;
@@ -233,24 +239,17 @@ export class PathResolver {
     }
 
     // Basic check: if it doesn't start with '.', '/', or match an alias, it *might* be an npm package.
-    // However, this is unreliable (could be implicit root relative).
-    // We return false here and let resolveAnyPath handle non-alias, non-relative paths
-    // by trying to resolve them relative to the project root.
-    // A more robust solution might involve checking node_modules, but that's out of scope.
     if (
       !importPath.startsWith('.') &&
       !importPath.startsWith('/') &&
       !this.isAliasPath(importPath)
     ) {
-      // Let's be conservative and assume it's NOT an npm package for now,
-      // allowing resolution attempts relative to the root.
-      // A truly external npm package won't resolve on the filesystem anyway.
       logger.trace(
-        `Path '${importPath}' is non-relative, non-absolute, non-alias. Treating as potentially root-relative.`,
+        `Path '${importPath}' is non-relative, non-absolute, non-alias. Considering as NPM package.`,
       );
-      return false;
+      return true; // MODIFIED: Was false, now true for paths like 'lodash'
     }
 
-    return false; // Default to false if none of the above conditions met
+    return false; // Default to false if none of the above conditions met (e.g. relative paths)
   }
 }
