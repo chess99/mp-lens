@@ -135,14 +135,24 @@ program
 
 // lint command
 program
-  .command('lint')
+  .command('lint [path]')
   .description('分析小程序项目中组件声明与使用的一致性')
-  .argument('[path]', '可选，指定要分析的文件或目录路径')
-  .action(async (path, cmdOptions) => {
+  .option('--fix', '自动修复JSON文件中"声明但未使用"的问题')
+  .action(async (...actionArgs: any[]) => {
+    const path: string | undefined = actionArgs[0] as string | undefined;
+    const cmdOptions: { fix?: boolean } = actionArgs[1] || {};
+
     const globalOptions = program.opts();
+    const rawOptions = {
+      ...globalOptions,
+      ...cmdOptions,
+      path: path,
+      fix: !!cmdOptions.fix,
+    };
+
     setupLogger(globalOptions);
     try {
-      await lint({ ...globalOptions, ...cmdOptions, path });
+      await lint(rawOptions);
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);

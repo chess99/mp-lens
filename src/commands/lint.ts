@@ -365,6 +365,100 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
 }
 
 /**
+ * Applies auto-fixes for "declared but not used" components based on lint results.
+ *
+ * @param result The lint result containing issues to fix.
+ * @param projectRoot The absolute path to the project root.
+ */
+async function applyLintFixes(result: LintResult, projectRoot: string): Promise<void> {
+  if (result.issues.length === 0) {
+    logger.info('\nNo issues found, nothing to fix.');
+    return;
+  }
+
+  logger.info('\nAttempting to apply auto-fixes for "declared but not used" components...');
+  let totalFilesModified = 0;
+  let totalComponentsRemoved = 0;
+
+  for (const issue of result.issues) {
+    if (issue.declaredNotUsed.length > 0) {
+      let jsonData;
+      const jsonFilePath = issue.jsonFile;
+      const relativeJsonPath = path.relative(projectRoot, jsonFilePath);
+
+      try {
+        const jsonContentStr = fs.readFileSync(jsonFilePath, 'utf-8');
+        jsonData = JSON.parse(jsonContentStr);
+      } catch (parseError: any) {
+        logger.error(
+          `Error parsing ${relativeJsonPath} for fix: ${parseError.message}. Skipping this file.`,
+        );
+        continue;
+      }
+
+      let modifiedInThisFile = false;
+      let removalsInThisFile = 0;
+
+      for (const compSpec of issue.declaredNotUsed) {
+        const tagToRemove = compSpec.componentTag;
+        let tagWasRemoved = false;
+
+        if (
+          jsonData.usingComponents &&
+          Object.prototype.hasOwnProperty.call(jsonData.usingComponents, tagToRemove)
+        ) {
+          delete jsonData.usingComponents[tagToRemove];
+          logger.info(
+            `  [Fixed] Removed '${tagToRemove}' from usingComponents in ${relativeJsonPath}`,
+          );
+          tagWasRemoved = true;
+        }
+
+        if (
+          jsonData.componentGenerics &&
+          Object.prototype.hasOwnProperty.call(jsonData.componentGenerics, tagToRemove)
+        ) {
+          delete jsonData.componentGenerics[tagToRemove];
+          if (!tagWasRemoved) {
+            logger.info(
+              `  [Fixed] Removed '${tagToRemove}' from componentGenerics in ${relativeJsonPath}`,
+            );
+          }
+          tagWasRemoved = true;
+        }
+
+        if (tagWasRemoved) {
+          removalsInThisFile++;
+        }
+      }
+
+      if (removalsInThisFile > 0) {
+        modifiedInThisFile = true;
+        totalComponentsRemoved += removalsInThisFile;
+      }
+
+      if (modifiedInThisFile) {
+        try {
+          fs.writeFileSync(jsonFilePath, JSON.stringify(jsonData, null, 2) + '\n');
+          totalFilesModified++;
+        } catch (writeError: any) {
+          logger.error(`Error writing fixes to ${relativeJsonPath}: ${writeError.message}`);
+        }
+      }
+    }
+  }
+
+  if (totalComponentsRemoved > 0) {
+    logger.info(
+      `\nAuto-fixing complete. Removed ${totalComponentsRemoved} unused component references across ${totalFilesModified} files.`,
+    );
+  } else {
+    logger.info('\nNo "declared but not used" components found to auto-fix.');
+  }
+  logger.info('It is recommended to re-run lint to verify changes and check for other issues.');
+}
+
+/**
  * Main lint command implementation (now uses initializeCommandContext)
  */
 export async function lint(rawOptions: any): Promise<void> {
@@ -411,4 +505,9 @@ export async function lint(rawOptions: any): Promise<void> {
     );
   }
   generateReport(result, miniappRootAbs, projectRoot);
+
+  // Apply fixes if --fix is enabled
+  if (rawOptions.fix) {
+    await applyLintFixes(result, projectRoot);
+  }
 }
