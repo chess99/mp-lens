@@ -23,9 +23,7 @@ async function readGlobalComponents(
 ): Promise<Record<string, string>> {
   try {
     const appJsonPath = path.join(
-      miniappRoot
-        ? path.join(pathResolver['projectRoot'], miniappRoot)
-        : pathResolver['projectRoot'],
+      miniappRoot ? miniappRoot : pathResolver['projectRoot'],
       'app.json',
     );
 
@@ -105,7 +103,7 @@ async function processDirectory(
   projectRoot: string, // absolute path
 ): Promise<void> {
   try {
-    logger.info(`Processing directory: ${dirPath}`);
+    logger.info(`正在处理目录: ${dirPath}`);
     const files = fs.readdirSync(dirPath);
     const wxmlFiles = files.filter((file) => path.extname(file) === '.wxml');
     for (const wxmlFile of wxmlFiles) {
@@ -260,12 +258,12 @@ async function processWholeProject(
   miniappRoot: string, // absolute path
 ): Promise<void> {
   try {
-    logger.info('Processing whole project...');
+    logger.info('正在处理整个项目...');
     const projectAnalysis = await analyzeProject(projectRoot, options);
     const nodes = projectAnalysis.projectStructure.nodes.filter(
       (node) => node.type === 'Page' || node.type === 'Component',
     );
-    logger.info(`Found ${nodes.length} pages/components to analyze`);
+    logger.info(`发现 ${nodes.length} 个页面/组件需要分析`);
     for (const node of nodes) {
       const basePath = node.properties?.basePath;
       if (!basePath) continue;
@@ -295,11 +293,11 @@ async function processWholeProject(
  */
 function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: string): void {
   const sep = '─'.repeat(60);
-  console.log('\nComponent Usage Analysis Results:');
+  console.log('\n组件使用情况分析结果:');
   console.log('================================\n');
 
   if (result.issues.length === 0) {
-    console.log(chalk.green('✓ No issues found. All component declarations match usage.'));
+    console.log(chalk.green('✓ 未发现问题。所有组件声明均与使用情况匹配。'));
   } else {
     for (const issue of result.issues) {
       // Print block header
@@ -311,7 +309,7 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
       if (issue.declaredNotUsed.length > 0) {
         const jsonPath = projectRoot ? path.relative(projectRoot, issue.jsonFile) : issue.jsonFile;
         console.log(jsonPath);
-        console.log('  Declared but not used in WXML:');
+        console.log('  已在 JSON 中声明但在 WXML 中未使用:');
         for (const component of issue.declaredNotUsed) {
           console.log(chalk.yellow(`    - ${component.componentTag}`));
         }
@@ -321,7 +319,7 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
       if (issue.usedNotDeclared.length > 0) {
         const wxmlPath = projectRoot ? path.relative(projectRoot, issue.wxmlFile) : issue.wxmlFile;
         console.log(wxmlPath);
-        console.log('  Used in WXML but not declared in JSON:');
+        console.log('  已在 WXML 中使用但在 JSON 中未声明:');
         for (const component of issue.usedNotDeclared) {
           console.log(chalk.red(`    - ${component.componentTag}`));
         }
@@ -329,38 +327,26 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
       }
     }
     // Summary
-    console.log(chalk.blue('Summary:'));
-    console.log(chalk.blue(`  - Files Scanned: ${result.summary.filesScanned}`));
-    console.log(chalk.blue(`  - Files with issues: ${result.summary.filesWithIssues}`));
-    console.log(
-      chalk.blue(
-        `  - Total 'Declared but not used': ${result.summary.declaredNotUsedCount} instances`,
-      ),
-    );
-    console.log(
-      chalk.blue(
-        `  - Total 'Used but not declared': ${result.summary.usedNotDeclaredCount} instances`,
-      ),
-    );
+    console.log(chalk.blue('总结:'));
+    console.log(chalk.blue(`  - 已扫描文件数: ${result.summary.filesScanned}`));
+    console.log(chalk.blue(`  - 存在问题的文件数: ${result.summary.filesWithIssues}`));
+    console.log(chalk.blue(`  - "已声明但未使用"总数: ${result.summary.declaredNotUsedCount}处`));
+    console.log(chalk.blue(`  - "已使用但未声明"总数: ${result.summary.usedNotDeclaredCount}处`));
     // Tips
-    console.log(chalk.cyan('\nTips for resolution:'));
+    console.log(chalk.cyan('\n解决建议:'));
     console.log(
       chalk.cyan(
-        '  - For "Declared but not used": Remove the component entry from the \'usingComponents\' section in the .json file.',
+        '  - 对于"已声明但未使用"的情况: 请从 .json 文件的 \'usingComponents\' 部分移除相应的组件条目。',
       ),
     );
-    console.log(chalk.cyan('  - For "Used but not declared":'));
-    console.log(chalk.cyan('    1. Ensure the tag in .wxml is not a typo.'));
+    console.log(chalk.cyan('  - 对于"已使用但未声明"的情况:'));
+    console.log(chalk.cyan('    1. 请检查 .wxml 中的标签是否拼写错误。'));
     console.log(
       chalk.cyan(
-        "    2. If it's a valid custom component, add it to 'usingComponents' in the .json file with the correct path.",
+        "    2. 如果是有效的自定义组件, 请将其以正确的路径添加到 .json 文件的 'usingComponents' 中。",
       ),
     );
-    console.log(
-      chalk.cyan(
-        '    3. Ensure you have a comprehensive list of native WXML tags if you are manually checking.',
-      ),
-    );
+    console.log(chalk.cyan('    3. 如果您正在手动检查, 请确保您有一份全面的原生 WXML 标签列表。'));
   }
 }
 
@@ -372,11 +358,11 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
  */
 async function applyLintFixes(result: LintResult, projectRoot: string): Promise<void> {
   if (result.issues.length === 0) {
-    logger.info('\nNo issues found, nothing to fix.');
+    logger.info('\n未发现问题，无需修复。');
     return;
   }
 
-  logger.info('\nAttempting to apply auto-fixes for "declared but not used" components...');
+  logger.info('\n尝试自动修复"已声明但未使用"的组件...');
   let totalFilesModified = 0;
   let totalComponentsRemoved = 0;
 
@@ -409,7 +395,7 @@ async function applyLintFixes(result: LintResult, projectRoot: string): Promise<
         ) {
           delete jsonData.usingComponents[tagToRemove];
           logger.info(
-            `  [Fixed] Removed '${tagToRemove}' from usingComponents in ${relativeJsonPath}`,
+            `  [已修复] 已从 ${relativeJsonPath} 的 usingComponents 中移除 '${tagToRemove}'`,
           );
           tagWasRemoved = true;
         }
@@ -421,7 +407,7 @@ async function applyLintFixes(result: LintResult, projectRoot: string): Promise<
           delete jsonData.componentGenerics[tagToRemove];
           if (!tagWasRemoved) {
             logger.info(
-              `  [Fixed] Removed '${tagToRemove}' from componentGenerics in ${relativeJsonPath}`,
+              `  [已修复] 已从 ${relativeJsonPath} 的 componentGenerics 中移除 '${tagToRemove}'`,
             );
           }
           tagWasRemoved = true;
@@ -450,12 +436,12 @@ async function applyLintFixes(result: LintResult, projectRoot: string): Promise<
 
   if (totalComponentsRemoved > 0) {
     logger.info(
-      `\nAuto-fixing complete. Removed ${totalComponentsRemoved} unused component references across ${totalFilesModified} files.`,
+      `\n自动修复完成。在 ${totalFilesModified} 个文件中移除了 ${totalComponentsRemoved} 个未使用的组件引用。`,
     );
   } else {
-    logger.info('\nNo "declared but not used" components found to auto-fix.');
+    logger.info('\n未发现"已声明但未使用"的组件可供自动修复。');
   }
-  logger.info('It is recommended to re-run lint to verify changes and check for other issues.');
+  logger.info('建议重新运行 lint 命令以验证更改并检查其他潜在问题。');
 }
 
 /**
@@ -466,10 +452,10 @@ export async function lint(rawOptions: any): Promise<void> {
     rawOptions,
     'lint',
   );
-  logger.info('Starting component linting process...');
-  logger.info(`Project: ${projectRoot}`);
+  logger.info('开始组件使用情况检查流程...');
+  logger.debug(`Project: ${projectRoot}`);
   if (miniappRoot) {
-    logger.info(`Miniapp Root: ${miniappRoot}`);
+    logger.debug(`Miniapp Root: ${miniappRoot}`);
   }
   const aliasResolver = null;
   const pathResolver = new PathResolver(projectRoot, mergedConfig, aliasResolver, false);

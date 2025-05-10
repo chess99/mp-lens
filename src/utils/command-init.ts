@@ -40,7 +40,7 @@ export async function initializeCommandContext(
   // 1. Resolve Project Path and Set Logger Root
   const projectRoot = path.resolve(rawOptions.project);
   logger.setProjectRoot(projectRoot);
-  logger.info(`Resolved project root: ${projectRoot}`);
+  logger.debug(`Resolved project root: ${projectRoot}`);
   if (!fs.existsSync(projectRoot)) {
     throw new Error(`Project directory does not exist: ${projectRoot}`);
   }
@@ -65,9 +65,9 @@ export async function initializeCommandContext(
   const includeAssets = mergedConfig.includeAssets ?? false;
 
   // Basic logging (can be expanded)
-  logger.info(`Project path: ${projectRoot}`);
-  if (miniappRoot) logger.info(`Using Miniapp root directory: ${miniappRoot}`);
-  if (entryFile) logger.info(`Using specific entry file: ${entryFile}`);
+  logger.debug(`Project path: ${projectRoot}`);
+  if (miniappRoot) logger.debug(`Using Miniapp root directory: ${miniappRoot}`);
+  if (entryFile) logger.debug(`Using specific entry file: ${entryFile}`);
 
   return {
     projectRoot,

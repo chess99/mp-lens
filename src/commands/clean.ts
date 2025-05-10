@@ -64,14 +64,13 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
 
   // === Log Clean-Specific Info ===
   // Common path/option logging is done in initializeCommandContext
-  if (listOnly) logger.info(chalk.blue('ℹ️ List Mode: Files will be listed but NOT deleted.'));
-  else if (deleteDirectly)
-    logger.info(chalk.yellow('⚠️ Delete Mode: Files will be deleted WITHOUT confirmation.'));
-  else logger.info('🧹 Starting unused file cleanup (will prompt before deletion)...');
+  if (listOnly) logger.info(chalk.blue('ℹ️ 列表模式: 文件将被列出但不会被删除。'));
+  else if (deleteDirectly) logger.info(chalk.yellow('⚠️ 删除模式: 文件将被直接删除而无需确认。'));
+  else logger.info('🧹 开始清理未使用文件 (删除前会提示)...');
 
   try {
     // Analyze project using options from context
-    logger.info('Analyzing project to find unused files...');
+    logger.info('正在分析项目以查找未使用文件...');
     const { unusedFiles } = await analyzeProject(projectRoot, {
       fileTypes,
       excludePatterns: exclude,
@@ -85,26 +84,26 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     });
 
     if (unusedFiles.length === 0) {
-      logger.info('✨ No unused files found.');
+      logger.info('✨ 未找到未使用文件。');
       return;
     }
 
     // Log files found
-    logger.info(chalk.yellow(`Found ${unusedFiles.length} unused files:`));
+    logger.info(chalk.yellow(`发现 ${unusedFiles.length} 个未使用文件:`));
     unusedFiles.forEach((file) => {
       const relativePath = path.relative(projectRoot, file);
       // Adjust log prefix based on mode
       let prefix = '[Action]';
-      if (listOnly) prefix = chalk.blue('[List]');
-      else if (deleteDirectly) prefix = chalk.red('[Delete]');
-      else prefix = chalk.yellow('[Delete (Pending Confirmation)]');
+      if (listOnly) prefix = chalk.blue('[列表]');
+      else if (deleteDirectly) prefix = chalk.red('[删除]');
+      else prefix = chalk.yellow('[删除 (待确认)]');
       logger.info(`  ${prefix} ${relativePath}`);
     });
     console.log(); // Add spacing
 
     // If listOnly mode, we are done after listing
     if (listOnly) {
-      logger.info('List mode complete. No files were changed.');
+      logger.info('列表模式完成。未更改任何文件。');
       return;
     }
 
@@ -116,7 +115,7 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
         {
           type: 'confirm',
           name: 'proceedConfirm',
-          message: `Proceed with deleting ${unusedFiles.length} files?`,
+          message: `是否继续删除 ${unusedFiles.length} 个文件?`,
           default: false,
         },
       ]);
@@ -124,12 +123,12 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
     }
 
     if (!proceed) {
-      logger.info('Operation cancelled.');
+      logger.info('操作已取消。');
       return;
     }
 
     // Perform deletion if confirmed or if deleteDirectly was true
-    logger.info(`Deleting ${unusedFiles.length} files...`);
+    logger.info(`正在删除 ${unusedFiles.length} 个文件...`);
     let processedCount = 0;
     let errorCount = 0;
 
@@ -140,18 +139,18 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
         logger.debug(`Deleted: ${relativePath}`);
         processedCount++;
       } catch (err) {
-        logger.error(`Failed to process file ${file}: ${(err as Error).message}`);
+        logger.error(`处理文件 ${file} 失败: ${(err as Error).message}`);
         errorCount++;
       }
     }
 
     // Final summary
-    logger.info(chalk.green(`✅ Successfully deleted ${processedCount} files.`));
+    logger.info(chalk.green(`✅ 成功删除 ${processedCount} 个文件。`));
     if (errorCount > 0) {
-      logger.error(chalk.red(` Encountered errors processing ${errorCount} files.`));
+      logger.error(chalk.red(` 处理 ${errorCount} 个文件时遇到错误。`));
     }
   } catch (error) {
-    logger.error(`Cleanup failed: ${(error as Error).message}`);
+    logger.error(`清理失败: ${(error as Error).message}`);
     const stack = (error as Error).stack;
     if (stack) {
       logger.debug(stack);

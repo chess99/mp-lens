@@ -246,7 +246,7 @@ function resolveAppJson(
 
   // Priority 1: Use provided entry content
   if (entryContent && typeof entryContent === 'object' && Object.keys(entryContent).length > 0) {
-    logger.info('Using provided entryContent as app.json structure.');
+    logger.info('使用提供的 entryContent 作为 app.json 结构。');
     effectiveAppJsonContent = entryContent;
     // Try to find a corresponding path if entryFile hint is given
     if (entryFile) {
@@ -267,7 +267,7 @@ function resolveAppJson(
   if (entryFile) {
     const potentialPath = path.resolve(miniappRoot, entryFile);
     if (fs.existsSync(potentialPath)) {
-      logger.info(`Using custom entry file as app.json: ${potentialPath}`);
+      logger.info(`使用自定义入口文件作为 app.json: ${potentialPath}`);
       appJsonPath = potentialPath;
       try {
         const content = fs.readFileSync(appJsonPath, 'utf-8');
@@ -347,7 +347,7 @@ function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: str
 
   try {
     const files = glob.sync(globPattern, globOptions);
-    logger.info(`Found ${files.length} files via initial scan in ${rootDir}`);
+    logger.debug(`Found ${files.length} files via initial scan in ${rootDir}`);
     return files;
   } catch (error) {
     logger.error(`Error during initial file scan:`, error);
@@ -380,10 +380,10 @@ export async function analyzeProject(
     const potentialMiniappRoot = path.resolve(trueProjectRoot, miniappRootOption);
     if (fs.existsSync(potentialMiniappRoot) && fs.statSync(potentialMiniappRoot).isDirectory()) {
       actualMiniappRoot = potentialMiniappRoot;
-      logger.info(`Using specified miniapp root: ${actualMiniappRoot}`);
+      logger.info(`使用指定的小程序根目录: ${actualMiniappRoot}`);
     } else {
       logger.warn(
-        `Specified miniapp root '${miniappRootOption}' not found or not a directory. Defaulting to project root.`, // eslint-disable-line
+        `指定的小程序根目录 '${miniappRootOption}' 未找到或不是目录。默认使用项目根目录。`, // eslint-disable-line
       );
     }
   } else {
@@ -535,7 +535,7 @@ function findUnusedFiles(
   logger.verbose('Total Module Nodes:', allModuleNodes.length);
   // logger.verbose('Entry Node IDs for BFS:', entryNodeIds.size); // Removed, happens before
   logger.verbose('Reachable Node IDs:', reachableNodeIds.size);
-  logger.info('Unused Files Found:', unusedFiles.length);
+  logger.info(`发现 ${unusedFiles.length} 个未使用的文件。`);
 
   return unusedFiles;
 }

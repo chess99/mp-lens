@@ -80,19 +80,19 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
   let outputPathAbsolute = null;
   if (output) {
     outputPathAbsolute = path.isAbsolute(output) ? output : path.resolve(process.cwd(), output);
-    logger.info(`Resolved output path: ${outputPathAbsolute}`);
+    logger.info(`已解析输出路径: ${outputPathAbsolute}`);
   }
 
   // === Log Graph-Specific Options ===
-  logger.info(`Output format: ${format}`);
+  logger.info(`输出格式: ${format}`);
   // Note: Common path logging is done in initializeCommandContext
-  if (outputPathAbsolute) logger.info(`Output file: ${outputPathAbsolute}`);
-  if (depth !== undefined) logger.info(`Max depth: ${depth}`);
-  if (focus) logger.info(`Focusing on file: ${focus}`);
-  if (npm) logger.info('Including npm dependencies');
+  if (outputPathAbsolute) logger.info(`输出文件: ${outputPathAbsolute}`);
+  if (depth !== undefined) logger.info(`最大深度: ${depth}`);
+  if (focus) logger.info(`聚焦文件: ${focus}`);
+  if (npm) logger.info('包含 npm 依赖');
 
   try {
-    logger.info('Analyzing project dependencies...');
+    logger.info('正在分析项目依赖...');
     // No need to recalculate fileTypes
 
     // Call analyzeProject with options from context
@@ -108,7 +108,7 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       includeAssets,
     });
 
-    logger.info('Rendering graph...');
+    logger.info('正在渲染依赖图...');
 
     // Pass data to generators
     const htmlGenerator = new HtmlGeneratorPreact(projectStructure, reachableNodeIds, unusedFiles);
@@ -126,35 +126,31 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
         break;
       case 'dot':
         outputContent = dotGenerator.generate({
-          title: 'Project Dependency Graph',
+          title: '项目依赖图',
           maxDepth: depth,
           focusNode: focus,
         });
         break;
       case 'json':
-        logger.warn(
-          'JSON output currently does not support depth/focus filtering. Outputting full structure.',
-        );
+        logger.warn('JSON 输出目前不支持深度/聚焦过滤。将输出完整结构。');
         outputContent = renderJSON(projectStructure);
         break;
       case 'svg':
       case 'png':
         outputContent = dotGenerator.generate({
-          title: 'Project Dependency Graph',
+          title: '项目依赖图',
           maxDepth: depth,
           focusNode: focus,
         });
         logger.warn(
-          chalk.yellow(
-            `Format '${format}' requires Graphviz installed to convert DOT output. Saving DOT content.`,
-          ),
+          chalk.yellow(`格式 '${format}' 需要安装 Graphviz才能转换 DOT 输出。正在保存 DOT 内容。`),
         );
         if (isString(output) && (output.endsWith('.png') || output.endsWith('.svg'))) {
-          logger.warn(`Output file will contain DOT content, not a ${format.toUpperCase()} image.`);
+          logger.warn(`输出文件将包含 DOT 内容，而不是 ${format.toUpperCase()} 图像。`);
         }
         break;
       default:
-        throw new Error(`Unsupported output format: ${format}`);
+        throw new Error(`不支持的输出格式: ${format}`);
     }
 
     // Handle output (Now consistent for all text-based formats)
@@ -166,10 +162,10 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
       // Ensure outputContent is string or buffer before writing
       if (typeof outputContent === 'string' || Buffer.isBuffer(outputContent)) {
         fs.writeFileSync(outputPathAbsolute, outputContent);
-        logger.info(`✅ Graph saved to: ${outputPathAbsolute}`);
+        logger.info(`✅ 依赖图已保存到: ${outputPathAbsolute}`);
       } else {
         // This case should ideally not happen with current formats
-        logger.error(`Internal error: outputContent is not writable for format ${format}`);
+        logger.error(`内部错误: format ${format} 的 outputContent 不可写`);
       }
     } else {
       // Handle console output OR default HTML file saving
@@ -185,13 +181,13 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
               fs.mkdirSync(outputDir, { recursive: true });
             }
             fs.writeFileSync(defaultHtmlPath, outputContent);
-            logger.info(`✅ Graph saved to: ${defaultHtmlPath}`);
+            logger.info(`✅ 依赖图已保存至: ${defaultHtmlPath}`);
           } else {
-            logger.error('Internal error: HTML outputContent is not a string.');
+            logger.error('内部错误: HTML outputContent 不是字符串。');
           }
         } catch (writeError) {
           logger.error(
-            `Failed to save default HTML graph to ${defaultHtmlPath}: ${(writeError as Error).message}`,
+            `保存默认 HTML 依赖图到 ${defaultHtmlPath} 失败: ${(writeError as Error).message}`,
           );
         }
       } else if (typeof outputContent === 'string') {
@@ -199,11 +195,11 @@ export async function graph(rawOptions: RawGraphOptions): Promise<void> {
         console.log(outputContent);
       } else {
         // Handle binary formats like potential future image generation
-        logger.warn(`Cannot output binary data for format '${format}' to console. Use --output.`);
+        logger.warn(`无法将格式 '${format}' 的二进制数据输出到控制台。请使用 --output。`);
       }
     }
   } catch (error) {
-    logger.error(`Graph generation failed: ${(error as Error).message}`);
+    logger.error(`依赖图生成失败: ${(error as Error).message}`);
     const stack = (error as Error).stack;
     if (stack) {
       logger.debug(stack);

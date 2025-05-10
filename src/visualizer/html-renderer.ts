@@ -249,7 +249,7 @@ export class HtmlGeneratorPreact {
       logger.warn('[convertGraphToTreeInternal] No rootId could be determined!');
       return { id: 'empty', label: 'No Data', type: 'Unknown' };
     }
-    logger.info(`[convertGraphToTreeInternal] Determined final rootId: ${rootId}`);
+    logger.debug(`[convertGraphToTreeInternal] Determined final rootId: ${rootId}`);
 
     // Recursive helper - uses node properties directly for stats
     const buildSubtreeHelper = (currentId: string, visited: Set<string>): TreeNodeData => {

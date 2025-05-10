@@ -53,19 +53,17 @@ export class ProjectStructureBuilder {
       miniappRoot: miniappRoot,
     });
 
-    logger.info('Starting project structure analysis...');
-
     // --- Start: Initialize all nodes first --- //
     logger.debug(`Initializing nodes for ${this.allFiles.length} found files.`);
     for (const filePath of this.allFiles) {
       this.addNodeForFile(filePath, 'Module', false); // Add as Module, don't log yet
     }
-    logger.info(`Initialized ${this.nodes.size} nodes from file scan.`);
+    logger.debug(`Initialized ${this.nodes.size} nodes from file scan.`);
     // --- End: Initialize all nodes first --- //
   }
 
   async build(): Promise<ProjectStructure> {
-    logger.info('Starting project structure analysis...');
+    logger.info('开始项目结构分析...');
 
     // 1. Find and parse app.json - REMOVED (using constructor values)
     // const appJsonInfo = this.findAndParseAppJson();
@@ -108,7 +106,7 @@ export class ProjectStructureBuilder {
     this.processImplicitGlobalFiles();
 
     // --- Start: Final pass to parse all remaining files --- //
-    logger.info(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);
+    logger.debug(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);
     const initialParsedCount = this.parsedModules.size;
     for (const node of this.nodes.values()) {
       // Only parse modules that haven't been touched yet by the recursive build
@@ -121,7 +119,7 @@ export class ProjectStructureBuilder {
         await this.parseModuleDependencies(node);
       }
     }
-    logger.info(
+    logger.debug(
       `Final pass complete. Parsed an additional ${
         this.parsedModules.size - initialParsedCount
       } modules.`,
@@ -137,7 +135,7 @@ export class ProjectStructureBuilder {
     };
 
     logger.info(
-      `Project structure analysis complete. Found ${structure.nodes.length} nodes and ${structure.links.length} links.`,
+      `项目结构分析完成。发现 ${structure.nodes.length} 个节点和 ${structure.links.length} 条链接。`,
     );
     return structure;
   }
@@ -546,9 +544,7 @@ export class ProjectStructureBuilder {
         }
       }
     } else {
-      logger.warn(
-        `Referenced file in app.json not found: ${relativePath} (Resolved: ${absolutePath})`,
-      );
+      logger.warn(`app.json 中引用的文件未找到: ${relativePath} (解析路径: ${absolutePath})`);
     }
   }
   // --- End: Added processing functions ---

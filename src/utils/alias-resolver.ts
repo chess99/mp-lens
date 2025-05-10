@@ -32,12 +32,16 @@ export class AliasResolver {
     const foundTsConfig = this.loadFromTsConfig();
     const foundCustomConfig = this.loadFromCustomConfig();
 
-    if (foundTsConfig && this.projectRoot) {
-      logger.info(`已从tsconfig.json加载别名配置，项目路径: ${this.projectRoot}`);
+    if (foundTsConfig) {
+      logger.info(`已从tsconfig.json加载别名配置`);
     }
 
-    if (foundCustomConfig && this.projectRoot) {
-      logger.info(`已从mp-lens.config.json加载别名配置，项目路径: ${this.projectRoot}`);
+    if (foundCustomConfig) {
+      logger.info(`已从mp-lens.config.json加载别名配置`);
+    }
+
+    if (this.projectRoot) {
+      logger.info(`alias解析的根目录: ${this.projectRoot}`);
     }
 
     this.initialized = true;

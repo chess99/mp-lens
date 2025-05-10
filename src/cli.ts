@@ -60,7 +60,7 @@ function setupLogger(globalOptions: any) {
   }
   // Setting project root will happen within command handlers now
   // logger.setProjectRoot(resolvedProjectPath);
-  logger.info(`Logger level set to: ${logger.getLevel()}`);
+  logger.debug(`Logger level set to: ${logger.getLevel()}`);
 }
 
 const program = new Command();
