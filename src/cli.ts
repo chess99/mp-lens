@@ -30,6 +30,7 @@ const { version } = require(packageJsonPath);
 // Import command functions
 import { clean } from './commands/clean';
 import { graph } from './commands/graph';
+import { lint } from './commands/lint';
 import { logger, LogLevel } from './utils/debug-logger';
 
 // Remove the local mergeOptions function from cli.ts
@@ -126,6 +127,22 @@ program
     try {
       // Pass both command and global options to the handler
       await clean({ ...globalOptions, ...cmdOptions });
+    } catch (error) {
+      logger.error(`Command failed: ${(error as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+// lint command
+program
+  .command('lint')
+  .description('分析小程序项目中组件声明与使用的一致性')
+  .argument('[path]', '可选，指定要分析的文件或目录路径')
+  .action(async (path, cmdOptions) => {
+    const globalOptions = program.opts();
+    setupLogger(globalOptions);
+    try {
+      await lint({ ...globalOptions, ...cmdOptions, path });
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);

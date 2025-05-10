@@ -5,6 +5,8 @@ export interface CommandOptions {
   config?: string;
   list?: boolean;
   delete?: boolean;
+  miniappRoot?: string;
+  entryFile?: string;
 }
 
 export interface AnalyzerOptions {
@@ -19,13 +21,13 @@ export interface AnalyzerOptions {
   includeAssets?: boolean;
 }
 
-interface OutputOptions {
+export interface OutputOptions {
   format: 'text' | 'json';
   projectRoot: string;
   miniappRoot?: string;
 }
 
-interface GraphOptions extends CommandOptions {
+export interface GraphOptions extends CommandOptions {
   format: 'html' | 'dot' | 'json' | 'png' | 'svg';
   output?: string;
   depth?: number;
@@ -36,7 +38,7 @@ interface GraphOptions extends CommandOptions {
   entryFile?: string;
 }
 
-interface CleanOptions extends CommandOptions {
+export interface CleanOptions extends CommandOptions {
   types: string;
   exclude: string[];
   essentialFiles?: string;
@@ -44,7 +46,7 @@ interface CleanOptions extends CommandOptions {
   entryFile?: string;
 }
 
-interface ListUnusedOptions extends CommandOptions {
+export interface ListUnusedOptions extends CommandOptions {
   types: string;
   exclude: string[];
   essentialFiles?: string;

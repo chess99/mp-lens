@@ -49,6 +49,7 @@
   "homepage": "https://github.com/chess99/mp-lens#readme",
   "dependencies": {
     "@antv/g6": "^4.8.21",
+    "@wxml/parser": "^0.4.0",
     "chalk": "^4.1.2",
     "chart.js": "^4.4.9",
     "commander": "^12.1.0",
