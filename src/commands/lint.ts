@@ -315,15 +315,30 @@ function generateReport(result: LintResult, miniappRoot?: string, projectRoot?: 
         }
         console.log('');
       }
-      // Used but not declared (grouped by WXML file)
+
+      // Used but not declared - display issue at the specific WXML file where it occurs
       if (issue.usedNotDeclared.length > 0) {
-        const wxmlPath = projectRoot ? path.relative(projectRoot, issue.wxmlFile) : issue.wxmlFile;
-        console.log(wxmlPath);
-        console.log('  已在 WXML 中使用但在 JSON 中未声明:');
+        // Group tags by WXML file where they're used
+        const fileToTags = new Map<string, string[]>();
         for (const component of issue.usedNotDeclared) {
-          console.log(chalk.red(`    - ${component.componentTag}`));
+          for (const file of component.usedIn) {
+            if (!fileToTags.has(file)) {
+              fileToTags.set(file, []);
+            }
+            fileToTags.get(file)!.push(component.componentTag);
+          }
         }
-        console.log('');
+
+        // Display each WXML file with its undeclared tags
+        for (const [wxmlFile, tags] of fileToTags.entries()) {
+          const wxmlPath = projectRoot ? path.relative(projectRoot, wxmlFile) : wxmlFile;
+          console.log(wxmlPath);
+          console.log('  已在 WXML 中使用但在 JSON 中未声明:');
+          for (const tag of tags) {
+            console.log(chalk.red(`    - ${tag}`));
+          }
+          console.log('');
+        }
       }
     }
     // Summary
