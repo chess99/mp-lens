@@ -121,10 +121,10 @@ describe('findAppJsonConfig', () => {
       miniappRoot: path.resolve(projectRoot, 'src'),
     });
     expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('Auto-detected entryFile: src/app.json'),
+      expect.stringContaining('自动检测到入口文件: src/app.json'),
     );
     expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('Auto-detected miniappRoot: src'),
+      expect.stringContaining('自动检测到小程序根目录: src'),
     );
   });
 
@@ -177,7 +177,7 @@ describe('findAppJsonConfig', () => {
 
     expect(result).toBe('ambiguous');
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('Found multiple valid app.json'),
+      expect.stringContaining('发现多个有效的 app.json 文件'),
     );
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('app.json')); // Check for the first location
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('src/app.json')); // Check for the second location
@@ -270,7 +270,7 @@ describe('findAppJsonConfig', () => {
       entryFile: path.resolve(projectRoot, 'src/app.json'),
       miniappRoot: path.resolve(projectRoot, 'src'),
     });
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Error reading directory'));
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('读取目录'));
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('EACCES: permission denied'));
   });
 });
