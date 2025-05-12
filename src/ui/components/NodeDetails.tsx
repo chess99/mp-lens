@@ -71,9 +71,7 @@ export function NodeDetails({ node }: NodeDetailsProps) {
 
   // Calculate top file types by count
   const topFileTypes = useMemo(() => {
-    return Object.entries(fileTypes)
-      .sort(([, countA], [, countB]) => countB - countA)
-      .slice(0, 5); // Show top 5
+    return Object.entries(fileTypes).sort(([, countA], [, countB]) => countB - countA);
   }, [fileTypes]);
 
   // Calculate file type size distribution percentages
@@ -86,8 +84,7 @@ export function NodeDetails({ node }: NodeDetailsProps) {
         ext,
         size: size as number,
         percentage: Math.round(((size as number) / totalSize) * 100),
-      }))
-      .slice(0, 5); // Show top 5
+      }));
   }, [sizeByType, totalSize]);
 
   // Get file type color by extension
@@ -125,9 +122,9 @@ export function NodeDetails({ node }: NodeDetailsProps) {
         {topFileTypes.length > 0 && (
           <div className="details-card file-type-card">
             <h3 className="card-title">文件类型分布</h3>
-            <div className="distribution-list file-type-list">
+            <div className="distribution-list file-type-list scrollable-list">
               {topFileTypes.map(([ext, count]) => {
-                const barWidth = (count / Math.max(...topFileTypes.map(([, c]) => c))) * 100;
+                const barWidth = (count / Math.max(1, ...topFileTypes.map(([, c]) => c))) * 100;
                 return (
                   <div key={ext} className="distribution-item file-type-item">
                     <span className="dist-label">.{ext}</span>
@@ -152,7 +149,7 @@ export function NodeDetails({ node }: NodeDetailsProps) {
         {sizeDistribution.length > 0 && (
           <div className="details-card size-dist-card">
             <h3 className="card-title">体积分布</h3>
-            <div className="distribution-list size-dist-list">
+            <div className="distribution-list size-dist-list scrollable-list">
               {sizeDistribution.map((item) => (
                 <div key={item.ext} className="distribution-item size-dist-item">
                   <span className="dist-label">.{item.ext}</span>
