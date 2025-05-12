@@ -109,11 +109,14 @@ export class ProjectStructureBuilder {
     logger.debug(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);
     const initialParsedCount = this.parsedModules.size;
     for (const node of this.nodes.values()) {
-      // Only parse modules that haven't been touched yet by the recursive build
+      // Only parse modules that haven't been touched yet AND are not JSON files
+      const filePath = node.properties?.absolutePath;
+      const fileExt = filePath ? path.extname(filePath).toLowerCase() : '';
       if (
         node.type === 'Module' &&
-        node.properties?.absolutePath &&
-        !this.parsedModules.has(node.properties.absolutePath)
+        filePath &&
+        !this.parsedModules.has(filePath) &&
+        ['.js', '.ts', '.wxml', '.wxss'].includes(fileExt) // Check file extension
       ) {
         // Use node.properties.absolutePath which is the ID and the key for parsedModules
         await this.parseModuleDependencies(node);
