@@ -1,0 +1,92 @@
+/* TreeView Specific */
+.treeView {
+  font-size: 0.9em;
+  overflow-y: auto; /* Allow vertical scroll if needed */
+  user-select: none; /* Disable text selection */
+  display: flex; /* Allow controls and list to be arranged */
+  flex-direction: column; /* Stack controls above list */
+}
+
+.treeControls {
+  padding: 5px 8px; /* Match tree-node-item padding */
+  margin-bottom: 5px;
+  border-bottom: 1px solid #eee;
+  display: flex; /* Layout buttons */
+  gap: 10px; /* Space between buttons */
+}
+
+.treeControls button {
+  padding: 3px 8px;
+  font-size: 0.85em;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.treeControls button:hover {
+  background-color: #e0e0e0;
+}
+
+.treeView ul {
+  padding-left: 0;
+  list-style-type: none;
+  margin: 0;
+  flex-grow: 1; /* Allow list to take remaining space */
+  overflow-y: auto; /* Scroll tree list independently if needed */
+}
+
+/* REMOVED nested ul padding rule */
+/* We handle nesting via component structure, not global CSS */
+
+/* Optional: Target the specific children list class if needed */
+/* If needed, create a specific class like .treeChildren and apply padding */
+/*
+.treeChildren {
+  padding-left: 30px; 
+}
+*/
+
+.treeNodeItem {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap; /* Prevent wrapping */
+  overflow: hidden; /* Hide overflow */
+}
+
+.treeNodeItem:hover {
+  background-color: #f0f0f0;
+}
+
+.treeNodeItem.selected {
+  background-color: #dbeafe; /* Example selected color */
+  font-weight: bold;
+}
+
+/* Note: Targeting sub-elements like .toggle, .label, .stats inside .treeNodeItem */
+/* requires careful handling in the component's TSX when using CSS Modules. */
+/* You might need separate classes or structure the styles differently. */
+/* For now, keeping original structure, but may need adjustment. */
+
+.toggle {
+  display: inline-block;
+  width: 1.5em; /* Ensure space for toggle */
+  text-align: center;
+  margin-right: 4px;
+}
+
+.label {
+  flex-grow: 1;
+  overflow: hidden; /* Hide overflow within label span */
+  text-overflow: ellipsis; /* Add ellipsis for long labels */
+  margin-right: 8px; /* Space before stats */
+}
+
+.stats {
+  color: #666;
+  font-size: 0.9em;
+  white-space: nowrap; /* Prevent stats wrapping */
+  margin-left: auto; /* Push stats to the right */
+}

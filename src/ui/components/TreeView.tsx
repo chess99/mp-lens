@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { TreeNodeData, TreeViewProps } from '../types';
+import styles from './TreeView.module.css'; // Import CSS module
 
 // Define props for the recursive TreeNode component
 interface TreeNodeProps {
@@ -49,27 +50,27 @@ function TreeNode({
   };
 
   return (
-    <li className="tree-node">
+    <li>
       <div
         onClick={handleNodeClick} // Single click selects
         onDblClick={handleNodeDoubleClick} // Double click toggles
-        className={`tree-node-item ${isSelected ? 'selected' : ''}`}
+        className={`${styles.treeNodeItem} ${isSelected ? styles.selected : ''}`}
         title={`ID: ${node.id}`}
         style={{ paddingLeft: `${depth * indentSize}px` }}
       >
         {hasChildren && (
           // Restore the onClick handler for the toggle span
-          <span className="toggle" onClick={handleToggleClick}>
+          <span className={styles.toggle} onClick={handleToggleClick}>
             {isExpanded ? '▼' : '▶'}
           </span>
         )}
-        {!hasChildren && <span className="toggle">&nbsp;</span>} {/* Placeholder */}
-        <span className="label">{node.label}</span>
-        <span className="stats">({node.properties?.fileCount || 0} files)</span>
+        {!hasChildren && <span className={styles.toggle}>&nbsp;</span>} {/* Placeholder */}
+        <span className={styles.label}>{node.label}</span>
+        <span className={styles.stats}>({node.properties?.fileCount || 0} files)</span>
         {/* Optionally display size: formatBytes(node.properties?.size || 0) */}
       </div>
       {hasChildren && isExpanded && (
-        <ul className="tree-children">
+        <ul>
           {node.children?.map((child) => (
             <TreeNode
               key={child.id}
@@ -196,15 +197,15 @@ export function TreeView({
   const isNodeExpanded = (nodeId: string) => expandedNodes.has(nodeId);
 
   return (
-    <div className="tree-view">
+    <div className={styles.treeView}>
       {/* Add Expand/Collapse Buttons */}
-      <div className="tree-controls">
+      <div className={styles.treeControls}>
         <button onClick={handleExpandAll}>Expand All</button>
         <button onClick={handleCollapseAll}>Collapse All</button>
       </div>
-      {/* End Buttons */}
       <ul>
         <TreeNode
+          key={data.id}
           node={data}
           onNodeSelect={onNodeSelect}
           selectedNodeId={selectedNodeId}

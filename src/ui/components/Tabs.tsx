@@ -1,4 +1,5 @@
 import { TabsProps } from '../types';
+import styles from './Tabs.module.css'; // Import CSS Module
 
 // Define props including the controlled state
 interface ControlledTabsProps extends TabsProps {
@@ -12,13 +13,13 @@ export function Tabs({ tabs, activeTabId, onTabChange }: ControlledTabsProps) {
   // const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || '');
 
   return (
-    <div className="tabs-container">
-      <ul className="tabs-list">
+    <div className={styles.tabsContainer}>
+      <ul className={styles.tabsList}>
         {tabs.map((tab) => (
-          <li key={tab.id} className="tab-item">
+          <li key={tab.id} className={styles.tabItem}>
             <button
               onClick={() => onTabChange(tab.id)}
-              className={activeTabId === tab.id ? 'active' : ''}
+              className={`${styles.button} ${activeTabId === tab.id ? styles.active : ''}`}
               role="tab"
               aria-selected={activeTabId === tab.id}
               aria-controls={`tab-content-${tab.id}`}
@@ -28,13 +29,12 @@ export function Tabs({ tabs, activeTabId, onTabChange }: ControlledTabsProps) {
           </li>
         ))}
       </ul>
-      <div className="tab-content-area">
+      <div className={styles.tabContentArea}>
         {tabs.map((tab) => (
           <div
             key={tab.id}
             id={`tab-content-${tab.id}`}
-            className={`tab-content ${activeTabId === tab.id ? 'active' : ''}`}
-            style={{ display: activeTabId === tab.id ? 'block' : 'none' }}
+            className={`${styles.tabContent} ${activeTabId === tab.id ? styles.active : ''}`}
             role="tabpanel"
             aria-labelledby={`tab-${tab.id}`}
           >

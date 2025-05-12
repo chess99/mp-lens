@@ -1,0 +1,78 @@
+/* UnusedFilesView.module.css */
+
+.unusedFilesView {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.unusedFilesViewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.unusedFilesViewHeader h2 {
+  margin: 0;
+  font-size: 1.4em;
+}
+
+.returnToTreeButton {
+  padding: 5px 10px;
+  font-size: 0.9em;
+  background-color: #6c757d;
+  color: white;
+  border: 1px solid #5a6268;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.returnToTreeButton:hover {
+  background-color: #5a6268;
+}
+
+.analysisContent {
+  /* Container for analysis cards */
+}
+
+.detailsCard {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.simpleListContainer {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.simpleList {
+  list-style: none;
+  padding: 10px;
+  margin: 0;
+}
+
+.simpleList li {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+  font-family: monospace;
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.simpleList li:last-child {
+  border-bottom: none;
+}
+
+.simpleList li:hover {
+  background-color: #f0f0f0;
+}

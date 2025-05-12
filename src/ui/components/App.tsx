@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { TreeNodeData } from '../types'; // AppProps might need adjustment if `data` prop is removed
-import { buildTreeWithStats, formatBytes } from '../utils/dependency-tree-processor'; // NEW
+import { buildTreeWithStats } from '../utils/dependency-tree-processor'; // UPDATED: Removed formatBytes
 import { DependencyGraph } from './DependencyGraph';
 import { FileListView } from './FileListView';
+import { Header } from './Header'; // Import the new Header component
+import layoutStyles from './Layout.module.css'; // Import the Layout CSS module
 import { NodeDetails } from './NodeDetails';
 import { Tabs } from './Tabs';
 import { TreeView } from './TreeView';
@@ -146,13 +148,18 @@ export function App(props: AppProps) {
     initialTreeData.id === 'error_root'
   ) {
     return (
-      <div class="app-container mode-tree">
-        <header class="header">
-          <h1>{window.__MP_LENS_TITLE__ || '依赖可视化'}</h1>
-        </header>
-        <main class="main-container mode-tree">
+      <div className={layoutStyles.appContainer}>
+        <Header
+          title={window.__MP_LENS_TITLE__ || '依赖可视化'}
+          totalFiles={0}
+          totalSize={0}
+          unusedFileCount={0}
+          onTreeModeClick={() => {}}
+          onUnusedFilesClick={() => {}}
+        />
+        <main className={layoutStyles.mainContainer}>
           <section
-            class="content"
+            className={layoutStyles.content}
             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
           >
             <p>{initialTreeData.label}</p>
@@ -162,35 +169,25 @@ export function App(props: AppProps) {
     );
   }
 
-  return (
-    <div className={`app-container mode-${currentMode}`}>
-      <header className="header">
-        <h1>{window.__MP_LENS_TITLE__ || '依赖可视化'}</h1>
-        <div className="overview-stats">
-          <div className="stat-item clickable" title="返回文件树视图" onClick={switchToTreeMode}>
-            <span className="stat-label">总文件数:</span>
-            <span className="stat-value">{rootStats.totalFiles}</span>
-            <span className="stat-indicator">›</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">总代码量:</span>
-            <span className="stat-value">{formatBytes(rootStats.totalSize)}</span>
-          </div>
-          <div
-            className="stat-item clickable"
-            title="点击查看未使用的文件列表"
-            onClick={switchToUnusedFilesMode}
-          >
-            <span className="stat-label">未使用文件:</span>
-            <span className="stat-value">{rootStats.unusedFileCount}</span>
-            <span className="stat-indicator">›</span>
-          </div>
-        </div>
-      </header>
+  // Create class name for main container with mode
+  const mainContainerClassName = `${layoutStyles.mainContainer} ${
+    currentMode === 'unusedFiles' ? layoutStyles.modeUnusedFiles : ''
+  }`;
 
-      <main className={`main-container mode-${currentMode}`}>
+  return (
+    <div className={layoutStyles.appContainer}>
+      <Header
+        title={window.__MP_LENS_TITLE__ || '依赖可视化'}
+        totalFiles={rootStats.totalFiles}
+        totalSize={rootStats.totalSize}
+        unusedFileCount={rootStats.unusedFileCount}
+        onTreeModeClick={switchToTreeMode}
+        onUnusedFilesClick={switchToUnusedFilesMode}
+      />
+
+      <main className={mainContainerClassName}>
         {currentMode === 'tree' && (
-          <aside className="sidebar">
+          <aside className={layoutStyles.sidebar}>
             <div className="tree-container">
               <TreeView
                 data={initialTreeData} // Pass the dynamically built tree with stats
@@ -201,7 +198,7 @@ export function App(props: AppProps) {
           </aside>
         )}
 
-        <section className="content">
+        <section className={layoutStyles.content}>
           {currentMode === 'tree' ? (
             <Tabs
               tabs={[

@@ -1,0 +1,86 @@
+/* Header.module.css */
+
+.header {
+  padding: 10px 20px;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #dee2e6;
+  flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.headerMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px; /* Space between title/button and stats */
+}
+
+.header h1 {
+  margin: 0 0 8px 0; /* Add back bottom margin */
+  font-size: 1.5em;
+}
+
+.overviewStats {
+  display: flex;
+  gap: 20px;
+  font-size: 0.9em;
+}
+
+.statItem {
+  background-color: #f8f9fa; /* Default background */
+  padding: 5px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent; /* Add transparent border for layout consistency */
+}
+
+/* Styles for clickable stat items */
+.clickable {
+  background-color: #fff; /* Slightly different background */
+  border: 1px solid #d6d8db; /* Add border */
+  cursor: pointer;
+  user-select: none; /* Prevent text selection */
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.clickable:hover {
+  background-color: #f1f3f5;
+  border-color: #adb5bd;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Subtle shadow on hover */
+}
+
+.clickable:active {
+  /* Add active state */
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075);
+}
+
+.statLabel {
+  font-weight: bold;
+  color: #495057; /* Slightly adjust color */
+}
+
+.statValue {
+  font-size: 1.1em; /* Slightly reduce size for balance */
+  font-weight: bold;
+  color: #343a40;
+}
+
+/* Style for the indicator chevron */
+.statIndicator {
+  font-weight: bold;
+  font-size: 1.2em; /* Make chevron slightly larger */
+  color: #6c757d; /* Use a less prominent color */
+  margin-left: auto; /* Push indicator to the right */
+  padding-left: 8px; /* More space before indicator */
+  line-height: 1; /* Ensure proper vertical alignment */
+}
+
+.clickable:hover .statIndicator {
+  color: #343a40; /* Darken indicator on hover */
+}

@@ -1,0 +1,43 @@
+/* Layout.module.css */
+
+.appContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mainContainer {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden; /* Important for child scrolling */
+}
+
+.sidebar {
+  width: 450px; /* Wider fixed width */
+  border-right: 1px solid #dee2e6;
+  padding: 15px;
+  overflow-y: auto; /* Allow sidebar to scroll */
+  flex-shrink: 0;
+  background-color: #fff;
+  transition:
+    width 0.3s ease,
+    padding 0.3s ease,
+    opacity 0.3s ease; /* Add transition */
+}
+
+.content {
+  flex-grow: 1;
+  padding: 15px;
+  overflow-y: auto; /* Allow content to scroll */
+  transition: padding 0.3s ease; /* Smooth padding transition */
+}
+
+/* Mode-specific layout adjustments */
+.mainContainer.modeAnalysis .sidebar,
+.mainContainer.modeUnusedFiles .sidebar {
+  width: 0; /* Collapse sidebar */
+  padding: 0; /* Remove padding */
+  border-right: none; /* Hide border */
+  opacity: 0; /* Fade out */
+  overflow: hidden; /* Prevent content showing during transition */
+}

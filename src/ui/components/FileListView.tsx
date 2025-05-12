@@ -2,6 +2,7 @@ import { useMemo, useState } from 'preact/hooks';
 import type { GraphNode } from '../../analyzer/project-structure'; // Import graph types
 import { NodeDetailsProps } from '../types';
 import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED import path
+import styles from './FileListView.module.css'; // Import CSS Module
 
 // ADDED: Define props for FileListView, including the new callback
 interface FileListViewProps extends NodeDetailsProps {
@@ -131,8 +132,8 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
   // If no files are found *after filtering* (or initially), show a message
   if (displayedFiles.length === 0 && allFiles.length === 0) {
     return (
-      <div className="file-list-view">
-        <div className="empty-state">
+      <div className={styles.fileListView}>
+        <div className={styles.emptyState}>
           <p>此节点没有直接关联的文件。</p>
         </div>
       </div>
@@ -160,19 +161,19 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
   };
 
   return (
-    <div className="file-list-view">
-      <div className="file-list-header">
+    <div className={styles.fileListView}>
+      <div className={styles.fileListHeader}>
         <h3>文件列表 ({displayedFiles.length})</h3>
-        {miniappRoot && <div className="root-path">根目录: {miniappRoot}</div>}
+        {miniappRoot && <div className={styles.rootPath}>根目录: {miniappRoot}</div>}
       </div>
 
       {/* Filter Controls */}
       {uniqueFileTypes.length > 1 && ( // Only show filters if there's more than one type
-        <div className="file-filter-controls">
+        <div className={styles.fileFilterControls}>
           <span>筛选:</span>
           <button
             onClick={() => setFilterType('')}
-            className={`filter-button ${filterType === '' ? 'active' : ''}`}
+            className={`${styles.filterButton} ${filterType === '' ? styles.active : ''}`}
           >
             All
           </button>
@@ -180,7 +181,7 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`filter-button ${filterType === type ? 'active' : ''}`}
+              className={`${styles.filterButton} ${filterType === type ? styles.active : ''}`}
               title={`.${type}`}
             >
               .{type}
@@ -189,15 +190,15 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
         </div>
       )}
 
-      <div className="file-table-container">
+      <div className={styles.fileTableContainer}>
         {displayedFiles.length > 0 ? (
-          <table className="file-table">
+          <table className={styles.fileTable}>
             <thead>
               <tr>
-                <th className="sequence-column">序号</th>
-                <th className="file-column">文件</th>
+                <th className={styles.sequenceColumn}>序号</th>
+                <th className={styles.fileColumn}>文件</th>
                 <th
-                  className="ref-count-column sortable"
+                  className={`${styles.refCountColumn} ${styles.sortable}`}
                   style={{ cursor: 'pointer' }}
                   onClick={handleDependencyCountSortClick}
                   title="点击切换排序"
@@ -205,7 +206,7 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
                   被依赖次数 {dependencyCountArrow}
                 </th>
                 <th
-                  className="size-column sortable"
+                  className={`${styles.sizeColumn} ${styles.sortable}`}
                   style={{ cursor: 'pointer' }}
                   onClick={handleSizeSortClick}
                   title="点击切换排序"
@@ -223,18 +224,18 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
                   style={{ cursor: 'pointer' }}
                 >
                   {/* Use path as key since ID changes */}
-                  <td className="sequence-column">{file.id}</td>
-                  <td className="file-column" title={file.path}>
+                  <td className={styles.sequenceColumn}>{file.id}</td>
+                  <td className={styles.fileColumn} title={file.path}>
                     {file.relativePath}
                   </td>
-                  <td className="ref-count-column">{file.dependencyCount}</td>
-                  <td className="size-column">{formatBytes(file.size)}</td>
+                  <td className={styles.refCountColumn}>{file.dependencyCount}</td>
+                  <td className={styles.sizeColumn}>{formatBytes(file.size)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <div className="empty-state">
+          <div className={styles.emptyState}>
             <p>没有文件匹配当前的筛选条件。</p>
           </div>
         )}

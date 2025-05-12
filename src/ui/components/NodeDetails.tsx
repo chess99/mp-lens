@@ -2,6 +2,7 @@ import { useMemo } from 'preact/hooks';
 import type { ProjectStructure } from '../../analyzer/project-structure'; // Import necessary types
 import { NodeDetailsProps } from '../types';
 import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
+import styles from './NodeDetails.module.css'; // Import CSS Module
 
 // Update NodeDetailsProps to include fullGraphData and the callback
 export interface ExtendedNodeDetailsProps extends NodeDetailsProps {
@@ -101,51 +102,51 @@ export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: Extended
   };
 
   return (
-    <div className="node-details">
+    <div className={styles.nodeDetails}>
       {/* Header with node name, type, and displayPath */}
-      <div className="details-card details-header">
-        <div className="detail-title-area">
-          <div className="node-type-badge">{node.type}</div>
-          <h2 className="node-title">{node.label || node.id}</h2>
-          {displayPath && <div className="node-path">{displayPath}</div>}
+      <div className={`${styles.detailsCard} ${styles.detailsHeader}`}>
+        <div className={styles.detailTitleArea}>
+          <div className={styles.nodeTypeBadge}>{node.type}</div>
+          <h2 className={styles.nodeTitle}>{node.label || node.id}</h2>
+          {displayPath && <div className={styles.nodePath}>{displayPath}</div>}
         </div>
-        <div className="node-stats">
+        <div className={styles.nodeStats}>
           {fileCount > 0 && (
-            <div className="node-stat-item">
-              <span className="stat-value">{fileCount}</span>
-              <span className="stat-label">文件</span>
+            <div className={styles.nodeStatItem}>
+              <span className={styles.statValue}>{fileCount}</span>
+              <span className={styles.statLabel}>文件</span>
             </div>
           )}
           {totalSize > 0 && (
-            <div className="node-stat-item">
-              <span className="stat-value">{formatBytes(totalSize)}</span>
-              <span className="stat-label">总大小</span>
+            <div className={styles.nodeStatItem}>
+              <span className={styles.statValue}>{formatBytes(totalSize)}</span>
+              <span className={styles.statLabel}>总大小</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="details-grid">
+      <div className={styles.detailsGrid}>
         {/* File Type Distribution Card - Compacted */}
         {topFileTypes.length > 0 && (
-          <div className="details-card file-type-card">
-            <h3 className="card-title">文件类型分布</h3>
-            <div className="distribution-list file-type-list scrollable-list">
+          <div className={styles.detailsCard}>
+            <h3 className={styles.cardTitle}>文件类型分布</h3>
+            <div className={`${styles.distributionList} ${styles.scrollableList}`}>
               {topFileTypes.map(([ext, count]) => {
                 const barWidth = (count / Math.max(1, ...topFileTypes.map(([, c]) => c))) * 100;
                 return (
-                  <div key={ext} className="distribution-item file-type-item">
-                    <span className="dist-label">.{ext}</span>
-                    <div className="dist-bar-container">
+                  <div key={ext} className={styles.distributionItem}>
+                    <span className={styles.distLabel}>.{ext}</span>
+                    <div className={styles.distBarContainer}>
                       <div
-                        className="dist-bar file-type-bar"
+                        className={styles.distBar}
                         style={{
                           width: `${barWidth}%`,
                           backgroundColor: getColorForType(ext),
                         }}
                       ></div>
                     </div>
-                    <span className="dist-value">{count}</span>
+                    <span className={styles.distValue}>{count}</span>
                   </div>
                 );
               })}
@@ -155,23 +156,23 @@ export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: Extended
 
         {/* Size Distribution Card - Compacted */}
         {sizeDistribution.length > 0 && (
-          <div className="details-card size-dist-card">
-            <h3 className="card-title">体积分布</h3>
-            <div className="distribution-list size-dist-list scrollable-list">
+          <div className={styles.detailsCard}>
+            <h3 className={styles.cardTitle}>体积分布</h3>
+            <div className={`${styles.distributionList} ${styles.scrollableList}`}>
               {sizeDistribution.map((item) => (
-                <div key={item.ext} className="distribution-item size-dist-item">
-                  <span className="dist-label">.{item.ext}</span>
-                  <div className="dist-bar-container">
+                <div key={item.ext} className={styles.distributionItem}>
+                  <span className={styles.distLabel}>.{item.ext}</span>
+                  <div className={styles.distBarContainer}>
                     <div
-                      className="dist-bar size-bar"
+                      className={styles.distBar}
                       style={{
                         width: `${item.percentage}%`,
                         backgroundColor: getColorForType(item.ext),
                       }}
                     ></div>
                   </div>
-                  <span className="dist-value">{item.percentage}%</span>
-                  <span className="dist-sub-value">({formatBytes(item.size)})</span>
+                  <span className={styles.distValue}>{item.percentage}%</span>
+                  <span className={styles.distSubValue}>({formatBytes(item.size)})</span>
                 </div>
               ))}
             </div>
@@ -180,37 +181,37 @@ export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: Extended
 
         {/* Children List Card - Spans full width */}
         {childrenIds.length > 0 && (
-          <div className="details-card children-card">
-            <h3 className="card-title">子节点 ({childrenIds.length})</h3>
-            <div className="children-table">
-              <div className="child-header">
-                <div className="child-type-col">类型</div>
-                <div className="child-name-col">名称</div>
-                <div className="child-files-col">文件数</div>
-                <div className="child-size-col">大小</div>
-                <div className="child-dep-count-col">被依赖次数</div>
+          <div className={`${styles.detailsCard} ${styles.childrenCard}`}>
+            <h3 className={styles.cardTitle}>子节点 ({childrenIds.length})</h3>
+            <div className={styles.childrenTable}>
+              <div className={styles.childHeader}>
+                <div className={styles.childTypeCol}>类型</div>
+                <div className={styles.childNameCol}>名称</div>
+                <div className={styles.childFilesCol}>文件数</div>
+                <div className={styles.childSizeCol}>大小</div>
+                <div className={styles.childDepCountCol}>被依赖次数</div>
               </div>
-              <div className="children-rows">
+              <div className={styles.childrenRows}>
                 {node.children?.map((child) => (
                   <div
                     key={child.id}
-                    className="child-row clickable-row"
+                    className={`${styles.childRow} ${styles.clickableRow}`}
                     onClick={() => onChildNodeSelect(child.id)}
                     title={`跳转到依赖图: ${child.label || child.id}`}
                   >
-                    <div className="child-type-col">
-                      <span className="child-type-badge">{child.type}</span>
+                    <div className={styles.childTypeCol}>
+                      <span className={styles.childTypeBadge}>{child.type}</span>
                     </div>
-                    <div className="child-name-col" title={child.id}>
+                    <div className={styles.childNameCol} title={child.id}>
                       {child.label || child.id}
                     </div>
-                    <div className="child-files-col">
+                    <div className={styles.childFilesCol}>
                       {child.properties?.fileCount ? `${child.properties.fileCount} 文件` : '-'}
                     </div>
-                    <div className="child-size-col">
+                    <div className={styles.childSizeCol}>
                       {child.properties?.totalSize ? formatBytes(child.properties.totalSize) : '-'}
                     </div>
-                    <div className="child-dep-count-col">
+                    <div className={styles.childDepCountCol}>
                       {childDependencyCounts.get(child.id) || 0}
                     </div>
                   </div>
@@ -223,16 +224,3 @@ export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: Extended
     </div>
   );
 }
-
-/* Add to index.css or component style
-.details-list {
-  list-style: none;
-  padding-left: 15px;
-  font-size: 0.9em;
-  max-height: 150px; 
-  overflow-y: auto;
-}
-.details-list li {
-  margin-bottom: 4px;
-}
-*/

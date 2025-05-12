@@ -2,6 +2,7 @@ import G6, { Graph } from '@antv/g6';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { TreeNodeData } from '../types';
+import styles from './DependencyGraph.module.css';
 
 interface DependencyGraphProps {
   selectedNode: TreeNodeData | null;
@@ -449,54 +450,29 @@ export function DependencyGraph({
   }, []);
 
   return (
-    <div className="dependency-graph">
+    <div
+      style={{
+        position: 'relative',
+        height: 'calc(100vh - 250px)',
+        minHeight: '500px',
+        overflow: 'hidden',
+        border: '1px solid #eee',
+        borderRadius: '4px',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {isLoading && (
-        <div className="graph-placeholder">
-          <div className="graph-placeholder-text">
+        <div className={styles.graphPlaceholder}>
+          <div className={styles.graphPlaceholderText}>
             {!selectedNode
               ? '请从左侧选择一个节点以查看其依赖关系'
               : `正在渲染 "${selectedNode.label || selectedNode.id}" 的依赖关系...`}
           </div>
         </div>
       )}
-      <div className="graph-container" ref={containerRef}></div>
-      <style jsx>{`
-        .dependency-graph {
-          position: relative;
-          height: calc(100vh - 250px); /* Use viewport height */
-          min-height: 500px; /* Minimum height */
-          overflow: hidden;
-          border: 1px solid #eee;
-          border-radius: 4px;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-        .graph-container {
-          width: 100%;
-          height: 100%;
-          background-color: #fafafa;
-          z-index: 1;
-        }
-        .graph-placeholder {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background-color: rgba(250, 250, 250, 0.8);
-          z-index: 2;
-          color: #999;
-          font-style: italic;
-          text-align: center;
-        }
-        .graph-placeholder-text {
-          padding: 20px;
-        }
-      `}</style>
+      <div className={styles.graphContainer} ref={containerRef}></div>
     </div>
   );
 }

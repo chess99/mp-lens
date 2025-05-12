@@ -1,0 +1,280 @@
+/* NodeDetails.module.css */
+
+.nodeDetails {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detailsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.detailsCard {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.detailsHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 4px solid #4285f4;
+  grid-column: 1 / -1;
+}
+
+.detailTitleArea {
+  display: flex;
+  flex-direction: column;
+}
+
+.nodeTitle {
+  margin: 0;
+  font-size: 1.5em;
+  word-break: break-word;
+}
+
+.nodeTypeBadge {
+  display: inline-block;
+  background-color: #eaf2ff;
+  color: #4285f4;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-bottom: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.nodeStats {
+  display: flex;
+  gap: 20px;
+}
+
+.nodeStatItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statValue {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #343a40;
+}
+
+.statLabel {
+  font-weight: bold;
+  color: #495057;
+}
+
+.cardTitle {
+  margin: 0 0 16px 0;
+  font-size: 1.1em;
+  color: #424242;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.nodePath {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 4px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+/* Distribution Lists */
+.distributionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scrollableList {
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.scrollableList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollableList::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.scrollableList::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.scrollableList::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+.distributionItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.distLabel {
+  flex: 0 0 60px;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.distBarContainer {
+  flex: 1;
+  height: 10px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.distBar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.distValue {
+  flex: 0 0 50px;
+  text-align: right;
+  font-weight: 500;
+  color: #424242;
+}
+
+.distSubValue {
+  flex: 0 0 70px;
+  text-align: right;
+  font-size: 0.85em;
+  color: #757575;
+  margin-left: 5px;
+  white-space: nowrap;
+}
+
+/* Children Table */
+.childrenCard {
+  grid-column: 1 / -1;
+}
+
+.childrenTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.childHeader {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-weight: 500;
+  color: #666;
+  background-color: #f9f9f9;
+}
+
+.childRow {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  align-items: center;
+}
+
+.childRow:hover {
+  background-color: #f5f5f5;
+}
+
+.childTypeCol {
+  flex: 0 0 80px;
+  padding: 0 8px;
+}
+
+.childNameCol {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.childFilesCol {
+  flex: 0 0 80px;
+  text-align: right;
+  padding: 0 8px;
+}
+
+.childSizeCol {
+  flex: 0 0 80px;
+  text-align: right;
+  padding: 0 8px;
+}
+
+.childDepCountCol {
+  width: 100px;
+  text-align: right;
+  padding-right: 15px;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+.childTypeBadge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  color: #666;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.childrenRows {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover {
+  background-color: #eee;
+}
+
+/* Detail Lists */
+.detailsList {
+  list-style: none;
+  padding-left: 15px;
+  font-size: 0.9em;
+  max-height: 150px;
+  overflow-y: auto;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  margin-top: 5px;
+}
+
+.detailsList li {
+  margin-bottom: 4px;
+  padding: 2px 5px;
+}
+
+.detailsList li:nth-child(even) {
+  background-color: #fff;
+}

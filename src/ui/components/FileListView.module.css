@@ -1,0 +1,156 @@
+/* FileListView.module.css */
+
+.fileListView {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.fileListHeader {
+  margin-bottom: 15px;
+}
+
+.fileListHeader h3 {
+  margin: 0;
+  font-size: 1.2em;
+  color: #343a40;
+}
+
+.fileTableContainer {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.fileTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.fileTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #f8f9fa;
+}
+
+.fileTable th {
+  padding: 12px 15px;
+  text-align: left;
+  color: #495057;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.fileTable th.sizeColumn,
+.fileTable th.refCountColumn {
+  text-align: right;
+}
+
+.fileTable tbody tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.fileTable tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.fileTable td {
+  padding: 10px 15px;
+  word-break: break-all;
+}
+
+.sequenceColumn {
+  width: 60px;
+  text-align: center;
+}
+
+.fileColumn {
+  width: auto;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sizeColumn {
+  width: 120px;
+  text-align: right;
+}
+
+.refCountColumn {
+  width: 100px;
+  text-align: right;
+  padding-right: 15px;
+}
+
+.emptyState {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.rootPath {
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+.fileFilterControls {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fileFilterControls span {
+  font-weight: 500;
+  color: #495057;
+  margin-right: 5px;
+}
+
+.filterButton {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.filterButton:hover {
+  background-color: #e9ecef;
+  border-color: #bbb;
+}
+
+.filterButton.active {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+  font-weight: bold;
+}
+
+.sortable {
+  user-select: none;
+}
+
+/* Ensure tabular numbers for better alignment */
+.refCountColumn,
+.sizeColumn {
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
