@@ -287,9 +287,21 @@ export class ProjectStructureBuilder {
     const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss'];
 
     for (const ext of extensions) {
-      const filePath = absoluteBasePath + ext;
-      if (fs.existsSync(filePath)) {
-        const moduleNode = this.addNodeForFile(filePath, 'Module');
+      // Check both patterns: basePath.ext and basePath/index.ext
+      const filePathDirect = absoluteBasePath + ext;
+      const filePathIndex = path.join(absoluteBasePath, 'index' + ext);
+
+      let foundFilePath: string | null = null;
+
+      if (fs.existsSync(filePathDirect)) {
+        foundFilePath = filePathDirect;
+      } else if (fs.existsSync(filePathIndex)) {
+        foundFilePath = filePathIndex;
+      }
+
+      // If either path was found, process it
+      if (foundFilePath) {
+        const moduleNode = this.addNodeForFile(foundFilePath, 'Module');
         if (moduleNode) {
           // Assign structural parent ID (using the canonical ownerId)
           if (!moduleNode.properties) moduleNode.properties = {};
@@ -301,7 +313,7 @@ export class ProjectStructureBuilder {
           // If it's a JSON file, parse it for components
           if (ext === '.json') {
             // Pass the canonical ownerId and the absolute path to the JSON
-            await this.parseComponentJson(ownerId, filePath);
+            await this.parseComponentJson(ownerId, foundFilePath);
           }
           // If it's a script or template, parse dependencies
           else if ('.js,.ts,.wxml,.wxss'.includes(ext)) {
