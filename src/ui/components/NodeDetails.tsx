@@ -1,6 +1,13 @@
 import { useMemo } from 'preact/hooks';
+import type { ProjectStructure } from '../../analyzer/project-structure'; // Import necessary types
 import { NodeDetailsProps } from '../types';
 import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
+
+// Update NodeDetailsProps to include fullGraphData and the callback
+export interface ExtendedNodeDetailsProps extends NodeDetailsProps {
+  fullGraphData: ProjectStructure;
+  onChildNodeSelect: (nodeId: string) => void;
+}
 
 // Assign consistent colors to file types
 function getFileTypeColor(fileType: string): string {
@@ -51,13 +58,24 @@ function getFileTypeColor(fileType: string): string {
   return fileTypeColorMap[fileType] || '#4285F4'; // Default to blue
 }
 
-export function NodeDetails({ node }: NodeDetailsProps) {
+export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: ExtendedNodeDetailsProps) {
   const fileCount = node.properties?.fileCount || 0;
   const totalSize = node.properties?.totalSize || 0;
   const fileTypes = node.properties?.fileTypes || {};
   const sizeByType = node.properties?.sizeByType || {};
   const childrenIds = node.children?.map((c) => c.id) || [];
   const displayPath = node.properties?.basePath || node.properties?.path;
+
+  // Calculate dependency counts for child nodes
+  const childDependencyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!node.children || !fullGraphData || !fullGraphData.links) return counts;
+
+    for (const link of fullGraphData.links) {
+      counts.set(link.target, (counts.get(link.target) || 0) + 1);
+    }
+    return counts;
+  }, [fullGraphData.links]); // Only depends on all links in the graph
 
   // Calculate top file types by count
   const topFileTypes = useMemo(() => {
@@ -170,10 +188,16 @@ export function NodeDetails({ node }: NodeDetailsProps) {
                 <div className="child-name-col">名称</div>
                 <div className="child-files-col">文件数</div>
                 <div className="child-size-col">大小</div>
+                <div className="child-dep-count-col">被依赖次数</div>
               </div>
               <div className="children-rows">
                 {node.children?.map((child) => (
-                  <div key={child.id} className="child-row">
+                  <div
+                    key={child.id}
+                    className="child-row clickable-row"
+                    onClick={() => onChildNodeSelect(child.id)}
+                    title={`跳转到依赖图: ${child.label || child.id}`}
+                  >
                     <div className="child-type-col">
                       <span className="child-type-badge">{child.type}</span>
                     </div>
@@ -185,6 +209,9 @@ export function NodeDetails({ node }: NodeDetailsProps) {
                     </div>
                     <div className="child-size-col">
                       {child.properties?.totalSize ? formatBytes(child.properties.totalSize) : '-'}
+                    </div>
+                    <div className="child-dep-count-col">
+                      {childDependencyCounts.get(child.id) || 0}
                     </div>
                   </div>
                 ))}

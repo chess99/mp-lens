@@ -856,3 +856,20 @@ body {
   font-feature-settings: 'tnum'; /* Align numbers */
   font-variant-numeric: tabular-nums; /* Align numbers */
 }
+
+/* Styles for NodeDetails children table */
+.children-table .child-dep-count-col {
+  width: 100px; /* Adjust width as needed */
+  text-align: right;
+  padding-right: 15px;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}
+
+.children-table .clickable-row {
+  cursor: pointer;
+}
+
+.children-table .clickable-row:hover {
+  background-color: #eee; /* Or your theme's hover color */
+}

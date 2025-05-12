@@ -134,6 +134,12 @@ export function App(props: AppProps) {
     setActiveTabId('graph'); // Switch to the graph tab
   };
 
+  // Handler for when a child node is clicked in NodeDetails view
+  const handleChildNodeGraphJump = (nodeId: string) => {
+    handleGraphNodeSelect(nodeId);
+    setActiveTabId('graph');
+  };
+
   if (
     initialTreeData.id === 'loading' ||
     initialTreeData.id === 'empty' ||
@@ -199,7 +205,17 @@ export function App(props: AppProps) {
           {currentMode === 'tree' ? (
             <Tabs
               tabs={[
-                { id: 'details', label: '节点详情', content: <NodeDetails node={selectedNode} /> },
+                {
+                  id: 'details',
+                  label: '节点详情',
+                  content: (
+                    <NodeDetails
+                      node={selectedNode}
+                      fullGraphData={fullGraphData}
+                      onChildNodeSelect={handleChildNodeGraphJump}
+                    />
+                  ),
+                },
                 {
                   id: 'graph',
                   label: '依赖图',
