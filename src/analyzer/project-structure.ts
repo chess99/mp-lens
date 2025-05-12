@@ -22,7 +22,7 @@ export interface GraphNode {
     // File properties (for Module)
     fileSize?: number;
     fileExt?: string;
-    // Aggregated statistics (populated later)
+    // Statistics properties (calculated in UI, not populated by backend)
     fileCount?: number;
     totalSize?: number;
     fileTypes?: Record<string, number>; // { ext: count }

@@ -1,17 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { NodeDetailsProps } from '../types';
 import { getReachableModules } from '../utils';
-
-// Format bytes to readable format
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
-}
+import { formatBytes } from '../utils/stats-calculator'; // Import our formatBytes utility
 
 // ADD HELPER: Get file extension from path
 function getFileExtension(path: string): string {

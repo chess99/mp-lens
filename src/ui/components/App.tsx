@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { TreeNodeData } from '../types'; // AppProps might need adjustment if `data` prop is removed
+import { calculateTreeStats, formatBytes } from '../utils/stats-calculator'; // Import our new stats calculator
 import { buildTreeFromGraphData } from '../utils/tree-builder'; // Import the new tree builder
 import { DependencyGraph } from './DependencyGraph';
 import { FileListView } from './FileListView';
@@ -8,17 +9,6 @@ import { NodeDetails } from './NodeDetails';
 import { Tabs } from './Tabs';
 import { TreeView } from './TreeView';
 import { UnusedFilesView } from './UnusedFilesView';
-
-// 格式化字节单位
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
-}
 
 declare global {
   interface Window {
@@ -57,10 +47,24 @@ export function App(props: AppProps) {
   }
 
   const fullGraphData = useMemo(() => window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure, []);
-  const initialTreeData = useMemo(
+
+  // First build the tree structure from graph data
+  const initialTreeStructure = useMemo(
     () => buildTreeFromGraphData(fullGraphData) || emptyTreeNode,
     [fullGraphData],
   );
+
+  // Then calculate accurate statistics for the tree
+  const initialTreeData = useMemo(() => {
+    if (
+      initialTreeStructure.id === 'loading' ||
+      initialTreeStructure.id === 'empty' ||
+      initialTreeStructure.id === 'error_root'
+    ) {
+      return initialTreeStructure;
+    }
+    return calculateTreeStats(initialTreeStructure, fullGraphData.nodes, fullGraphData.links);
+  }, [initialTreeStructure, fullGraphData]);
 
   const [selectedNode, setSelectedNode] = useState<TreeNodeData>(initialTreeData);
   const [currentMode, setCurrentMode] = useState<'tree' | 'unusedFiles'>('tree');
@@ -161,7 +165,7 @@ export function App(props: AppProps) {
           <aside className="sidebar">
             <div className="tree-container">
               <TreeView
-                data={initialTreeData} // Pass the dynamically built tree
+                data={initialTreeData} // Pass the dynamically built tree with stats
                 onNodeSelect={handleNodeSelect}
                 selectedNodeId={selectedNode.id}
               />
