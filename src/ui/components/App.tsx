@@ -1,6 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
-import { AppProps, TreeNodeData } from '../types';
+import { TreeNodeData } from '../types'; // AppProps might need adjustment if `data` prop is removed
+import { buildTreeFromGraphData } from '../utils/tree-builder'; // Import the new tree builder
 import { DependencyGraph } from './DependencyGraph';
 import { FileListView } from './FileListView';
 import { NodeDetails } from './NodeDetails';
@@ -21,14 +22,12 @@ function formatBytes(bytes: number, decimals = 2): string {
 
 declare global {
   interface Window {
-    __MP_LENS_DATA__?: TreeNodeData;
     __MP_LENS_TITLE__?: string;
     __MP_LENS_GRAPH_DATA__?: ProjectStructure;
     __MP_LENS_UNUSED_FILES__?: string[];
   }
 }
 
-// Define a default empty structure matching the type
 const emptyProjectStructure: ProjectStructure = {
   nodes: [],
   links: [],
@@ -36,82 +35,115 @@ const emptyProjectStructure: ProjectStructure = {
   miniappRoot: '',
 };
 
-export function App({ data }: AppProps) {
-  // State for the currently selected node
-  const [selectedNode, setSelectedNode] = useState<TreeNodeData>(data); // Default to root node
-  // State for the current view mode
+const emptyTreeNode: TreeNodeData = {
+  id: 'loading',
+  label: 'Loading tree...',
+  type: 'Unknown',
+  properties: { fileCount: 0, totalSize: 0 },
+  children: [],
+};
+
+// AppProps might no longer need a `data` prop if tree is built internally
+export interface AppProps {
+  // No props are expected for now
+  // If we need to pass something specific from main.tsx later, it can be added here.
+}
+
+export function App(props: AppProps) {
+  // Accept props object directly
+  // Log props to satisfy linter if AppProps is empty, can be removed if AppProps gets members
+  if (Object.keys(props).length > 0) {
+    console.log('[App] Props received:', props);
+  }
+
+  const fullGraphData = useMemo(() => window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure, []);
+  const initialTreeData = useMemo(
+    () => buildTreeFromGraphData(fullGraphData) || emptyTreeNode,
+    [fullGraphData],
+  );
+
+  const [selectedNode, setSelectedNode] = useState<TreeNodeData>(initialTreeData);
   const [currentMode, setCurrentMode] = useState<'tree' | 'unusedFiles'>('tree');
 
-  // Callback for TreeView (left menu)
   const handleNodeSelect = (node: TreeNodeData) => {
     setSelectedNode(node);
     setCurrentMode('tree');
   };
 
-  // Use the defined default structure
-  const fullGraphData = window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure;
-
-  // *** NEW: Callback for DependencyGraph ***
   const handleGraphNodeSelect = (nodeId: string) => {
-    // Use the state variable which has a default value
     const nodeData = fullGraphData.nodes.find((n) => n.id === nodeId);
     if (nodeData) {
-      console.log('[App] Graph node selected, updating state:', nodeId);
-      setSelectedNode(nodeData);
-      // Ensure we are in tree mode if a graph node is clicked
-      // (though technically it should only be visible in tree mode)
+      // If a graph node is selected, we might want to find its representation
+      // in the *current* tree structure for TreeView selection, or rebuild/
+      // focus the tree. For now, let's ensure selectedNode is a valid TreeNodeData.
+      // This might mean we need a way to map a graph node ID to a tree node.
+      // For simplicity, we'll just update selectedNode with its properties.
+      // TreeView might need to be able to find this node by ID.
+      setSelectedNode({
+        id: nodeData.id,
+        label: nodeData.label,
+        type: nodeData.type,
+        properties: nodeData.properties,
+        // children might not be directly available here without tree traversal
+      });
       setCurrentMode('tree');
     } else {
       console.warn(`[App] Node data not found for ID: ${nodeId}`);
     }
   };
 
-  // --- Read REAL Unused Files Data ---
-  const realUnusedFiles = window.__MP_LENS_UNUSED_FILES__ || [];
+  const realUnusedFiles = useMemo(() => window.__MP_LENS_UNUSED_FILES__ || [], []);
 
-  // Calculate root stats using real data
-  const rootStats = {
-    totalFiles: data.properties?.fileCount || 0,
-    totalSize: data.properties?.totalSize || 0,
-    unusedFileCount: realUnusedFiles.length,
-    unusedFilesList: realUnusedFiles,
-  };
+  // Calculate root stats using the root of the built tree
+  const rootStats = useMemo(() => {
+    const rootNodeForStats = initialTreeData; // Use the root of the built tree
+    return {
+      totalFiles: rootNodeForStats.properties?.fileCount || 0,
+      totalSize: rootNodeForStats.properties?.totalSize || 0,
+      unusedFileCount: realUnusedFiles.length,
+      unusedFilesList: realUnusedFiles,
+    };
+  }, [initialTreeData, realUnusedFiles]);
 
-  // Rename function for clarity
-  const switchToUnusedFilesMode = () => {
-    setCurrentMode('unusedFiles');
-  };
+  const switchToUnusedFilesMode = () => setCurrentMode('unusedFiles');
+  const switchToTreeMode = () => setCurrentMode('tree');
 
-  // Handler to ensure we are in tree mode
-  const switchToTreeMode = () => {
-    // Optional: Could also reset selectedNode to root if desired, but let's keep it simple
-    // if (currentMode !== 'tree') {
-    //   setSelectedNode(data);
-    // }
-    setCurrentMode('tree');
-  };
+  if (
+    initialTreeData.id === 'loading' ||
+    initialTreeData.id === 'empty' ||
+    initialTreeData.id === 'error_root'
+  ) {
+    return (
+      <div class="app-container mode-tree">
+        <header class="header">
+          <h1>{window.__MP_LENS_TITLE__ || '依赖可视化'}</h1>
+        </header>
+        <main class="main-container mode-tree">
+          <section
+            class="content"
+            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+          >
+            <p>{initialTreeData.label}</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className={`app-container mode-${currentMode}`}>
       <header className="header">
         <h1>{window.__MP_LENS_TITLE__ || '依赖可视化'}</h1>
         <div className="overview-stats">
-          {/* Total Files: Clickable, ensures tree mode */}
-          <div
-            className="stat-item clickable"
-            title="返回文件树视图"
-            onClick={switchToTreeMode} // Use new handler
-          >
+          <div className="stat-item clickable" title="返回文件树视图" onClick={switchToTreeMode}>
             <span className="stat-label">总文件数:</span>
             <span className="stat-value">{rootStats.totalFiles}</span>
             <span className="stat-indicator">›</span>
           </div>
-          {/* Total Size remains non-clickable */}
           <div className="stat-item">
             <span className="stat-label">总代码量:</span>
             <span className="stat-value">{formatBytes(rootStats.totalSize)}</span>
           </div>
-          {/* Unused Files: Clickable, switches to unusedFiles mode */}
           <div
             className="stat-item clickable"
             title="点击查看未使用的文件列表"
@@ -129,7 +161,7 @@ export function App({ data }: AppProps) {
           <aside className="sidebar">
             <div className="tree-container">
               <TreeView
-                data={data}
+                data={initialTreeData} // Pass the dynamically built tree
                 onNodeSelect={handleNodeSelect}
                 selectedNodeId={selectedNode.id}
               />
@@ -141,19 +173,15 @@ export function App({ data }: AppProps) {
           {currentMode === 'tree' ? (
             <Tabs
               tabs={[
-                {
-                  id: 'details',
-                  label: '节点详情',
-                  content: <NodeDetails node={selectedNode} />,
-                },
+                { id: 'details', label: '节点详情', content: <NodeDetails node={selectedNode} /> },
                 {
                   id: 'graph',
                   label: '依赖图',
                   content: (
                     <DependencyGraph
-                      selectedNode={selectedNode}
+                      selectedNode={selectedNode} // selectedNode is TreeNodeData
                       fullGraphData={fullGraphData}
-                      onNodeSelect={handleGraphNodeSelect}
+                      onNodeSelect={handleGraphNodeSelect} // This callback receives nodeId (string)
                     />
                   ),
                 },

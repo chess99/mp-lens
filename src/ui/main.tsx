@@ -1,8 +1,9 @@
 import { Chart, ChartType, registerables } from 'chart.js'; // Import Chart.js and ChartType
 import { render } from 'preact';
-import { App } from './components/App';
-import './index.css'; // Import the CSS file
-import { ChartData, TreeNodeData } from './types';
+import type { ProjectStructure } from '../analyzer/project-structure'; // Corrected import path
+import { App } from './components/App'; // Re-added App import
+import './index.css';
+import { ChartData } from './types'; // TreeNodeData might not be needed here anymore
 
 // Register necessary Chart.js components
 Chart.register(...registerables);
@@ -11,7 +12,9 @@ Chart.register(...registerables);
 declare global {
   interface Window {
     Chart?: any; // 使用any类型来适配Chart.js
-    __MP_LENS_DATA__?: TreeNodeData; // Correct data variable name and type
+    __MP_LENS_GRAPH_DATA__?: ProjectStructure; // Use the correct type
+    __MP_LENS_UNUSED_FILES__?: string[]; // Keep this
+    __MP_LENS_TITLE__?: string; // Keep this
   }
 }
 
@@ -21,11 +24,10 @@ let currentCharts: Chart[] = []; // Keep track of chart instances
  * Client-side rendering function
  */
 function performRender(): void {
-  const data = window.__MP_LENS_DATA__;
-  if (!data) {
-    console.error('Could not find __MP_LENS_DATA__. Render failed.');
-    // Optionally render an error message
-    render(<div>Error: Data not found.</div>, document.getElementById('app')!);
+  // Check if the graph data is available, which is now the primary source
+  if (!window.__MP_LENS_GRAPH_DATA__) {
+    console.error('Could not find __MP_LENS_GRAPH_DATA__. Render failed.');
+    render(<div>Error: Graph data not found.</div>, document.getElementById('app')!);
     return;
   }
 
@@ -35,8 +37,8 @@ function performRender(): void {
     return;
   }
 
-  // Render the app (not hydrate)
-  render(<App data={data} />, rootElement);
+  // Render the app - App no longer takes a `data` prop derived from __MP_LENS_DATA__
+  render(<App />, rootElement); // Pass AppProps if defined and needed
 
   // Call initCharts AFTER rendering App, as it relies on elements created by App
   initCharts();

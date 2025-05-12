@@ -54,18 +54,25 @@ describe('HtmlGeneratorPreact', () => {
 
     // Verify HTML structure and embedded data
     expect(generatedHtml).toContain('<title>Test HTML</title>');
+
+    // Verify __MP_LENS_GRAPH_DATA__ is embedded
     expect(generatedHtml).toMatch(
-      /<script>[\s\S]*window\.__MP_LENS_DATA__\s*=\s*{.*}[\s\S]*;\s*<\/script>/,
+      /<script>[\s\S]*window\.__MP_LENS_GRAPH_DATA__\s*=\s*{.*"rootNodeId":"app".*}\s*;[\s\S]*<\/script>/,
     );
+
+    // Verify __MP_LENS_UNUSED_FILES__ is embedded
     expect(generatedHtml).toMatch(
-      /<script>[\s\S]*window\.__MP_LENS_GRAPH_DATA__\s*=\s*{.*}[\s\S]*;\s*<\/script>/,
+      /<script>[\s\S]*window\.__MP_LENS_UNUSED_FILES__\s*=\s*\[[^\]]*\]\s*;[\s\S]*<\/script>/, // Updated regex for unused files
     );
+
+    // Verify __MP_LENS_TITLE__ is embedded
     expect(generatedHtml).toMatch(
-      /<script>[\s\S]*window\.__MP_LENS_UNUSED_FILES__\s*=\s*\[.*][\s\S]*;\s*<\/script>/,
+      /<script>[\s\S]*window\.__MP_LENS_TITLE__\s*=\s*".*"\s*;[\s\S]*<\/script>/,
     );
-    expect(generatedHtml).toMatch(
-      /<script>[\s\S]*window\.__MP_LENS_TITLE__\s*=\s*".*"[\s\S]*;\s*<\/script>/,
-    );
+
+    // Verify main JS bundle script tag is present
+    expect(generatedHtml).toContain('<script type="module"');
+    expect(generatedHtml).toContain('</script>');
 
     // Check that assets were requested and included
     expect(AssetResolver.getJsAsset).toHaveBeenCalledWith('assets/main.js');
