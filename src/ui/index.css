@@ -825,3 +825,34 @@ body {
   margin-top: 5px;
   font-style: italic;
 }
+
+/* Add styles for FileListView table columns */
+.file-table th.sequence-column,
+.file-table td.sequence-column {
+  width: 60px; /* Adjust as needed */
+  text-align: center;
+}
+
+.file-table th.ref-count-column,
+.file-table td.ref-count-column {
+  width: 100px; /* Adjust as needed */
+  text-align: right; /* Numbers usually look better right-aligned */
+  padding-right: 15px; /* Add some padding */
+}
+
+.file-table th.size-column,
+.file-table td.size-column {
+  width: 120px; /* Adjust as needed */
+  text-align: right;
+  padding-right: 15px;
+}
+
+.file-table th.sortable {
+  user-select: none; /* Prevent text selection on click */
+}
+
+.file-table td.ref-count-column,
+.file-table td.size-column {
+  font-feature-settings: 'tnum'; /* Align numbers */
+  font-variant-numeric: tabular-nums; /* Align numbers */
+}

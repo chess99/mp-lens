@@ -1,8 +1,15 @@
-import { useState } from 'preact/hooks';
 import { TabsProps } from '../types';
 
-export function Tabs({ tabs }: TabsProps) {
-  const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || '');
+// Define props including the controlled state
+interface ControlledTabsProps extends TabsProps {
+  // Extend existing TabsProps for the 'tabs' array type
+  activeTabId: string;
+  onTabChange: (tabId: string) => void;
+}
+
+export function Tabs({ tabs, activeTabId, onTabChange }: ControlledTabsProps) {
+  // Internal state is removed
+  // const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id || '');
 
   return (
     <div className="tabs-container">
@@ -10,7 +17,7 @@ export function Tabs({ tabs }: TabsProps) {
         {tabs.map((tab) => (
           <li key={tab.id} className="tab-item">
             <button
-              onClick={() => setActiveTabId(tab.id)}
+              onClick={() => onTabChange(tab.id)}
               className={activeTabId === tab.id ? 'active' : ''}
               role="tab"
               aria-selected={activeTabId === tab.id}

@@ -38,6 +38,25 @@ export interface AppProps {
   // If we need to pass something specific from main.tsx later, it can be added here.
 }
 
+// Helper function to find a node in the tree by its ID
+function findTreeNodeById(treeNode: TreeNodeData | null, id: string): TreeNodeData | null {
+  if (!treeNode) {
+    return null;
+  }
+  if (treeNode.id === id) {
+    return treeNode;
+  }
+  if (treeNode.children) {
+    for (const child of treeNode.children) {
+      const found = findTreeNodeById(child, id);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
+}
+
 export function App(props: AppProps) {
   // Accept props object directly
   // Log props to satisfy linter if AppProps is empty, can be removed if AppProps gets members
@@ -55,31 +74,41 @@ export function App(props: AppProps) {
 
   const [selectedNode, setSelectedNode] = useState<TreeNodeData>(initialTreeData);
   const [currentMode, setCurrentMode] = useState<'tree' | 'unusedFiles'>('tree');
+  const [activeTabId, setActiveTabId] = useState<string>('details'); // Default to details tab
 
   const handleNodeSelect = (node: TreeNodeData) => {
     setSelectedNode(node);
     setCurrentMode('tree');
+    setActiveTabId('details'); // Reset to details tab when a tree node is selected
   };
 
   const handleGraphNodeSelect = (nodeId: string) => {
-    const nodeData = fullGraphData.nodes.find((n) => n.id === nodeId);
-    if (nodeData) {
-      // If a graph node is selected, we might want to find its representation
-      // in the *current* tree structure for TreeView selection, or rebuild/
-      // focus the tree. For now, let's ensure selectedNode is a valid TreeNodeData.
-      // This might mean we need a way to map a graph node ID to a tree node.
-      // For simplicity, we'll just update selectedNode with its properties.
-      // TreeView might need to be able to find this node by ID.
-      setSelectedNode({
-        id: nodeData.id,
-        label: nodeData.label,
-        type: nodeData.type,
-        properties: nodeData.properties,
-        // children might not be directly available here without tree traversal
-      });
+    // Find the corresponding node within the constructed tree data
+    const treeNode = findTreeNodeById(initialTreeData, nodeId);
+
+    if (treeNode) {
+      setSelectedNode(treeNode); // Set the found node from the tree
       setCurrentMode('tree');
     } else {
-      console.warn(`[App] Node data not found for ID: ${nodeId}`);
+      // Fallback or error handling if node not found in the tree
+      // This might happen if graph data includes nodes not represented in the tree
+      console.warn(
+        `[App] TreeNode not found in initialTreeData for ID: ${nodeId}. Falling back to graph data.`,
+      );
+      // Optional Fallback: use raw data like before, but be aware it might be incomplete for details view
+      const nodeData = fullGraphData.nodes.find((n) => n.id === nodeId);
+      if (nodeData) {
+        setSelectedNode({
+          // This fallback node will lack children and accurate calculated stats
+          id: nodeData.id,
+          label: nodeData.label,
+          type: nodeData.type,
+          properties: nodeData.properties,
+        });
+        setCurrentMode('tree');
+      } else {
+        console.error(`[App] GraphNode also not found for ID: ${nodeId}`);
+      }
     }
   };
 
@@ -98,6 +127,12 @@ export function App(props: AppProps) {
 
   const switchToUnusedFilesMode = () => setCurrentMode('unusedFiles');
   const switchToTreeMode = () => setCurrentMode('tree');
+
+  // Handler for when a file is clicked in FileListView
+  const handleFileSelect = (moduleId: string) => {
+    handleGraphNodeSelect(moduleId); // Reuse existing logic to select the node
+    setActiveTabId('graph'); // Switch to the graph tab
+  };
 
   if (
     initialTreeData.id === 'loading' ||
@@ -179,9 +214,11 @@ export function App(props: AppProps) {
                 {
                   id: 'filelist',
                   label: '文件列表',
-                  content: <FileListView node={selectedNode} />,
+                  content: <FileListView node={selectedNode} onFileSelect={handleFileSelect} />, // Pass handler
                 },
               ]}
+              activeTabId={activeTabId} // Pass state
+              onTabChange={setActiveTabId} // Pass setter
             />
           ) : (
             <UnusedFilesView
