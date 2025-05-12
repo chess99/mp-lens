@@ -54,8 +54,6 @@ export class HtmlGeneratorPreact {
   <title>${options.title || '依赖可视化'}</title>
   <style>
     ${cssContent}
-    body { margin: 0; font-family: sans-serif; background-color: #f8f9fa; color: #212529; }
-    #app { padding: 20px; }
   </style>
 </head>
 <body>

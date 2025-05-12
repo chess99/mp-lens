@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { TreeNodeData } from '../types'; // AppProps might need adjustment if `data` prop is removed
-import { calculateTreeStats, formatBytes } from '../utils/stats-calculator'; // Import our new stats calculator
-import { buildTreeFromGraphData } from '../utils/tree-builder'; // Import the new tree builder
+import { buildTreeWithStats, formatBytes } from '../utils/dependency-tree-processor'; // NEW
 import { DependencyGraph } from './DependencyGraph';
 import { FileListView } from './FileListView';
 import { NodeDetails } from './NodeDetails';
@@ -48,23 +47,11 @@ export function App(props: AppProps) {
 
   const fullGraphData = useMemo(() => window.__MP_LENS_GRAPH_DATA__ || emptyProjectStructure, []);
 
-  // First build the tree structure from graph data
-  const initialTreeStructure = useMemo(
-    () => buildTreeFromGraphData(fullGraphData) || emptyTreeNode,
+  // Build the tree structure AND calculate stats in one step
+  const initialTreeData = useMemo(
+    () => buildTreeWithStats(fullGraphData) || emptyTreeNode,
     [fullGraphData],
   );
-
-  // Then calculate accurate statistics for the tree
-  const initialTreeData = useMemo(() => {
-    if (
-      initialTreeStructure.id === 'loading' ||
-      initialTreeStructure.id === 'empty' ||
-      initialTreeStructure.id === 'error_root'
-    ) {
-      return initialTreeStructure;
-    }
-    return calculateTreeStats(initialTreeStructure, fullGraphData.nodes, fullGraphData.links);
-  }, [initialTreeStructure, fullGraphData]);
 
   const [selectedNode, setSelectedNode] = useState<TreeNodeData>(initialTreeData);
   const [currentMode, setCurrentMode] = useState<'tree' | 'unusedFiles'>('tree');

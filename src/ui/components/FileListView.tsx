@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import { NodeDetailsProps } from '../types';
-import { getReachableModules } from '../utils';
-import { formatBytes } from '../utils/stats-calculator'; // Import our formatBytes utility
+import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED import path
 
 // ADD HELPER: Get file extension from path
 function getFileExtension(path: string): string {
@@ -35,12 +34,15 @@ export function FileListView({ node }: NodeDetailsProps) {
 
   // Collect all reachable module files first
   const allFiles = useMemo(() => {
-    const moduleIds = getReachableModules(fullGraphData.nodes, fullGraphData.links, node.id);
+    // Get module IDs directly from the processed node properties
+    const moduleIds = node.properties?.reachableModuleIds || new Set<string>();
+    // const moduleIds = getReachableModules(fullGraphData.nodes, fullGraphData.links, node.id); // OLD way
+
     const nodeMap = new Map(fullGraphData.nodes.map((n: any) => [n.id, n]));
     const files: { id: number; path: string; relativePath: string; size: number; type: string }[] =
       [];
     let counter = 0; // Use a simple counter for ID
-    moduleIds.forEach((mid) => {
+    moduleIds.forEach((mid: string) => {
       const m = nodeMap.get(mid);
       if (!m || m.type !== 'Module') return; // Only include Modules
       const path = m.id;

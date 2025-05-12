@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import { NodeDetailsProps } from '../types';
-import { formatBytes } from '../utils/stats-calculator'; // Import our formatBytes utility
+import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
 
 // Assign consistent colors to file types
 function getFileTypeColor(fileType: string): string {
