@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { AppProps, TreeNodeData } from '../types';
 import { DependencyGraph } from './DependencyGraph';
+import { FileListView } from './FileListView';
 import { NodeDetails } from './NodeDetails';
 import { Tabs } from './Tabs';
 import { TreeView } from './TreeView';
@@ -155,6 +156,11 @@ export function App({ data }: AppProps) {
                       onNodeSelect={handleGraphNodeSelect}
                     />
                   ),
+                },
+                {
+                  id: 'filelist',
+                  label: '文件列表',
+                  content: <FileListView node={selectedNode} />,
                 },
               ]}
             />

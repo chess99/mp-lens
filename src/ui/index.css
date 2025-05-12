@@ -661,3 +661,99 @@ body {
 .return-to-tree-button:hover {
   background-color: #5a6268;
 }
+
+/* File List View */
+.file-list-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.file-list-header {
+  margin-bottom: 15px;
+}
+
+.file-list-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+  color: #343a40;
+}
+
+.file-table-container {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.file-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #f8f9fa;
+}
+
+.file-table th {
+  padding: 12px 15px;
+  text-align: left;
+  color: #495057;
+  font-weight: 600;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.file-table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.file-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.file-table td {
+  padding: 10px 15px;
+  word-break: break-all;
+}
+
+.file-table .sequence-column {
+  width: 60px;
+  text-align: center;
+}
+
+.file-table .file-column {
+  width: auto;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-table .size-column {
+  width: 100px;
+  text-align: right;
+}
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* End File List View */
+
+/* Root path display in file list */
+.root-path {
+  font-size: 0.8em;
+  color: #6c757d;
+  margin-top: 5px;
+  font-style: italic;
+}
