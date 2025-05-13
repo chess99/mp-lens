@@ -68,6 +68,41 @@ function calculateStatsFromModuleIds(
 }
 
 /**
+ * Ensures that every Module node has basic property information.
+ * Used for leaf nodes in the dependency graph.
+ */
+function ensureModuleProperties(node: GraphNode): ExtendedNodeProperties {
+  // If it's not a Module, return original properties
+  if (node.type !== 'Module') {
+    return node.properties || {};
+  }
+
+  // For Module nodes, ensure they have at least basic file information
+  const properties = node.properties || {};
+
+  return {
+    ...properties,
+    // If fileCount is missing, default to 1
+    fileCount: properties.fileCount !== undefined ? properties.fileCount : 1,
+    // If totalSize is missing but fileSize exists, use that
+    totalSize:
+      properties.totalSize !== undefined
+        ? properties.totalSize
+        : properties.fileSize !== undefined
+          ? properties.fileSize
+          : 0,
+    // Ensure fileTypes exists
+    fileTypes: properties.fileTypes || {
+      [properties.fileExt || 'unknown']: 1,
+    },
+    // Ensure sizeByType exists
+    sizeByType: properties.sizeByType || {
+      [properties.fileExt || 'unknown']: properties.fileSize || 0,
+    },
+  };
+}
+
+/**
  * Collects all unique reachable 'Module' node IDs starting from a given graph node ID.
  * Traverses through all link types.
  */
@@ -169,7 +204,7 @@ function processNodeRecursive(
         id: nodeData.id,
         label: nodeData.label + ' (Cycle)',
         type: nodeData.type as NodeType,
-        properties: nodeData.properties,
+        properties: ensureModuleProperties(nodeData),
         children: [],
       },
       reachableModuleIds: new Set<string>(), // No modules from a cycle node itself
@@ -200,6 +235,10 @@ function processNodeRecursive(
       linksFromMap /* collectionCache */,
     );
     modulesReachableFromThisFile.forEach((id) => aggregatedModuleIds.add(id));
+
+    // For Module nodes, always include itself in the reachable set
+    // This ensures it has its own stats even if it has no dependencies
+    aggregatedModuleIds.add(currentGraphNodeId);
   }
 
   // 2. Process children (non-Module, 'Structure' links that define the tree hierarchy)
@@ -235,20 +274,23 @@ function processNodeRecursive(
   });
 
   // 3. Calculate stats for the current node based on all aggregated module IDs
-  const currentStats = calculateStatsFromModuleIds(aggregatedModuleIds, nodeMap);
+  let finalProperties: ExtendedNodeProperties;
 
-  const finalProperties: ExtendedNodeProperties = {
-    ...nodeData.properties, // Preserve original properties
-    fileCount: currentStats.fileCount,
-    totalSize: currentStats.totalSize,
-    fileTypes: currentStats.fileTypes,
-    sizeByType: currentStats.sizeByType,
-    reachableModuleIds: aggregatedModuleIds, // Store the set of module IDs
-  };
-
-  // If properties already had some of these stat fields, they are now updated.
-  // If nodeData.properties came from the JSON, they might be stale/incorrect,
-  // this recalculation provides the accurate, aggregated stats.
+  if (nodeData.type === 'Module') {
+    // For Module nodes, ensure they have their own properties with at least basic values
+    finalProperties = ensureModuleProperties(nodeData);
+  } else {
+    // For non-Module nodes, calculate stats from all aggregated modules
+    const currentStats = calculateStatsFromModuleIds(aggregatedModuleIds, nodeMap);
+    finalProperties = {
+      ...nodeData.properties, // Preserve original properties
+      fileCount: currentStats.fileCount,
+      totalSize: currentStats.totalSize,
+      fileTypes: currentStats.fileTypes,
+      sizeByType: currentStats.sizeByType,
+      reachableModuleIds: aggregatedModuleIds, // Store the set of module IDs
+    };
+  }
 
   const treeNode: TreeNodeData = {
     id: nodeData.id,
@@ -274,6 +316,13 @@ export function buildTreeWithStats(projectStructure: ProjectStructure): TreeNode
 
   const nodeMap = new Map<string, GraphNode>();
   nodes.forEach((node) => nodeMap.set(node.id, node));
+
+  // Ensure all Module nodes have proper property information
+  nodes.forEach((node) => {
+    if (node.type === 'Module') {
+      node.properties = ensureModuleProperties(node);
+    }
+  });
 
   const linksFromMap = new Map<string, GraphLink[]>();
   links.forEach((link) => {

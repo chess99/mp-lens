@@ -7,7 +7,27 @@ import styles from './DependencyGraph.module.css';
 interface DependencyGraphProps {
   selectedNode: TreeNodeData | null;
   fullGraphData: ProjectStructure;
+  initialTreeData: TreeNodeData;
   onNodeSelect?: (nodeId: string) => void;
+}
+
+// Helper function to find a node in the tree by its ID (copied from App.tsx)
+function findTreeNodeById(treeNode: TreeNodeData | null, id: string): TreeNodeData | null {
+  if (!treeNode) {
+    return null;
+  }
+  if (treeNode.id === id) {
+    return treeNode;
+  }
+  if (treeNode.children) {
+    for (const child of treeNode.children) {
+      const found = findTreeNodeById(child, id);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
 }
 
 // Helper function to get color by node type
@@ -40,9 +60,24 @@ function getBorderColorByType(type: string, isCenter = false): string {
   return isCenter ? '#1890ff' : colors[type] || colors.Default;
 }
 
+// Helper to ensure node always has valid property information
+function ensureNodeProperties(properties: any = {}) {
+  return {
+    ...properties,
+    fileCount: properties.fileCount !== undefined ? properties.fileCount : 1,
+    totalSize:
+      properties.totalSize !== undefined
+        ? properties.totalSize
+        : properties.fileSize !== undefined
+          ? properties.fileSize
+          : 0,
+  };
+}
+
 export function DependencyGraph({
   selectedNode,
   fullGraphData,
+  initialTreeData,
   onNodeSelect,
 }: DependencyGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,23 +94,21 @@ export function DependencyGraph({
       return { nodes, edges };
     }
 
-    // Add the selected node as the center node
+    // Add the selected node as the center node (already has full properties)
     nodes.push({
       id: node.id,
       label: node.label || node.id,
-      // Style the center node directly
       style: {
-        fill: getNodeColorByType(node.type, true), // Use helper for center color
+        fill: getNodeColorByType(node.type, true),
         stroke: getBorderColorByType(node.type, true),
-        lineWidth: 3, // Make border thicker
+        lineWidth: 3,
         shadowColor: 'rgba(0,0,0,0.2)',
         shadowBlur: 10,
         shadowOffsetX: 0,
         shadowOffsetY: 5,
-        radius: 4, // Ensure consistent radius
-        cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
+        radius: 4,
+        cursor: 'pointer',
       },
-      // Add label config for center node if needed (e.g., bold)
       labelCfg: {
         style: {
           fontWeight: 'bold',
@@ -83,8 +116,8 @@ export function DependencyGraph({
           cursor: 'pointer',
         },
       },
-      nodeType: node.type, // Keep for potential future use or tooltip
-      properties: node.properties,
+      nodeType: node.type,
+      properties: ensureNodeProperties(node.properties), // Ensure center node has valid properties
     });
     nodeMap.set(node.id, true);
 
@@ -92,60 +125,32 @@ export function DependencyGraph({
     const outgoingLinks = fullGraphData.links.filter((link) => link.source === node.id);
     const maxOutgoingNodes = 30;
     outgoingLinks.slice(0, maxOutgoingNodes).forEach((link) => {
-      const targetNode = fullGraphData.nodes.find((n) => n.id === link.target);
-      if (targetNode && !nodeMap.has(targetNode.id)) {
-        nodes.push({
-          id: targetNode.id,
-          label: targetNode.label || targetNode.id,
-          // Apply standard style using helpers
-          style: {
-            fill: getNodeColorByType(targetNode.type),
-            stroke: getBorderColorByType(targetNode.type),
-            lineWidth: 1, // Standard border
-            radius: 4,
-            cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
-          },
-          nodeType: targetNode.type,
-          properties: targetNode.properties,
-        });
-        nodeMap.set(targetNode.id, true);
-      }
-      // Add edge if both source and target are in the subgraph
-      if (nodeMap.has(link.source) && nodeMap.has(link.target)) {
-        edges.push({
-          source: link.source,
-          target: link.target,
-          label: link.type || '',
-        });
-      }
-    });
+      const rawTargetNode = fullGraphData.nodes.find((n) => n.id === link.target);
+      if (rawTargetNode) {
+        if (!nodeMap.has(rawTargetNode.id)) {
+          const processedTargetNode = findTreeNodeById(initialTreeData, rawTargetNode.id);
+          const targetNodeData = processedTargetNode || rawTargetNode; // Prioritize processed node
 
-    // Find reverse dependencies (incoming edges)
-    const incomingLinks = fullGraphData.links.filter((link) => link.target === node.id);
-    const maxIncomingNodes = 30;
-    incomingLinks.slice(0, maxIncomingNodes).forEach((link) => {
-      const sourceNode = fullGraphData.nodes.find((n) => n.id === link.source);
-      if (sourceNode && !nodeMap.has(sourceNode.id)) {
-        nodes.push({
-          id: sourceNode.id,
-          label: sourceNode.label || sourceNode.id,
-          // Apply standard style using helpers
-          style: {
-            fill: getNodeColorByType(sourceNode.type),
-            stroke: getBorderColorByType(sourceNode.type),
-            lineWidth: 1,
-            radius: 4,
-            cursor: 'pointer', // Add cursor pointer to indicate clickable nodes
-          },
-          nodeType: sourceNode.type,
-          properties: sourceNode.properties,
-        });
-        nodeMap.set(sourceNode.id, true);
-      }
-      // Add edge if both source and target are in the subgraph
-      if (nodeMap.has(link.source) && nodeMap.has(link.target)) {
-        // Avoid duplicate edges
-        if (!edges.some((e) => e.source === link.source && e.target === link.target)) {
+          // Get properties, ensure they're valid
+          let targetProperties = processedTargetNode?.properties || rawTargetNode.properties || {};
+          targetProperties = ensureNodeProperties(targetProperties);
+
+          nodes.push({
+            id: targetNodeData.id,
+            label: targetNodeData.label || targetNodeData.id,
+            style: {
+              fill: getNodeColorByType(targetNodeData.type),
+              stroke: getBorderColorByType(targetNodeData.type),
+              lineWidth: 1,
+              radius: 4,
+              cursor: 'pointer',
+            },
+            nodeType: targetNodeData.type,
+            properties: targetProperties, // Use ensured properties
+          });
+          nodeMap.set(targetNodeData.id, true);
+        }
+        if (nodeMap.has(link.source) && nodeMap.has(link.target)) {
           edges.push({
             source: link.source,
             target: link.target,
@@ -155,12 +160,65 @@ export function DependencyGraph({
       }
     });
 
+    // Find reverse dependencies (incoming edges)
+    const incomingLinks = fullGraphData.links.filter((link) => link.target === node.id);
+    const maxIncomingNodes = 30;
+    incomingLinks.slice(0, maxIncomingNodes).forEach((link) => {
+      const rawSourceNode = fullGraphData.nodes.find((n) => n.id === link.source);
+      if (rawSourceNode) {
+        if (!nodeMap.has(rawSourceNode.id)) {
+          const processedSourceNode = findTreeNodeById(initialTreeData, rawSourceNode.id);
+          const sourceNodeData = processedSourceNode || rawSourceNode; // Prioritize processed node
+
+          // Get properties, ensure they're valid
+          let sourceProperties = processedSourceNode?.properties || rawSourceNode.properties || {};
+          sourceProperties = ensureNodeProperties(sourceProperties);
+
+          nodes.push({
+            id: sourceNodeData.id,
+            label: sourceNodeData.label || sourceNodeData.id,
+            style: {
+              fill: getNodeColorByType(sourceNodeData.type),
+              stroke: getBorderColorByType(sourceNodeData.type),
+              lineWidth: 1,
+              radius: 4,
+              cursor: 'pointer',
+            },
+            nodeType: sourceNodeData.type,
+            properties: sourceProperties, // Use ensured properties
+          });
+          nodeMap.set(sourceNodeData.id, true);
+        }
+        if (nodeMap.has(link.source) && nodeMap.has(link.target)) {
+          if (!edges.some((e) => e.source === link.source && e.target === link.target)) {
+            edges.push({
+              source: link.source,
+              target: link.target,
+              label: link.type || '',
+            });
+          }
+        }
+      }
+    });
+
     // Create tooltips for all nodes
     nodes.forEach((n) => {
       let tooltip = `<div style="padding: 5px; font-size: 12px;"><strong>${n.label}</strong><br/>Type: ${n.nodeType}`;
       if (n.properties) {
-        tooltip += `<br/>Files: ${n.properties.fileCount || 'N/A'}`;
-        tooltip += `<br/>Size: ${n.properties.sizeKB ? n.properties.sizeKB.toFixed(2) + ' KB' : 'N/A'}`;
+        // Always use fileCount from properties (now guaranteed to exist)
+        tooltip += `<br/>Files: ${n.properties.fileCount}`;
+
+        // Get size information, preferring totalSize, then fileSize, defaulting to 0
+        const sizeInBytes =
+          n.properties.totalSize !== undefined
+            ? n.properties.totalSize
+            : n.properties.fileSize !== undefined
+              ? n.properties.fileSize
+              : 0;
+
+        // Convert bytes to KB for display
+        const sizeToDisplay = (sizeInBytes / 1024).toFixed(2) + ' KB';
+        tooltip += `<br/>Size: ${sizeToDisplay}`;
       }
       tooltip += `</div>`;
       n.tooltip = tooltip; // Assign tooltip directly to node data
@@ -442,7 +500,7 @@ export function DependencyGraph({
       // No explicit graph destroy needed here if we reuse the instance
       // console.log('[G6] Cleanup effect');
     };
-  }, [selectedNode, fullGraphData, onNodeSelect]);
+  }, [selectedNode, fullGraphData, initialTreeData, onNodeSelect]);
 
   // Resize handling (existing logic)
   useEffect(() => {

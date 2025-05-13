@@ -220,6 +220,7 @@ export function App(props: AppProps) {
                     <DependencyGraph
                       selectedNode={selectedNode} // selectedNode is TreeNodeData
                       fullGraphData={fullGraphData}
+                      initialTreeData={initialTreeData} // Pass the processed tree data
                       onNodeSelect={handleGraphNodeSelect} // This callback receives nodeId (string)
                     />
                   ),
