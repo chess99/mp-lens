@@ -136,9 +136,7 @@ mp-lens clean --delete --types js,wxml
 * `--list`: **(推荐)** 只列出将被删除的文件，不实际执行任何操作。
 * `--delete`: **(谨慎使用)** 跳过交互式确认步骤，直接删除文件。
 
-![清理未使用文件示例](docs/images/clean-unused-files-example.png)
-
-### `lint` (实验性)
+### `lint`  
 
 分析小程序项目中自定义组件的声明与 WXML 中的实际使用情况是否一致。可以帮助发现以下问题：
 
