@@ -100,6 +100,15 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
     return Array.from(types).sort();
   }, [allFiles]);
 
+  // Calculate file counts for each type
+  const fileCountsByType = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const file of allFiles) {
+      counts[file.type] = (counts[file.type] || 0) + 1;
+    }
+    return counts;
+  }, [allFiles]);
+
   // Filter and sort files based on state
   const displayedFiles = useMemo(() => {
     let files = allFiles;
@@ -163,7 +172,6 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
   return (
     <div className={styles.fileListView}>
       <div className={styles.fileListHeader}>
-        <h3>文件列表 ({displayedFiles.length})</h3>
         {miniappRoot && <div className={styles.rootPath}>根目录: {miniappRoot}</div>}
       </div>
 
@@ -175,7 +183,7 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
             onClick={() => setFilterType('')}
             className={`${styles.filterButton} ${filterType === '' ? styles.active : ''}`}
           >
-            All
+            All ({allFiles.length})
           </button>
           {uniqueFileTypes.map((type) => (
             <button
@@ -184,7 +192,7 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
               className={`${styles.filterButton} ${filterType === type ? styles.active : ''}`}
               title={`.${type}`}
             >
-              .{type}
+              .{type} ({fileCountsByType[type] || 0})
             </button>
           ))}
         </div>

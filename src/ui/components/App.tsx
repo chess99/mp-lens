@@ -81,7 +81,6 @@ export function App(props: AppProps) {
   const handleNodeSelect = (node: TreeNodeData) => {
     setSelectedNode(node);
     setCurrentMode('tree');
-    setActiveTabId('details'); // Reset to details tab when a tree node is selected
   };
 
   const handleGraphNodeSelect = (nodeId: string) => {
