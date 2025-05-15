@@ -14,7 +14,8 @@
     "sourceMap": true,
     "lib": ["ES2019", "DOM"],
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*", ".eslintrc.js"],
   "exclude": ["node_modules", "**/*.test.ts", "dist", ".ui-build-temp", "scripts/**/*.js"]

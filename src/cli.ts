@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import * as fs from 'fs'; // Import fs
 import * as path from 'path';
+import { CleanOptions, CommandOptions, GraphOptions } from './types/command-options'; // Import CommandOptions and GraphOptions
 
 // --- Robust package.json finder ---
 function findPackageJson(startDir: string): string {
@@ -31,6 +32,7 @@ const { version } = require(packageJsonPath);
 import { clean } from './commands/clean';
 import { graph } from './commands/graph';
 import { lint } from './commands/lint';
+import { registerPurgeWxssCommand } from './commands/purgewxss';
 import { logger, LogLevel } from './utils/debug-logger';
 
 // Remove the local mergeOptions function from cli.ts
@@ -74,13 +76,32 @@ program
   .option(
     '--verbose-level <level>',
     '详细日志级别 (0=基本, 1=正常, 2=详细, 3=追踪)',
-    (val) => parseInt(val, 10),
+    (val: string) => parseInt(val, 10),
     0, // Default verboseLevel to 0
   )
   .option('--trace', '启用最详细的日志输出 (等同于 --verbose-level 3)')
   .option('--config <path>', '指定配置文件的路径')
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
+
+// Define interfaces for command-specific options (these are fine for local parsing)
+interface GraphCommandArgs {
+  format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
+  output?: string;
+  depth?: number;
+  focus?: string;
+  npm?: boolean;
+  tree?: boolean;
+}
+
+interface CleanCommandArgs {
+  types?: string;
+  exclude?: string[];
+  essentialFiles?: string;
+  list?: boolean;
+  delete?: boolean;
+  includeAssets?: boolean;
+}
 
 // graph command
 program
@@ -90,16 +111,16 @@ program
   .option('-o, --output <file>', '保存图文件的路径')
   .option('--depth <number>', '限制依赖图的显示深度', parseInt)
   .option('--focus <file>', '高亮显示与特定文件相关的依赖')
-  .option('--npm', 'Include node_modules / miniprogram_npm in graph', false) // Default to false if flag exists
-  .option('--tree', '使用树状图可视化 (带节点展开/收起功能)', true) // Default to true
+  .option('--npm', 'Include node_modules / miniprogram_npm in graph', false)
+  .option('--tree', '使用树状图可视化 (带节点展开/收起功能)', true)
   .option('--no-tree', '使用传统图形可视化 (D3力导向布局)')
-  // Remove --no-npm, use --npm presence (default false)
-  .action(async (cmdOptions) => {
-    const globalOptions = program.opts();
+  .action(async (cmdArgs: GraphCommandArgs) => {
+    // Use local cmdArgs type
+    const globalOptions = program.opts() as CommandOptions; // Cast globalOptions
     setupLogger(globalOptions);
     try {
-      // Pass both command and global options to the handler
-      await graph({ ...globalOptions, ...cmdOptions });
+      // Construct the full options object and cast it to GraphOptions
+      await graph({ ...globalOptions, ...cmdArgs } as GraphOptions);
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
@@ -114,19 +135,20 @@ program
   .option(
     '--exclude <pattern>',
     '排除某些文件/目录 (覆盖配置文件)',
-    (value: string, previous: string[]) => previous.concat([value]),
+    (value: string, previous: string[]) => previous.concat([value]), // value and previous are correctly typed by commander here
     [],
   )
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
   .option('--list', '只列出将被删除的文件，不执行任何操作', false)
   .option('--delete', '直接删除文件，不进行确认提示', false)
   .option('--includeAssets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
-  .action(async (cmdOptions) => {
-    const globalOptions = program.opts();
+  .action(async (cmdArgs: CleanCommandArgs) => {
+    // Use local cmdArgs type
+    const globalOptions = program.opts() as CommandOptions; // Cast globalOptions
     setupLogger(globalOptions);
     try {
-      // Pass both command and global options to the handler
-      await clean({ ...globalOptions, ...cmdOptions });
+      // Construct the full options object and cast it to CleanOptions
+      await clean({ ...globalOptions, ...cmdArgs } as CleanOptions);
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
@@ -158,6 +180,9 @@ program
       process.exit(1);
     }
   });
+
+// purgewxss command (New command registration)
+registerPurgeWxssCommand(program);
 
 // Parse arguments
 program.parse(process.argv);

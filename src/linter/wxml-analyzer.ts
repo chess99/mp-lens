@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Could not find a declaration file for module '@wxml/parser'
-import { parse, Program, WXNode } from '@wxml/parser';
+import { parse, Program, WXAttribute, WXNode } from '@wxml/parser';
 import * as fs from 'fs';
 import { PathResolver } from '../analyzer/utils/path-resolver';
 import { logger } from '../utils/debug-logger';
@@ -136,6 +136,154 @@ function findImportTags(ast: WXNode | Program, importPaths: string[]): void {
   if (ast.type === 'Program' && Array.isArray(ast.body)) {
     for (const node of ast.body) {
       findImportTags(node, importPaths);
+    }
+  }
+}
+
+// New structures and functions for PurgeCSS analysis:
+
+export interface WxmlPurgeAnalysisResult {
+  wxmlFilePaths: Set<string>; // All WXML files processed (original + imports)
+  tagNames: Set<string>; // All unique tag names found
+  staticClassNames: Set<string>; // All unique static class names
+  dynamicClassValues: Set<string>; // Raw dynamic class expressions like "{{classExpr}}"
+}
+
+/**
+ * Analyzes a WXML file and its imports/includes to extract tags, static classes,
+ * and dynamic class expressions for PurgeCSS.
+ *
+ * @param initialWxmlFilePath Path to the initial WXML file to analyze
+ * @param pathResolver Instance of PathResolver to resolve import/include paths
+ * @param visited Set of already visited files (to prevent infinite loops and redundant work)
+ * @returns Promise<WxmlPurgeAnalysisResult>
+ */
+export async function analyzeWxmlForPurge(
+  initialWxmlFilePath: string,
+  pathResolver: PathResolver,
+  visited: Set<string> = new Set(),
+): Promise<WxmlPurgeAnalysisResult> {
+  const aggregatedResult: WxmlPurgeAnalysisResult = {
+    wxmlFilePaths: new Set(),
+    tagNames: new Set(),
+    staticClassNames: new Set(),
+    dynamicClassValues: new Set(),
+  };
+
+  await _analyzeWxmlRecursiveForPurge(initialWxmlFilePath, pathResolver, visited, aggregatedResult);
+  return aggregatedResult;
+}
+
+async function _analyzeWxmlRecursiveForPurge(
+  currentWxmlFilePath: string,
+  pathResolver: PathResolver,
+  visited: Set<string>,
+  aggregatedResult: WxmlPurgeAnalysisResult,
+): Promise<void> {
+  if (visited.has(currentWxmlFilePath)) {
+    return;
+  }
+  visited.add(currentWxmlFilePath);
+  aggregatedResult.wxmlFilePaths.add(currentWxmlFilePath);
+
+  try {
+    const content = fs.readFileSync(currentWxmlFilePath, 'utf-8');
+    const ast = parse(content);
+
+    collectWxmlData(ast, currentWxmlFilePath, aggregatedResult);
+
+    const importPaths = extractImportPaths(ast); // Reuse existing import path extraction
+    for (const importPath of importPaths) {
+      try {
+        const resolvedPath = pathResolver.resolveAnyPath(importPath, currentWxmlFilePath, [
+          '.wxml',
+        ]);
+        if (resolvedPath) {
+          await _analyzeWxmlRecursiveForPurge(
+            resolvedPath,
+            pathResolver,
+            visited,
+            aggregatedResult,
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          `Error processing import ${importPath} in ${currentWxmlFilePath} for purge analysis: ${err}`,
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(`Error analyzing WXML file ${currentWxmlFilePath} for purge analysis: ${err}`);
+  }
+}
+
+/**
+ * Collects tags, static classes, and dynamic class attributes from the AST.
+ */
+function collectWxmlData(
+  node: WXNode | Program,
+  wxmlFilePath: string, // current wxml file path for context if needed
+  result: WxmlPurgeAnalysisResult,
+): void {
+  if (node.type === 'WXElement') {
+    result.tagNames.add(node.name);
+
+    const attrs = node.startTag?.attributes as WXAttribute[] | undefined; // Type assertion for safety
+    if (attrs && Array.isArray(attrs)) {
+      for (const attr of attrs) {
+        if (attr.key === 'class' && typeof attr.value === 'string') {
+          const classValue = attr.value;
+          // Split by space for static classes, but keep {{...}} intact
+          const classParts = classValue.match(/\{\{[^}]*\}\}|[^{}\s]+/g) || [];
+
+          for (const part of classParts) {
+            if (part.startsWith('{{') && part.endsWith('}}')) {
+              result.dynamicClassValues.add(part);
+              // Try to extract literal strings from within {{...}} as potential static classes
+              // This helps if PurgeCSS's default extractor doesn't look inside mustaches.
+              const literalRegex = /['"]([^'"]+)['"]/g;
+              let match;
+              while ((match = literalRegex.exec(part)) !== null) {
+                if (match[1]) {
+                  match[1]
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .forEach((cls: string) => result.staticClassNames.add(cls));
+                }
+              }
+            } else {
+              // Static class name
+              part
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .forEach((cls: string) => result.staticClassNames.add(cls));
+            }
+          }
+        } else if (
+          attr.key &&
+          attr.key.startsWith('generic:') &&
+          attr.value &&
+          typeof attr.value === 'string'
+        ) {
+          // Handle generic component values as potential tags
+          result.tagNames.add(attr.value);
+        }
+      }
+    }
+  }
+
+  // Recursively process children
+  if (node.type === 'WXElement' && Array.isArray(node.children)) {
+    for (const child of node.children) {
+      collectWxmlData(child, wxmlFilePath, result);
+    }
+  }
+  // Handle Program/body
+  if (node.type === 'Program' && Array.isArray(node.body)) {
+    for (const item of node.body) {
+      collectWxmlData(item, wxmlFilePath, result);
     }
   }
 }
