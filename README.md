@@ -84,12 +84,15 @@ mp-lens -p ../我的小程序 graph -f svg -o output/dependency-graph.svg
 
 **选项:**
 
-* `-f, --format <html|dot|json|png|svg>`: 输出格式 (默认: `html`)。
-  * 注意: 生成 `png` 或 `svg` 可能需要系统预先安装 [Graphviz](https://graphviz.org/download/)。
-* `-o, --output <文件路径>`: 保存图文件的路径。若不指定，`html` 和 `json` 格式会输出到控制台，其他格式会生成默认名称的文件。
-* `--depth <数字>`: 限制依赖图的显示深度。
-* `--focus <文件路径>`: 高亮显示与指定文件相关的依赖路径。
-* `--npm`: (布尔值) 是否在图中包含 `node_modules` 或 `miniprogram_npm` 中的依赖 (默认: `true`)。
+* `-f, --format <format>`: 输出格式 (html|json)。默认为 `html`。
+* `-o, --output <file>`: 保存图文件的路径。如果未指定，HTML 将保存到 `mp-lens-graph.html`，其他格式输出到控制台。
+
+#### `format` (graph)
+
+输出依赖图的格式。支持以下几种格式：
+
+* `html` (默认): 生成一个交互式的 HTML 文件，可在浏览器中查看。
+* `json`: 以 JSON 格式输出图的节点和边数据。
 
 ![依赖关系图示例](docs/images/dependency-graph-example.png)
 

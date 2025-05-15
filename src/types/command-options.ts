@@ -7,6 +7,7 @@ export interface CommandOptions {
   delete?: boolean;
   miniappRoot?: string;
   entryFile?: string;
+  trace?: boolean;
 }
 
 export interface AnalyzerOptions {
@@ -28,14 +29,8 @@ export interface OutputOptions {
 }
 
 export interface GraphOptions extends CommandOptions {
-  format: 'html' | 'dot' | 'json' | 'png' | 'svg';
+  format?: 'html' | 'json';
   output?: string;
-  depth?: number;
-  focus?: string;
-  npm?: boolean;
-  tree?: boolean;
-  miniappRoot?: string;
-  entryFile?: string;
 }
 
 export interface CleanOptions extends CommandOptions {
@@ -83,14 +78,7 @@ export interface ConfigFileOptions {
   outputFormat?: 'text' | 'json'; // list-unused命令输出格式
 
   // 图表生成相关
-  format?: 'html' | 'dot' | 'json' | 'png' | 'svg'; // graph命令输出格式
-  graphFormat?: 'html' | 'dot' | 'json' | 'png' | 'svg'; // graph命令输出格式（替代名称）
-  depth?: number; // 图表依赖深度限制
-  graphDepth?: number; // 图表依赖深度限制（替代名称）
-  includeNpm?: boolean; // 是否包含npm依赖
-  npm?: boolean; // 是否包含npm依赖（替代名称）
-  tree?: boolean; // 是否使用树状图可视化
-  focus?: string; // 要关注的特定文件
+  format?: 'html' | 'json'; // graph命令输出格式
 
   // 高级选项
   entryContent?: any; // 自定义入口内容

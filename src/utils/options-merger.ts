@@ -146,37 +146,14 @@ export function mergeOptions(
   }
   // --- End: Auto-detection logic ---
 
-  // Only resolve focus path relative to project root
-  // Leave output path unresolved here as it should be resolved relative to cwd in the command handler
-  merged.focus = resolvePathIfNeeded(merged.focus);
-
   // Comment out this line to avoid duplicate resolution - output path will be handled in the command handlers
   // merged.output = resolvePathIfNeeded(merged.output);
 
   // 4. Aliases/Alternative Names
-  // Format (format/graphFormat)
   if (cliOptions.format !== undefined) {
     merged.format = cliOptions.format;
-    delete merged.graphFormat;
-  } else if (merged.graphFormat) {
-    merged.format = merged.graphFormat;
-    delete merged.graphFormat;
-  }
-  // Depth (depth/graphDepth)
-  if (cliOptions.depth !== undefined) {
-    merged.depth = cliOptions.depth;
-    delete merged.graphDepth;
-  } else if (merged.graphDepth !== undefined) {
-    merged.depth = merged.graphDepth;
-    delete merged.graphDepth;
-  }
-  // Npm toggle (npm/includeNpm)
-  if (cliOptions.npm !== undefined) {
-    merged.npm = cliOptions.npm;
-    delete merged.includeNpm;
-  } else if (merged.includeNpm !== undefined) {
-    merged.npm = merged.includeNpm;
-    delete merged.includeNpm;
+  } else if (fileConfig?.format !== undefined) {
+    merged.format = fileConfig.format;
   }
 
   return merged;

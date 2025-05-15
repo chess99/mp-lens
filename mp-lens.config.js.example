@@ -78,33 +78,9 @@ module.exports = {
   /**
    * [graph 命令可选] 生成依赖图的格式。
    * 'html': 交互式 HTML 文件 (默认)
-   * 'dot': Graphviz DOT 语言文件
    * 'json': JSON 格式表示图数据
-   * 'png': PNG 图片 (需要系统安装 Graphviz)
-   * 'svg': SVG 图片 (需要系统安装 Graphviz)
    */
   format: 'html',
-  // graphFormat: 'html' // 旧的别名
-
-  /**
-   * [graph 命令可选] 限制依赖图的显示深度。
-   * 默认不限制。
-   */
-  depth: undefined,
-  // graphDepth: undefined // 旧的别名
-
-  /**
-   * [graph 命令可选] 是否在依赖图中包含 npm 包 (node_modules 或 miniprogram_npm)。
-   * 默认: true (包含)
-   */
-  includeNpm: true,
-  // npm: true // 旧的别名
-
-  /**
-   * [graph 命令可选] 高亮显示与特定文件相关的依赖路径（相对于项目根目录）。
-   * 例: "src/pages/home/index.js"
-   */
-  focus: undefined,
 
   /**
    * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
@@ -124,4 +100,7 @@ module.exports = {
    * 例: "reports/unused_files.txt", "dist/dependency-graph.html"
    */
   output: undefined,
+
+  // Global options section is removed as they are mostly covered by specific command options or CLI global flags
+  // and the duplicated graph section below is also removed.
 }; 

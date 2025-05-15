@@ -8,8 +8,6 @@ import { AssetResolver } from '../utils/asset-resolver';
  */
 export interface HtmlGeneratorOptions {
   title: string;
-  maxDepth?: number; // This option might become UI-specific
-  focusNode?: string; // This option might become UI-specific
 }
 
 /**

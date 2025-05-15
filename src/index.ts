@@ -3,13 +3,11 @@ import { analyzeProject } from './analyzer/analyzer';
 import { DependencyGraph } from './analyzer/dependency-graph';
 import { findMiniProgramEntryPoints } from './knip/entry-finder';
 import { parseJson, parseWxml, parseWxs, parseWxss } from './knip/parsers';
-import { DotGenerator } from './visualizer/dot-generator';
 import { HtmlGeneratorPreact } from './visualizer/html-renderer';
 
 export {
   analyzeProject,
   DependencyGraph,
-  DotGenerator,
   findMiniProgramEntryPoints,
   HtmlGeneratorPreact,
   // Export Mini Program file parsers for knip custom compilers

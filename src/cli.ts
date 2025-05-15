@@ -85,15 +85,6 @@ program
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
 
 // Define interfaces for command-specific options (these are fine for local parsing)
-interface GraphCommandArgs {
-  format?: 'html' | 'dot' | 'json' | 'png' | 'svg';
-  output?: string;
-  depth?: number;
-  focus?: string;
-  npm?: boolean;
-  tree?: boolean;
-}
-
 interface CleanCommandArgs {
   types?: string;
   exclude?: string[];
@@ -107,14 +98,9 @@ interface CleanCommandArgs {
 program
   .command('graph')
   .description('生成依赖关系图的可视化文件')
-  .option('-f, --format <format>', '输出格式 (html|dot|json|png|svg)')
+  .option('-f, --format <format>', '输出格式 (html|json)')
   .option('-o, --output <file>', '保存图文件的路径')
-  .option('--depth <number>', '限制依赖图的显示深度', parseInt)
-  .option('--focus <file>', '高亮显示与特定文件相关的依赖')
-  .option('--npm', 'Include node_modules / miniprogram_npm in graph', false)
-  .option('--tree', '使用树状图可视化 (带节点展开/收起功能)', true)
-  .option('--no-tree', '使用传统图形可视化 (D3力导向布局)')
-  .action(async (cmdArgs: GraphCommandArgs) => {
+  .action(async (cmdArgs: GraphOptions) => {
     // Use local cmdArgs type
     const globalOptions = program.opts() as CommandOptions; // Cast globalOptions
     setupLogger(globalOptions);

@@ -61,5 +61,5 @@ node_modules
 
 # Misc
 *.tsbuildinfo
-graph-output*.html 
 mp-lens-graph.html
+mp-lens-graph.json
