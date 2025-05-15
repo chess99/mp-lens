@@ -3,29 +3,33 @@
 [![npm](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 [![License](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](https://github.com/chess99/mp-lens/blob/master/LICENSE)
 [![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
-[![构建状态](https://img.shields.io/travis/com/chess99/mp-lens.svg?style=flat)](https://travis-ci.com/chess99/mp-lens) <!-- CI/CD占位符 -->
+[![构建状态](https://img.shields.io/travis/com/chess99/mp-lens.svg?style=flat)](https://travis-ci.com/chess99/mp-lens)
 
-**mp-lens** 是一个命令行工具，旨在帮助微信小程序开发者理解项目结构、可视化依赖关系、分析包大小并安全地移除未使用的文件。
+**`mp-lens` 是一款专为微信小程序开发者设计的命令行工具，旨在解决项目维护中的常见痛点：**
 
-是否厌倦了臃肿的项目体积，以及手动寻找未使用的组件、页面、图片或工具函数的繁琐过程？ `mp-lens` 会扫描你的项目，构建依赖图，并找出可以安全移除的孤立文件。
+* **项目结构理解**：快速掌握项目全貌，可视化页面、组件、脚本间的复杂依赖。
+* **包体积优化**：精准识别并安全移除未使用的文件（组件、页面、图片、脚本等），有效减小项目体积。
+* **代码质量提升**：辅助检查组件声明与使用的一致性，清理冗余 CSS 规则。
+
+厌倦了手动排查臃肿的项目和那些难以追踪的孤立文件吗？`mp-lens` 通过深度扫描项目，构建依赖图，并智能分析，让您轻松、安全地优化小程序项目。
 
 ## ✨ 功能特性
 
-* **全面的依赖分析:** 扫描多种文件类型（`.js`, `.ts`, `.wxml`, `.wxss`, `.json`, `.wxs`, 以及常见的图片格式），构建项目依赖图。
-* **依赖图可视化:** 生成交互式 HTML 或静态图文件（如 DOT 语言、SVG、PNG），助你清晰理解页面、组件、脚本之间的相互联系。
-* **未使用的文件检测:** 根据分析结果，识别出项目中未被任何地方引用的文件（包括页面、组件、脚本、样式、图片、WXS模块等）。
-* **路径别名支持:** 支持解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置，正确分析使用别名导入的模块依赖关系。
-* **灵活的项目结构支持:** 支持自定义小程序项目路径和入口文件路径，适用于不同目录结构的项目。也支持自动检测 `app.json`。
-* **安全清理:**
-  * 提供 `--list` 模式，预览哪些文件*将*被删除，但并**不执行**实际删除操作。
-  * 默认在删除文件前进行**交互式确认**。
-  * 支持 Glob 模式，可在分析和清理时**排除**特定的文件或目录。
-* **可配置:** 可通过命令行选项快速执行任务，也支持通过配置文件进行更复杂的设置。
-* **使用 TypeScript 构建:** 类型安全，易于维护。
+* **全面的依赖分析:** 扫描多种文件类型（`.js`, `.ts`, `.wxml`, `.wxss`, `.json`, `.wxs`, 及常见图片格式），构建项目依赖图。
+* **依赖图可视化:** 生成交互式 HTML 或静态图文件（如 DOT、SVG、PNG），清晰展现页面、组件、脚本间的相互联系。
+* **精准的未使用文件检测:** 基于依赖分析，准确识别项目中未被任何地方引用的孤立文件（包括页面、组件、脚本、样式、图片、WXS模块等）。
+* **灵活的路径别名支持:** 智能解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置，确保依赖分析的准确性。
+* **广泛的项目结构兼容:** 支持自定义小程序项目根目录、`miniappRoot` 和入口文件路径，适配各种项目结构。可自动检测 `app.json`。
+* **安全至上的清理机制:**
+  * 提供 `--list` 模式，仅预览待删除文件，**不执行实际删除**。
+  * 默认在删除文件前进行**交互式确认**，防止误操作。
+  * 支持 Glob 模式，可在分析和清理时**排除**特定文件或目录。
+* **高度可配置:** 支持命令行选项快速执行，也支持通过配置文件进行更细致的设置。
+* **TypeScript 构建:** 类型安全，代码健壮，易于维护和扩展。
 
 ## 🚀 安装
 
-你可以全局安装 `mp-lens`，或将其作为项目的开发依赖项。
+您可以全局安装 `mp-lens`，或将其作为项目的开发依赖项。
 
 **全局安装:**
 
@@ -35,7 +39,7 @@ npm install -g mp-lens
 yarn global add mp-lens
 ```
 
-**本地安装 (推荐用于项目):**
+**本地安装 (推荐):**
 
 ```bash
 npm install --save-dev mp-lens
@@ -43,129 +47,172 @@ npm install --save-dev mp-lens
 yarn add --dev mp-lens
 ```
 
-如果本地安装，通常通过 `npx` 运行：`npx mp-lens <命令>`，或者将其添加到 `package.json` 的 `scripts` 中。
+若本地安装，建议通过 `npx` 运行 (`npx mp-lens <命令>`) 或将其添加到 `package.json` 的 `scripts` 中。
 
 ## 💡 使用方法
 
-基本命令结构如下：
+基本命令结构：
 
 ```bash
-mp-lens [全局选项] <命令> [命令选项]
+mp-lens [全局选项] <命令> [命令特定选项]
 ```
 
-如果本地安装且未使用 `npx`，请使用相对路径运行，例如：`./node_modules/.bin/mp-lens`。
+### 全局选项
 
-**全局选项:**
+这些选项适用于所有命令：
 
-* `-p, --project <路径>`: 指定项目的根目录 (默认: 当前目录)。
+* `-p, --project <路径>`: 指定项目的根目录 (默认: 当前执行命令的目录)。
+* `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。如果未指定，工具会尝试自动检测（如 `src`, `miniprogram`）。
+* `--entry-file <路径>`: 指定入口文件路径（相对于 `miniappRoot`，默认为 `app.json`）。工具会尝试自动检测。
+* `--config <路径>`: 指定配置文件的路径 (用于更复杂的设置，详见 [配置文件](#️-configuration-file) 部分)。
+* `-v, --verbose`: 显示更详细的日志输出，有助于调试。
 * `-h, --help`: 显示帮助信息。
-* `-v, --verbose`: 显示更详细的日志输出。
-* `--config <路径>`: 指定配置文件的路径 (可选高级功能)。
-* `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录，可自动检测）。
-* `--entry-file <路径>`: 指定入口文件路径（相对于小程序根目录，默认为app.json，可自动检测）。
 
-**可用命令:**
+### 可用命令
 
-### `graph`
+#### 1. `graph` - 生成依赖关系图
 
-生成依赖关系图的可视化文件。
+可视化项目依赖，帮助理解项目结构。
 
 ```bash
-# 在当前目录生成一个交互式的 HTML 依赖图
+# 在当前目录生成交互式 HTML 依赖图
 mp-lens graph
 
-# 为指定项目生成 SVG 格式的依赖图并保存
-mp-lens -p ../我的小程序 graph -f svg -o dependency-graph.svg
-
-# 生成聚焦于特定页面的依赖图
-mp-lens graph --focus src/pages/home/index.js -o home-deps.html
+# 为指定项目生成 SVG 格式的依赖图并保存到 output 目录
+mp-lens -p ../我的小程序 graph -f svg -o output/dependency-graph.svg
 ```
 
 **选项:**
 
-* `-f, --format <html|dot|json|png|svg>`: 输出格式 (默认: html)。生成 PNG/SVG 可能需要系统安装 Graphviz。
-* `-o, --output <文件>`: 保存图文件的路径。
+* `-f, --format <html|dot|json|png|svg>`: 输出格式 (默认: `html`)。
+  * 注意: 生成 `png` 或 `svg` 可能需要系统预先安装 [Graphviz](https://graphviz.org/download/)。
+* `-o, --output <文件路径>`: 保存图文件的路径。若不指定，`html` 和 `json` 格式会输出到控制台，其他格式会生成默认名称的文件。
 * `--depth <数字>`: 限制依赖图的显示深度。
-* `--focus <文件路径>`: 高亮显示与特定文件相关的依赖。
-* `--npm`: 在图中包含 `node_modules` 或 `miniprogram_npm` 中的依赖 (默认: true)。
+* `--focus <文件路径>`: 高亮显示与指定文件相关的依赖路径。
+* `--npm`: (布尔值) 是否在图中包含 `node_modules` 或 `miniprogram_npm` 中的依赖 (默认: `true`)。
 
 ![依赖关系图示例](docs/images/dependency-graph-example.png)
 
-### `clean`
+#### 2. `clean` - 分析并移除未使用的文件
 
-分析项目并删除未使用的文件。**⚠️ 使用此命令务必谨慎！**
+**⚠️ 警告：此命令会修改或删除您的文件，请务必谨慎操作！**
+
+**强烈建议:**
+
+1. **使用版本控制 (如 Git)**，并在运行 `clean` 前**提交所有更改**。
+2. 首次使用或不确定时，**务必先使用 `--list` 模式**进行预览。
 
 **默认行为:**
 
-* 分析项目，找出未使用的文件。
-* 列出将被删除的文件。
-* **提示用户确认**是否继续删除。
-
-**安全提示:**
-
-1. **使用版本控制 (如 Git)** 并在运行 `clean` 前提交所有更改。
-2. 首次使用时，考虑先用 `--list` 模式查看将删除哪些文件。
+1. 分析项目，找出未使用的文件。
+2. 列出将被删除的文件。
+3. **提示用户进行交互式确认**后才执行删除。
 
 **用法示例:**
 
 ```bash
-# 默认模式: 列出文件并提示确认删除
+# 默认模式: 分析并列出未使用文件，然后提示确认删除
 mp-lens clean
 
-# 列表模式: 只列出将被删除的文件 (安全，不执行任何操作)
+# 预览模式 (推荐): 只列出将被删除的文件，不执行任何操作 (安全)
 mp-lens clean --list
 
-# 删除模式: 直接删除未使用文件，不进行确认 (谨慎使用!)
+# 直接删除模式 (高风险!): 直接删除未使用文件，不进行确认 (请谨慎使用!)
 mp-lens clean --delete
 
-# 仅清理未使用的图片文件 (会提示确认)
+# 清理特定类型的未使用文件 (例如仅图片，仍会提示确认)
 mp-lens clean --types png,jpg,gif
 
-# 清理时排除特定的目录 (会提示确认)
-mp-lens clean --exclude "**/legacy/**"
+# 清理时排除特定目录 (仍会提示确认)
+mp-lens clean --exclude "**/legacy/**" --exclude "src/archive/**"
 
-# 直接删除未使用的 JS 和 WXML 文件 (谨慎使用!)
+# 直接删除未使用的 JS 和 WXML 文件 (高风险!)
 mp-lens clean --delete --types js,wxml
 ```
 
 **选项:**
 
-* `--types <类型1,类型2,...>`: 指定要分析和删除的文件类型，用逗号分隔 (默认: js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs)。
-* `--exclude <模式>`: 用于排除文件/目录的 Glob 模式。可多次使用。
-* `--essential-files <文件1,文件2,...>`: 指定应被视为必要的文件（这些文件永远不会被删除），用逗号分隔。
-* `--list`: **(推荐)** 只列出将被删除的文件，不实际执行任何操作。
-* `--delete`: **(谨慎使用)** 跳过交互式确认步骤，直接删除文件。
+* `--types <类型1,类型2,...>`: 指定要分析和删除的文件类型扩展名，用逗号分隔 (默认: `js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs`)。
+* `--exclude <Glob模式>`: 用于排除文件/目录的 Glob 模式。可多次使用此选项以添加多个排除规则。
+* `--essential-files <文件1,文件2,...>`: 指定应被视为"必要"的文件路径（相对于 `miniappRoot`），这些文件将永远不会被报告为未使用或被清理。
+* `--list`: **(安全模式，强烈推荐首次使用)** 仅列出将被删除的文件，不执行任何实际的删除操作。
+* `--delete`: **(高风险，谨慎使用!)** 跳过交互式确认步骤，直接删除分析出的未使用文件。
 
-### `lint`  
+#### 3. `lint` - 检查组件声明与使用的一致性
 
-分析小程序项目中自定义组件的声明与 WXML 中的实际使用情况是否一致。可以帮助发现以下问题：
+分析小程序项目中自定义组件的 `.json` 声明与 `.wxml` 中的实际使用情况是否匹配。
 
-* 组件在 `.json` 文件中声明，但在对应的 `.wxml` 文件中并未使用 (“声明但未使用”)。
-* 标签在 `.wxml` 文件中被使用，看起来像自定义组件，但未在对应的 `.json` 文件中声明 (“使用但未声明”)。
+**主要解决问题:**
+
+* 组件在 `.json` 中声明，但在对应 `.wxml` 中并未使用 ("声明但未使用")。
+* 标签在 `.wxml` 中被使用（形似自定义组件），但未在对应 `.json` 中声明 ("使用但未声明")。
 
 ```bash
 # 分析整个小程序项目的组件使用情况
 mp-lens lint
 
-# 分析指定页面或组件的组件使用情况
+# 分析指定页面或组件的组件使用情况 (路径相对于 miniappRoot)
 mp-lens lint src/pages/my-page/index
 
-# 分析并自动修复 JSON 文件中“声明但未使用”的组件
+# 分析并尝试自动修复 JSON 文件中"声明但未使用"的组件 (会修改源文件，请谨慎!)
 mp-lens lint --fix
 ```
 
 **选项:**
 
-* `[path]` (可选): 指定要分析的具体文件（`.wxml` 或 `.json`）或目录路径。如果指定了文件，其对应的 `.wxml` 或 `.json` 会被自动包含。如果省略，则分析整个小程序项目。
-* `--fix`: 自动修复 `.json` 文件中“声明但未使用”的问题。此选项会修改你的源文件，请谨慎使用，建议在版本控制下操作。
+* `[path]` (可选参数): 指定要分析的具体文件（`.wxml` 或 `.json`）或目录路径（相对于 `miniappRoot`）。
+  * 如果指定文件，其对应的 `.wxml` 或 `.json` 会被自动关联分析。
+  * 如果省略，则分析 `miniappRoot` 下的整个小程序项目。
+* `--fix`: 自动从 `.json` 文件中移除"声明但未使用"的组件条目。
+  * **注意:** 此选项会修改您的源文件，请务必在版本控制下操作，并仔细检查更改。它**不会**修改 WXML 文件。
 
-**注意:** `lint` 命令目前主要关注组件声明和使用的匹配关系，它**不会**修改 WXML 文件。
+#### 4. `purgewxss` - 清理 WXSS 文件中未使用的 CSS 规则
 
-## 与Knip集成检测未使用的文件和组件
+分析 WXML 文件中的类名使用情况，并尝试从对应的 WXSS 文件中移除未被引用的 CSS 规则。
 
-mp-lens 提供了与 [Knip](https://knip.dev) 的集成支持，帮助你检测小程序项目中未使用的文件、组件和死代码。
+**⚠️ 警告：此命令可能移除有用的 CSS，特别是在涉及复杂动态类名或 JavaScript 操作样式时。请务必谨慎！**
 
-与mp-lens的文件级别分析不同，Knip能深入分析模块内部，找出未使用的导出（exports）、函数和变量，从而实现更加精细的代码清理。
+**强烈建议:**
+
+1. **使用版本控制 (如 Git)**，并在运行前**提交所有更改**。
+2. 先不带 `--write` 选项运行，**仔细检查预览结果和日志**。
+3. 使用 `--write` 后，**务必手动测试和审查更改**，确保应用样式无误。
+
+**用法示例:**
+
+```bash
+# 分析项目中所有 WXSS 文件，并预览将移除的 CSS (不实际写入文件)
+mp-lens purgewxss
+
+# 分析指定的 WXSS 文件，并实际写入更改 (谨慎使用!)
+mp-lens purgewxss src/pages/home/index.wxss --write
+
+# 分析所有 WXSS 文件，并实际写入更改 (谨慎使用!)
+mp-lens purgewxss --write
+```
+
+**选项:**
+
+* `[wxss-file-path]` (可选参数): 指定要分析的具体 WXSS 文件路径（相对于 `miniappRoot`）。
+  * 如果省略，则分析 `miniappRoot` 下所有 `.wxss` 文件 (遵循全局的 `exclude` 配置)。
+* `--write`: **(高风险)** 实际将优化后的 CSS 写入 `.wxss` 文件。若无此参数，仅显示分析结果和潜在优化，**不会修改任何文件**。
+
+**重要限制与注意事项:**
+
+* **依赖 WXML 分析:** `purgewxss` 通过分析关联的 WXML 文件（包括其导入的 WXML）来确定 CSS 类名的使用状态。其准确性高度依赖于 WXML 分析的覆盖度和正确性。
+* **动态类名处理:**
+  * 对于简单的动态类名 (如 `class="{{ someVar }}"` 或 `class="{{ cond ? 'classA' : 'classB' }}"`)，工具会尝试将这些类名（`someVar` 对应的变量值无法静态确定，但 `classA`, `classB` 会被视为安全）标记为使用中。
+  * **风险与跳过:** 若 WXML 中包含复杂或难以静态分析的动态类名构造 (如 `class="{{ 'prefix-' + variable }}"`)，`mp-lens` 会将此 WXML 标记为包含风险用法。为安全起见，**对应的 WXSS 文件将不会被处理 (PurgeCSS 操作会被跳过)**，并会输出警告。这是为了防止因无法准确静态解析类名而错误移除 CSS。
+* **`externalClasses`:** 微信小程序的 `externalClasses` 机制允许父组件向子组件传递类名。本工具主要分析 WXML 元素 `class` 属性中的类名，**不会**深度追踪通过 `externalClasses` 传入的类名字符串本身是否存在风险拼接（例如父组件 `<child-comp my-ext-class="{{ 'prefix-' + variable }}" />`）。
+
+## 🤝 与 Knip 集成 (可选)
+
+`mp-lens` 可与 [Knip](https://knip.dev) 集成，以实现更深层次的代码分析，检测小程序项目中未使用的文件、组件、导出 (exports)、函数和变量等死代码。
+
+* **mp-lens 优势**: 专注于小程序特有的文件类型和依赖关系（如 `.wxml`, `.wxss`, `app.json` 中的页面/组件引用）。
+* **Knip 优势**: 更侧重于 JavaScript/TypeScript 模块内部的未使用导出、类型等。
+
+两者结合能提供更全面的项目清理方案。
 
 ```bash
 # 安装依赖
@@ -174,43 +221,64 @@ npm install --save-dev mp-lens knip
 
 详细的集成指南和配置示例请查看 [mp-lens与Knip集成文档](docs/knip-integration.md)。
 
-## ⚙️ Configuration File
+## ⚙️ 配置文件 (`mp-lens.config.js` 或 `mp-lens.config.json`)
 
-对于复杂的配置（例如，大量的排除规则、路径别名等），可以使用配置文件 `mp-lens.config.json` 或 `mp-lens.config.js` 放置于项目根目录，或通过全局选项 `--config` 指定路径。
+对于复杂或固定的配置（如大量排除规则、路径别名等），建议在项目根目录创建 `mp-lens.config.js` (推荐，更灵活) 或 `mp-lens.config.json` 文件。也可以通过全局选项 `--config <路径>` 指定配置文件位置。
 
-配置文件示例 (`mp-lens.config.json`):
+**配置文件示例 (`mp-lens.config.js`):**
 
-```json
-{
-  "miniappRoot": "src",
-  "entryFile": "app.json",
-  "types": "js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg",
-  "exclude": [
+```javascript
+// mp-lens.config.js
+export default {
+  miniappRoot: "src", // 小程序代码主目录 (相对于项目根目录)
+  entryFile: "app.json", // 入口文件 (相对于 miniappRoot)
+  // 分析的文件类型 (clean 命令的默认值)
+  types: "js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs",
+  exclude: [ // 等同于命令行中的 --exclude (Glob 模式)
     "**/node_modules/**",
     "**/miniprogram_npm/**",
-    "**/*.mock.js"
+    "**/*.mock.js",
+    "assets/images/ignore_this_folder/**"
   ],
-  "essentialFiles": [
-    "utils/init.js", // 这个文件总是被认为是必需的
+  essentialFiles: [ // 这些文件永远不会被视为未使用 (相对于 miniappRoot)
+    "utils/init.js",
     "config/theme.json"
   ],
-  "includeAssets": false // 默认不清理图片等资源文件
-}
+  // clean 命令是否默认包含图片等资源文件进行分析和清理
+  // true: 包含资源文件，可能会被识别为未使用并清理
+  // false: 不包含资源文件，资源文件不会被清理 (默认行为)
+  includeAssetsInClean: false,
+  aliases: { // 路径别名配置 (通常会自动从 tsconfig.json 或 jsconfig.json 读取)
+    "@/*": ["src/*"],
+    "@components/*": ["src/components/*"]
+  },
+  // purgewxss 命令特定配置
+  purgeWxss: {
+    // 可以在这里覆盖全局的 excludePatterns，或添加针对 purgewxss 的特定排除
+    // excludePatterns: ["src/styles/global.wxss"],
+  }
+};
 ```
 
 **常用配置项说明:**
 
-* `miniappRoot`: (字符串) 小程序源代码所在的子目录（相对于项目根目录）。
-* `entryFile`: (字符串) 入口文件的路径（相对于 `miniappRoot`）。默认为 `app.json`。
-* `types`: (字符串) 要分析的文件扩展名列表，用逗号分隔。
-* `excludePatterns` 或 `exclude`: (字符串数组) 要排除的文件/目录的 Glob 模式列表。
-* `essentialFiles`: (字符串数组) 应始终被视为必需的文件路径列表（相对于 `miniappRoot`），这些文件永远不会被报告为未使用或被清理。
-* `includeAssets`: (布尔值) 是否在清理和报告中包含图片等资源文件(.png, .jpg, .jpeg, .gif, .svg)。默认为 false，表示这些资源文件不会被报告为未使用或被清理。设置为 true 表示显式包含这些资源文件在分析和清理范围内。
-* `aliases`: (对象) 路径别名配置，用于解析模块导入（通常从 `tsconfig.json` 或 `jsconfig.json` 自动加载）。
+* `miniappRoot` (string): 小程序源代码所在的子目录（相对于项目根目录）。
+* `entryFile` (string): 入口文件的路径（相对于 `miniappRoot`）。默认为 `app.json`。
+* `types` (string): `clean` 命令默认分析的文件扩展名列表，逗号分隔。
+* `exclude` (string[]): 要排除的文件/目录的 Glob 模式列表。
+* `essentialFiles` (string[]): 应始终被视为必需的文件路径列表（相对于 `miniappRoot`）。
+* `includeAssetsInClean` (boolean): 控制 `clean` 命令是否分析和清理图片等资源文件 (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`)。
+  * `true`: 资源文件会被纳入分析范围，可能被清理。
+  * `false` (默认): 资源文件不会被视为"未使用"，也不会被清理。
+* `aliases` (object): 路径别名配置。工具会尝试自动从 `tsconfig.json` (compilerOptions.paths) 或 `jsconfig.json` 加载。此处配置可覆盖自动加载的或补充。
+* `purgeWxss` (object): `purgewxss` 命令的特定配置，例如可以有其专属的 `excludePatterns`。
 
 ## 🤝 贡献
 
-欢迎各种形式的贡献！如果你发现任何问题或有改进建议，请随时提交 Issue 或 Pull Request。
+我们非常欢迎各种形式的贡献！如果您发现任何问题、有功能建议或希望改进代码，请随时：
+
+* 提交 [Issue](https://github.com/chess99/mp-lens/issues)
+* 创建 [Pull Request](https://github.com/chess99/mp-lens/pulls)
 
 ## 📄 许可证
 
