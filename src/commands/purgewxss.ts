@@ -126,6 +126,22 @@ async function performPurge(
         continue;
       }
 
+      // Skip WXSS processing if its corresponding WXML has risky dynamic class patterns
+      if (
+        wxmlAnalysisResult.riskyDynamicClassPatterns &&
+        wxmlAnalysisResult.riskyDynamicClassPatterns.length > 0
+      ) {
+        statusMessage = chalk.yellow('跳过 (WXML 中检测到有风险的动态类名用法)');
+        logger.info(`${relativeWxssPath} ${statusMessage}`);
+        logger.warn(`  详情: WXML 文件 ${wxmlFilePath} 或其导入包含以下风险用法:`);
+        wxmlAnalysisResult.riskyDynamicClassPatterns.forEach((pattern) => {
+          // Show relative path to the specific WXML file containing the risky pattern
+          const riskyFilePathRelative = path.relative(projectRoot, pattern.filePath);
+          logger.warn(`    - 文件: ${riskyFilePathRelative}, 表达式: ${pattern.expression}`);
+        });
+        continue;
+      }
+
       const wxssContent = await fs.readFile(wxssFilePath, 'utf-8');
       if (!wxssContent.trim()) {
         statusMessage = chalk.gray('跳过 (WXSS 文件为空)');

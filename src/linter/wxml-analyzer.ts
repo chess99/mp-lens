@@ -146,7 +146,9 @@ export interface WxmlPurgeAnalysisResult {
   wxmlFilePaths: Set<string>; // All WXML files processed (original + imports)
   tagNames: Set<string>; // All unique tag names found
   staticClassNames: Set<string>; // All unique static class names
-  dynamicClassValues: Set<string>; // Raw dynamic class expressions like "{{classExpr}}"
+  dynamicClassValues: Set<string>; // Raw DYNAMIC but SAFE class expressions like "{{classExpr}}}"
+  // Store risky patterns for logging and to inform decisions like skipping WXSS processing
+  riskyDynamicClassPatterns: Array<{ filePath: string; expression: string }>;
 }
 
 /**
@@ -168,6 +170,7 @@ export async function analyzeWxmlForPurge(
     tagNames: new Set(),
     staticClassNames: new Set(),
     dynamicClassValues: new Set(),
+    riskyDynamicClassPatterns: [], // Initialize new field
   };
 
   await _analyzeWxmlRecursiveForPurge(initialWxmlFilePath, pathResolver, visited, aggregatedResult);
@@ -218,6 +221,40 @@ async function _analyzeWxmlRecursiveForPurge(
 }
 
 /**
+ * Checks if a WXML class expression (the content inside {{...}}) is safe.
+ * Safe: simple literals, or ternary operators yielding simple literals.
+ * Unsafe: contains '+' for concatenation, unless it's part of a more complex, unhandled safe pattern.
+ * @param expression The content of the class binding, e.g., "condition ? 'classA' : 'classB'" or "'prefix-' + varName"
+ */
+export function isSafeClassExpression(expression: string): boolean {
+  const trimmedExpression = expression.trim();
+
+  // Regex for: condition ? 'literal' : 'literal'  OR  condition ? "literal" : "literal"
+  // Allows for empty strings as literals e.g. condition ? 'my-class' : ''
+  // It also allows for non-literal conditions.
+  const safeTernaryRegex = /^(?:[^?]+)\s*\?\s*('[^']*'|"[^"]*")\s*:\s*('[^']*'|"[^"]*")$/;
+  if (safeTernaryRegex.test(trimmedExpression)) {
+    return true;
+  }
+
+  // Regex for simple string literal: 'literal' OR "literal"
+  const simpleLiteralRegex = /^('[^']*'|"[^"]*")$/;
+  if (simpleLiteralRegex.test(trimmedExpression)) {
+    return true;
+  }
+
+  // If it's not a safe ternary or simple literal, and contains '+', it's considered risky.
+  if (trimmedExpression.includes('+')) {
+    return false;
+  }
+
+  // Default to safe if no '+' is found and it's not an explicitly identified risky pattern.
+  // This means expressions like `{{ myObject.classKey }}` or `{{ [classA, classB] }}`
+  // would be considered "safe" by this specific rule if they don't use '+'.
+  return true;
+}
+
+/**
  * Collects tags, static classes, and dynamic class attributes from the AST.
  */
 function collectWxmlData(
@@ -238,19 +275,29 @@ function collectWxmlData(
 
           for (const part of classParts) {
             if (part.startsWith('{{') && part.endsWith('}}')) {
-              result.dynamicClassValues.add(part);
-              // Try to extract literal strings from within {{...}} as potential static classes
-              // This helps if PurgeCSS's default extractor doesn't look inside mustaches.
-              const literalRegex = /['"]([^'"]+)['"]/g;
-              let match;
-              while ((match = literalRegex.exec(part)) !== null) {
-                if (match[1]) {
-                  match[1]
-                    .trim()
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .forEach((cls: string) => result.staticClassNames.add(cls));
+              const innerExpression = part.substring(2, part.length - 2);
+              if (isSafeClassExpression(innerExpression)) {
+                result.dynamicClassValues.add(part);
+                // Try to extract literal strings from within SAFE {{...}} as potential static classes
+                const literalRegex = /['"]([^'"]+)['"]/g;
+                let match;
+                while ((match = literalRegex.exec(part)) !== null) {
+                  if (match[1]) {
+                    match[1]
+                      .trim()
+                      .split(/\\s+/)
+                      .filter(Boolean)
+                      .forEach((cls: string) => result.staticClassNames.add(cls));
+                  }
                 }
+              } else {
+                // This is a risky dynamic class pattern
+                result.riskyDynamicClassPatterns.push({
+                  filePath: wxmlFilePath,
+                  expression: part,
+                });
+                // Optionally, log here or ensure it's logged by the caller
+                logger.warn(`Risky dynamic class pattern found in ${wxmlFilePath}: ${part}`);
               }
             } else {
               // Static class name
