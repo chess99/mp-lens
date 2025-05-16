@@ -32,8 +32,7 @@
         "${workspaceFolder}/dist/cli.js",
         "-p",
         "/Users/zcs/code/mmbb/mt-address-msc",
-        "clean",
-        "--list"
+        "clean"
       ],
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],

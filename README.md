@@ -16,12 +16,11 @@
 ## ✨ 功能特性
 
 * **全面的依赖分析:** 扫描多种文件类型（`.js`, `.ts`, `.wxml`, `.wxss`, `.json`, `.wxs`, 及常见图片格式），构建项目依赖图。
-* **依赖图可视化:** 生成交互式 HTML 或静态图文件（如 DOT、SVG、PNG），清晰展现页面、组件、脚本间的相互联系。
+* **依赖图可视化:** 生成交互式 HTML 或 JSON 格式的依赖图，清晰展现页面、组件、脚本间的相互联系。
 * **精准的未使用文件检测:** 基于依赖分析，准确识别项目中未被任何地方引用的孤立文件（包括页面、组件、脚本、样式、图片、WXS模块等）。
 * **灵活的路径别名支持:** 智能解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置，确保依赖分析的准确性。
 * **广泛的项目结构兼容:** 支持自定义小程序项目根目录、`miniappRoot` 和入口文件路径，适配各种项目结构。可自动检测 `app.json`。
 * **安全至上的清理机制:**
-  * 提供 `--list` 模式，仅预览待删除文件，**不执行实际删除**。
   * 默认在删除文件前进行**交互式确认**，防止误操作。
   * 支持 Glob 模式，可在分析和清理时**排除**特定文件或目录。
 * **高度可配置:** 支持命令行选项快速执行，也支持通过配置文件进行更细致的设置。
@@ -82,14 +81,17 @@ mp-lens [全局选项] <命令> [命令特定选项]
 # 在当前目录生成交互式 HTML 依赖图
 mp-lens graph
 
-# 为指定项目生成 SVG 格式的依赖图并保存到 output 目录
-mp-lens -p ../我的小程序 graph -f svg -o output/dependency-graph.svg
+# 为指定项目生成 HTML 格式的依赖图
+mp-lens -p ../我的小程序 graph -o output/dependency-graph.html
+
+# 生成 JSON 格式的依赖图数据
+mp-lens graph -f json -o dependency-data.json
 ```
 
 **选项:**
 
 * `-f, --format <format>`: 输出格式 (html|json)。默认为 `html`。
-* `-o, --output <file>`: 保存图文件的路径。如果未指定，HTML 将保存到 `mp-lens-graph.html`，其他格式输出到控制台。
+* `-o, --output <file>`: 保存图文件的路径。如果未指定，HTML 将保存到 `mp-lens-graph.html`，JSON 将保存到 `mp-lens-graph.json`。
 
 #### `format` (graph)
 
