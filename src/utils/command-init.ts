@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigFileOptions, GlobalCliOptions } from '../types/command-options';
+import { MiniProgramAppJson } from '../types/miniprogram';
 import { ConfigLoader } from './config-loader';
 import { logger } from './debug-logger';
 import { findAppJsonConfig } from './fs-finder';
@@ -11,7 +12,7 @@ interface CommandExecutionContext {
   projectRoot: string;
   miniappRoot: string;
   appJsonPath: string;
-  appJsonContent: string;
+  appJsonContent: MiniProgramAppJson;
   fileTypes: string[];
   exclude: string[];
   essentialFilesList: string[];
@@ -168,11 +169,11 @@ function processEssentialFiles(
 function resolveAppJson(
   miniappRoot: string,
   rawAppJsonPath?: string,
-  appJsonContent?: any,
-): { appJsonPath: string; appJsonContent: any } {
+  appJsonContent?: MiniProgramAppJson,
+): { appJsonPath: string; appJsonContent: MiniProgramAppJson } {
   // Result variables
   let appJsonPath: string = '';
-  let effectiveAppJsonContent: any = {}; // Default to empty object
+  let effectiveAppJsonContent: MiniProgramAppJson = {} as MiniProgramAppJson; // Default to empty object
 
   // Priority 1: Use provided app.json content
   if (

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
 
 /**
@@ -115,8 +116,8 @@ function processAppJsonGlobals(
   miniappRoot: string,
   entryPoints: Set<string>,
   processedComponentJsonPaths: Set<string>,
-): any | null {
-  let appJsonContent: any = null;
+): MiniProgramAppJson | null {
+  let appJsonContent: MiniProgramAppJson | null = null;
   try {
     // Directly resolve app.json instead of using resolveAppJson
     const appJsonPath = path.resolve(miniappRoot, 'app.json');
@@ -165,7 +166,7 @@ function processAppJsonGlobals(
 function processPagesAndSubPackages(
   projectRoot: string,
   miniappRoot: string,
-  appJsonContent: any,
+  appJsonContent: MiniProgramAppJson,
   entryPoints: Set<string>,
 ): PageInfo[] {
   const pagesFound: PageInfo[] = [];

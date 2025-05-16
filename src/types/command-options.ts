@@ -1,3 +1,5 @@
+import { MiniProgramAppJson } from './miniprogram';
+
 export interface GlobalCliOptions {
   config?: string;
   project: string;
@@ -41,7 +43,7 @@ export interface ConfigFileOptions {
 
   // 入口文件(app.json), 如未提供会自动尝试在 miniappRoot 内查找
   appJsonPath?: string; // 入口文件路径
-  appJsonContent?: any; // 或者直接提供入口文件内容
+  appJsonContent?: MiniProgramAppJson; // 或者直接提供入口文件内容
 
   // 文件分析相关
   types?: string; // 要检查的文件类型
@@ -64,6 +66,6 @@ export interface AnalyzerOptions {
   verboseLevel?: number;
   essentialFiles?: string[];
   appJsonPath: string;
-  appJsonContent?: any;
+  appJsonContent?: MiniProgramAppJson;
   includeAssets?: boolean;
 }

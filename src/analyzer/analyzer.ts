@@ -164,22 +164,26 @@ export async function analyzeProject(
   logger.debug('Include assets in cleanup:', includeAssets);
   logger.debug('Essential files:', essentialFiles);
 
+  // 验证 appJsonContent 存在
+  if (
+    !appJsonContent ||
+    typeof appJsonContent !== 'object' ||
+    Object.keys(appJsonContent).length === 0
+  ) {
+    const errorMsg =
+      '分析失败: 没有找到有效的 app.json 内容。请确保小程序项目根目录中存在 app.json 文件，或通过配置提供 appJsonContent。';
+    logger.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
   // --- Initial File Scan --- //
   // Scan should happen within the miniapp root if specified
   const allFoundFiles = findAllFiles(miniappRoot, fileTypes, excludePatterns);
-  if (allFoundFiles.length === 0 && !appJsonContent) {
-    // If no files found AND no appJsonContent provided, analysis is likely pointless
-    logger.warn(
-      'No files found matching specified types/exclusions within the miniapp root, and no appJsonContent provided. Analysis may yield empty results.', // eslint-disable-line
-    );
-    // Decide whether to throw or return empty structure
-    // Returning empty might be more user-friendly than throwing hard error
-    // return {
-    //   projectStructure: { nodes: [], links: [], rootNodeId: null, miniappRoot: actualMiniappRoot },
-    //   unusedFiles: [],
-    //   reachableNodeIds: new Set<string>(),
-    // };
+  if (allFoundFiles.length === 0) {
+    // If no files found, analysis will be based solely on appJsonContent
+    logger.warn('在指定的 miniapp 根目录中未找到匹配的文件。');
   }
+
   // Add app.json path if it exists and wasn't found by glob (e.g., different extension)
   if (appJsonPath && !allFoundFiles.includes(appJsonPath)) {
     logger.debug(`Manually adding app.json path to found files: ${appJsonPath}`);

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
+import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
 import { FileParser } from './file-parser';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
@@ -17,7 +18,7 @@ export class ProjectStructureBuilder {
 
   // --- Start: Added appJson details to constructor ---
   private appJsonPath: string | undefined;
-  private appJsonContent: any;
+  private appJsonContent: MiniProgramAppJson;
   // --- End: Added appJson details ---
 
   // --- Start: Add allFiles ---
@@ -32,7 +33,7 @@ export class ProjectStructureBuilder {
     projectRoot: string,
     miniappRoot: string,
     appJsonPath: string | undefined,
-    appJsonContent: any,
+    appJsonContent: MiniProgramAppJson,
     // --- Start: Added allFiles param ---
     allFiles: string[],
     // --- End: Added allFiles param ---
@@ -143,7 +144,7 @@ export class ProjectStructureBuilder {
     return structure;
   }
 
-  private async processAppJsonContent(content: any): Promise<void> {
+  private async processAppJsonContent(content: MiniProgramAppJson): Promise<void> {
     // Process Pages
     if (content.pages && Array.isArray(content.pages)) {
       for (const pagePath of content.pages) {
@@ -496,7 +497,7 @@ export class ProjectStructureBuilder {
 
   // --- Start: Added processing functions for TabBar, Theme, Workers ---
 
-  private processTabBar(content: any): void {
+  private processTabBar(content: MiniProgramAppJson): void {
     if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
       logger.debug('Processing tabBar entries...');
       content.tabBar.list.forEach((item: any) => {
@@ -519,7 +520,7 @@ export class ProjectStructureBuilder {
     }
   }
 
-  private processTheme(content: any): void {
+  private processTheme(content: MiniProgramAppJson): void {
     // Check for themeLocation first
     if (content.themeLocation && typeof content.themeLocation === 'string') {
       logger.debug(`Processing themeLocation: ${content.themeLocation}`);
@@ -530,7 +531,7 @@ export class ProjectStructureBuilder {
     this.addSingleFileLink(this.rootNodeId!, 'theme.json', 'Config');
   }
 
-  private processWorkers(content: any): void {
+  private processWorkers(content: MiniProgramAppJson): void {
     // Workers field defines entry points for worker threads
     if (content.workers && typeof content.workers === 'string') {
       logger.debug(`Processing workers entry: ${content.workers}`);
