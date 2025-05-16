@@ -18,7 +18,8 @@
     "dev": "npm run build:ui && ts-node src/cli.ts",
     "prepare": "npm run build",
     "clean": "rimraf dist",
-    "knip:fix": "npx knip --fix"
+    "knip:fix": "npx knip --fix",
+    "release": "bash scripts/publish.sh"
   },
   "keywords": [
     "miniprogram",
