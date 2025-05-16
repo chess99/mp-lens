@@ -65,6 +65,10 @@ mp-lens [全局选项] <命令> [命令特定选项]
 * `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。如果未指定，工具会尝试自动检测（如 `src`, `miniprogram`）。
 * `--entry-file <路径>`: 指定入口文件路径（相对于 `miniappRoot`，默认为 `app.json`）。工具会尝试自动检测。
 * `--config <路径>`: 指定配置文件的路径 (用于更复杂的设置，详见 [配置文件](#️-configuration-file) 部分)。
+* `--types <类型1,类型2,...>`: 指定要分析的文件类型扩展名，用逗号分隔 (默认: `js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs`)。
+* `--exclude <Glob模式>`: 用于排除文件/目录的 Glob 模式。可多次使用此选项以添加多个排除规则。
+* `--essential-files <文件1,文件2,...>`: 指定应被视为"必要"的文件路径（相对于 `miniappRoot`），这些文件将永远不会被报告为未使用或被清理。
+* `--include-assets`: 在分析和清理中包含图片等资源文件 (默认不包含)。
 * `-v, --verbose`: 显示更详细的日志输出，有助于调试。
 * `-h, --help`: 显示帮助信息。
 
@@ -103,7 +107,7 @@ mp-lens -p ../我的小程序 graph -f svg -o output/dependency-graph.svg
 **强烈建议:**
 
 1. **使用版本控制 (如 Git)**，并在运行 `clean` 前**提交所有更改**。
-2. 首次使用或不确定时，**务必先使用 `--list` 模式**进行预览。
+2. 首次使用时，默认会先预览文件列表并交互式确认。
 
 **默认行为:**
 
@@ -117,29 +121,22 @@ mp-lens -p ../我的小程序 graph -f svg -o output/dependency-graph.svg
 # 默认模式: 分析并列出未使用文件，然后提示确认删除
 mp-lens clean
 
-# 预览模式 (推荐): 只列出将被删除的文件，不执行任何操作 (安全)
-mp-lens clean --list
-
-# 直接删除模式 (高风险!): 直接删除未使用文件，不进行确认 (请谨慎使用!)
-mp-lens clean --delete
+# 直接写入模式: 实际写入更改（删除文件）
+mp-lens clean --write
 
 # 清理特定类型的未使用文件 (例如仅图片，仍会提示确认)
-mp-lens clean --types png,jpg,gif
+mp-lens --types png,jpg,gif clean
 
 # 清理时排除特定目录 (仍会提示确认)
-mp-lens clean --exclude "**/legacy/**" --exclude "src/archive/**"
+mp-lens --exclude "**/legacy/**" --exclude "src/archive/**" clean
 
-# 直接删除未使用的 JS 和 WXML 文件 (高风险!)
-mp-lens clean --delete --types js,wxml
+# 删除未使用的 JS 和 WXML 文件
+mp-lens --types js,wxml clean --write
 ```
 
 **选项:**
 
-* `--types <类型1,类型2,...>`: 指定要分析和删除的文件类型扩展名，用逗号分隔 (默认: `js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs`)。
-* `--exclude <Glob模式>`: 用于排除文件/目录的 Glob 模式。可多次使用此选项以添加多个排除规则。
-* `--essential-files <文件1,文件2,...>`: 指定应被视为"必要"的文件路径（相对于 `miniappRoot`），这些文件将永远不会被报告为未使用或被清理。
-* `--list`: **(安全模式，强烈推荐首次使用)** 仅列出将被删除的文件，不执行任何实际的删除操作。
-* `--delete`: **(高风险，谨慎使用!)** 跳过交互式确认步骤，直接删除分析出的未使用文件。
+* `--write`: 实际写入更改（删除文件），不进行确认提示。**使用此选项前请务必谨慎，建议先在没有此选项的情况下运行以预览要删除的文件。**
 
 #### 3. `lint` - 检查组件声明与使用的一致性
 
@@ -250,7 +247,7 @@ export default {
   // clean 命令是否默认包含图片等资源文件进行分析和清理
   // true: 包含资源文件，可能会被识别为未使用并清理
   // false: 不包含资源文件，资源文件不会被清理 (默认行为)
-  includeAssetsInClean: false,
+  includeAssets: false,
   aliases: { // 路径别名配置 (通常会自动从 tsconfig.json 或 jsconfig.json 读取)
     "@/*": ["src/*"],
     "@components/*": ["src/components/*"]
@@ -265,7 +262,7 @@ export default {
 * `types` (string): `clean` 命令默认分析的文件扩展名列表，逗号分隔。
 * `exclude` (string[]): 要排除的文件/目录的 Glob 模式列表。
 * `essentialFiles` (string[]): 应始终被视为必需的文件路径列表（相对于 `miniappRoot`）。
-* `includeAssetsInClean` (boolean): 控制 `clean` 命令是否分析和清理图片等资源文件 (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`)。
+* `includeAssets` (boolean): 控制 `clean` 命令是否分析和清理图片等资源文件 (`.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`)。
   * `true`: 资源文件会被纳入分析范围，可能被清理。
   * `false` (默认): 资源文件不会被视为"未使用"，也不会被清理。
 * `aliases` (object): 路径别名配置。工具会尝试自动从 `tsconfig.json` (compilerOptions.paths) 或 `jsconfig.json` 加载。此处配置可覆盖自动加载的或补充。

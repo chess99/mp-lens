@@ -18,8 +18,7 @@ export interface CmdGraphOptions {
 }
 
 export interface CmdCleanOptions {
-  list?: boolean;
-  delete?: boolean;
+  write?: boolean;
 }
 
 export interface CmdLintOptions {

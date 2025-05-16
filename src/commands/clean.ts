@@ -8,7 +8,7 @@ import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
 
 /**
- * Cleans unused files: lists, prompts for deletion, or deletes directly.
+ * Cleans unused files: lists, prompts for deletion, or writes changes directly.
  */
 export async function clean(
   cliOptions: GlobalCliOptions,
@@ -27,12 +27,10 @@ export async function clean(
     includeAssets,
   } = await initializeCommandContext(cliOptions);
 
-  const listOnly = cmdOptions.list ?? false;
-  const deleteDirectly = cmdOptions.delete ?? false;
+  const writeDirectly = cmdOptions.write ?? false;
 
-  if (listOnly) logger.info(chalk.blue('ℹ️ 列表模式: 文件将被列出但不会被删除。'));
-  else if (deleteDirectly) logger.info(chalk.yellow('⚠️ 删除模式: 文件将被直接删除而无需确认。'));
-  else logger.info('🧹 开始清理未使用文件 (删除前会提示)...');
+  if (writeDirectly) logger.info(chalk.yellow('⚠️ 写入模式: 将直接删除未使用文件'));
+  else logger.info('🧹 开始清理未使用文件 (变更前会提示确认)...');
 
   try {
     logger.info('正在分析项目以查找未使用文件...');
@@ -58,29 +56,20 @@ export async function clean(
     unusedFiles.forEach((file) => {
       const relativePath = path.relative(projectRoot, file);
       // Adjust log prefix based on mode
-      let prefix = '[Action]';
-      if (listOnly) prefix = chalk.blue('[列表]');
-      else if (deleteDirectly) prefix = chalk.red('[删除]');
-      else prefix = chalk.yellow('[删除 (待确认)]');
+      const prefix = writeDirectly ? chalk.red('[将删除]') : chalk.yellow('[待确认删除]');
       logger.info(`  ${prefix} ${relativePath}`);
     });
     console.log(); // Add spacing
 
-    // If listOnly mode, we are done after listing
-    if (listOnly) {
-      logger.info('列表模式完成。未更改任何文件。');
-      return;
-    }
-
-    // Confirmation before action (only if not deleteDirectly)
-    let proceed = deleteDirectly;
+    // Confirmation before action (only if not writeDirectly)
+    let proceed = writeDirectly;
     if (!proceed) {
-      // Prompt only if not in direct delete mode
+      // Prompt only if not in direct write mode
       const answers = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'proceedConfirm',
-          message: `是否继续删除 ${unusedFiles.length} 个文件?`,
+          message: `是否删除这 ${unusedFiles.length} 个文件?`,
           default: false,
         },
       ]);
@@ -92,7 +81,7 @@ export async function clean(
       return;
     }
 
-    // Perform deletion if confirmed or if deleteDirectly was true
+    // Perform deletion if confirmed or if writeDirectly was true
     logger.info(`正在删除 ${unusedFiles.length} 个文件...`);
     let processedCount = 0;
     let errorCount = 0;
@@ -101,7 +90,7 @@ export async function clean(
       try {
         const relativePath = path.relative(projectRoot, file);
         fs.unlinkSync(file);
-        logger.debug(`Deleted: ${relativePath}`);
+        logger.debug(`已删除: ${relativePath}`);
         processedCount++;
       } catch (err) {
         logger.error(`处理文件 ${file} 失败: ${(err as Error).message}`);

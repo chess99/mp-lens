@@ -74,13 +74,22 @@ program
   .option('--trace', '启用最详细的日志输出 (等同于 --verbose-level 3)')
   .option('--config <path>', '指定配置文件的路径')
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
-  .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
+  .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）')
+  .option('--types <types>', '指定要分析的文件类型 (覆盖配置文件)')
+  .option(
+    '--exclude <pattern>',
+    '排除某些文件/目录 (覆盖配置文件)',
+    (value: string, previous: string[]) => previous.concat([value]),
+    [],
+  )
+  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
+  .option('--include-assets', '在分析和清理中包含图片等资源文件 (默认不包含)', false);
 
 // graph command
 program
   .command('graph')
   .description('生成依赖关系图的可视化文件')
-  .option('-f, --format <format>', '输出格式 (html|json)')
+  .option('-f, --format <format>', '输出格式 (html|json)', 'html')
   .option('-o, --output <file>', '保存图文件的路径')
   .action(async (cmdOptions: CmdGraphOptions) => {
     const cliOptions = program.opts() as GlobalCliOptions; // Cast globalOptions
@@ -97,17 +106,7 @@ program
 program
   .command('clean')
   .description('分析项目并删除未使用的文件。默认会先列出文件并提示确认。')
-  .option('--types <types>', '指定要分析的文件类型 (覆盖配置文件)')
-  .option(
-    '--exclude <pattern>',
-    '排除某些文件/目录 (覆盖配置文件)',
-    (value: string, previous: string[]) => previous.concat([value]), // value and previous are correctly typed by commander here
-    [],
-  )
-  .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
-  .option('--list', '只列出将被删除的文件，不执行任何操作', false)
-  .option('--delete', '直接删除文件，不进行确认提示', false)
-  .option('--includeAssets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
+  .option('--write', '实际写入更改（删除文件）', false)
   .action(async (cmdOptions: CmdCleanOptions) => {
     const cliOptions = program.opts() as GlobalCliOptions;
     setupLogger(cliOptions);
@@ -143,6 +142,7 @@ program
   .option('--write', '实际写入对 WXSS 文件的更改。')
   .action(async (wxssFilePathInput: string, cmdOptions: CmdPurgeWxssOptions) => {
     const cliOptions = program.opts() as GlobalCliOptions;
+    setupLogger(cliOptions);
     try {
       await purgewxss(cliOptions, { wxssFilePathInput, ...cmdOptions });
     } catch (error: any) {
