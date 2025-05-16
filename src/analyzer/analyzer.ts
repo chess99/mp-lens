@@ -93,80 +93,6 @@ function findReachableNodes(structure: ProjectStructure, entryNodeIds: string[])
   return reachable;
 }
 
-/**
- * Resolves the app.json path and content based on user options or defaults.
- */
-function resolveAppJson(
-  miniappRoot: string,
-  entryFile?: string,
-  entryContent?: any,
-): { appJsonPath: string | null; appJsonContent: any } {
-  let appJsonPath: string | null = null;
-  let effectiveAppJsonContent: any = {}; // Default to empty object
-
-  // Priority 1: Use provided entry content
-  if (entryContent && typeof entryContent === 'object' && Object.keys(entryContent).length > 0) {
-    logger.info('使用提供的 entryContent 作为 app.json 结构。');
-    effectiveAppJsonContent = entryContent;
-    // Try to find a corresponding path if entryFile hint is given
-    if (entryFile) {
-      const potentialPath = path.resolve(miniappRoot, entryFile);
-      if (fs.existsSync(potentialPath)) {
-        appJsonPath = potentialPath;
-        logger.debug(`Found potential app.json path matching entryFile hint: ${appJsonPath}`);
-      } else {
-        logger.debug(
-          `EntryFile hint given (${entryFile}), but file not found at ${potentialPath}.`,
-        );
-      }
-    }
-    return { appJsonPath, appJsonContent: effectiveAppJsonContent };
-  }
-
-  // Priority 2: Use provided entry file path
-  if (entryFile) {
-    const potentialPath = path.resolve(miniappRoot, entryFile);
-    if (fs.existsSync(potentialPath)) {
-      logger.info(`使用自定义入口文件作为 app.json: ${potentialPath}`);
-      appJsonPath = potentialPath;
-      try {
-        const content = fs.readFileSync(appJsonPath, 'utf-8');
-        effectiveAppJsonContent = JSON.parse(content);
-      } catch (error) {
-        logger.error(`Failed to read or parse custom entry file ${appJsonPath}:`, error);
-        throw new Error(`Failed to process entry file: ${entryFile}`);
-      }
-      return { appJsonPath, appJsonContent: effectiveAppJsonContent };
-    } else {
-      logger.warn(
-        `Specified entry file '${entryFile}' not found relative to miniapp root '${miniappRoot}'. Falling back to default app.json detection.`, // eslint-disable-line
-      );
-    }
-  }
-
-  // Priority 3: Find default app.json
-  const defaultAppJsonPath = path.resolve(miniappRoot, 'app.json');
-  if (fs.existsSync(defaultAppJsonPath)) {
-    logger.debug(`Found default app.json at: ${defaultAppJsonPath}`);
-    appJsonPath = defaultAppJsonPath;
-    try {
-      const content = fs.readFileSync(appJsonPath, 'utf-8');
-      effectiveAppJsonContent = JSON.parse(content);
-    } catch (error) {
-      logger.error(`Failed to read or parse default app.json ${appJsonPath}:`, error);
-      // If default fails to parse, maybe still proceed with empty content?
-      // For now, let's treat it as critical if app.json exists but is invalid.
-      throw new Error(`Failed to process default app.json`);
-    }
-  } else {
-    logger.warn(
-      'Could not find default app.json and no valid entryFile or entryContent provided. Proceeding with empty app configuration.', // eslint-disable-line
-    );
-  }
-
-  return { appJsonPath, appJsonContent: effectiveAppJsonContent };
-}
-
 // --- End: New Helper Function --- //
 
 // --- Start: Re-added findAllFiles --- //
@@ -219,55 +145,32 @@ function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: str
 // --- Start: Exported analyzeProject function --- //
 
 export async function analyzeProject(
-  trueProjectRoot: string,
+  projectRoot: string,
   options: AnalyzerOptions,
 ): Promise<AnalysisResult> {
   const {
     fileTypes = ['js', 'ts', 'wxml', 'wxss', 'json'],
     excludePatterns = [],
-    miniappRoot: miniappRootOption,
-    entryFile,
-    entryContent,
+    miniappRoot,
+    appJsonPath,
+    appJsonContent,
     essentialFiles = [],
     includeAssets = false,
   } = options;
 
-  logger.debug('Project Root:', trueProjectRoot);
-
-  // --- Resolve MiniApp Root --- //
-  let actualMiniappRoot = trueProjectRoot;
-  if (miniappRootOption) {
-    const potentialMiniappRoot = path.resolve(trueProjectRoot, miniappRootOption);
-    if (fs.existsSync(potentialMiniappRoot) && fs.statSync(potentialMiniappRoot).isDirectory()) {
-      actualMiniappRoot = potentialMiniappRoot;
-      logger.info(`使用指定的小程序根目录: ${actualMiniappRoot}`);
-    } else {
-      logger.warn(
-        `指定的小程序根目录 '${miniappRootOption}' 未找到或不是目录。默认使用项目根目录。`, // eslint-disable-line
-      );
-    }
-  } else {
-    logger.debug('Miniapp root not specified, using project root.');
-  }
-  logger.debug('MiniApp Root:', actualMiniappRoot);
+  logger.debug('Project Root:', projectRoot);
+  logger.debug('MiniApp Root:', miniappRoot);
   logger.debug('Exclude patterns:', excludePatterns);
   logger.debug('Include assets in cleanup:', includeAssets);
   logger.debug('Essential files:', essentialFiles);
 
-  // --- Resolve App.json --- //
-  const { appJsonPath, appJsonContent } = resolveAppJson(
-    actualMiniappRoot,
-    entryFile,
-    entryContent,
-  );
-
   // --- Initial File Scan --- //
   // Scan should happen within the miniapp root if specified
-  const allFoundFiles = findAllFiles(actualMiniappRoot, fileTypes, excludePatterns);
-  if (allFoundFiles.length === 0 && !entryContent) {
-    // If no files found AND no entryContent provided, analysis is likely pointless
+  const allFoundFiles = findAllFiles(miniappRoot, fileTypes, excludePatterns);
+  if (allFoundFiles.length === 0 && !appJsonContent) {
+    // If no files found AND no appJsonContent provided, analysis is likely pointless
     logger.warn(
-      'No files found matching specified types/exclusions within the miniapp root, and no entryContent provided. Analysis may yield empty results.', // eslint-disable-line
+      'No files found matching specified types/exclusions within the miniapp root, and no appJsonContent provided. Analysis may yield empty results.', // eslint-disable-line
     );
     // Decide whether to throw or return empty structure
     // Returning empty might be more user-friendly than throwing hard error
@@ -285,8 +188,8 @@ export async function analyzeProject(
 
   // --- Build Project Structure ---
   const builder = new ProjectStructureBuilder(
-    trueProjectRoot,
-    actualMiniappRoot,
+    projectRoot,
+    miniappRoot,
     appJsonPath,
     appJsonContent,
     allFoundFiles, // Pass the list of all files
@@ -304,11 +207,7 @@ export async function analyzeProject(
     logger.warn('Project structure has no root node ID defined.');
   }
   // Add essential files as entry points
-  const essentialFilePaths = resolveEssentialFiles(
-    trueProjectRoot,
-    actualMiniappRoot,
-    essentialFiles,
-  );
+  const essentialFilePaths = resolveEssentialFiles(projectRoot, miniappRoot, essentialFiles);
   essentialFilePaths.forEach((filePath) => {
     if (nodeMap.has(filePath)) {
       entryNodeIdsSet.add(filePath);
@@ -321,10 +220,7 @@ export async function analyzeProject(
   const allFilePathsInStructure = projectStructure.nodes
     .filter((n) => n.type === 'Module' && n.properties?.absolutePath)
     .map((n) => n.properties!.absolutePath as string);
-  const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(
-    trueProjectRoot,
-    allFilePathsInStructure,
-  );
+  const pureAmbientDtsFiles = findPureAmbientDeclarationFiles(projectRoot, allFilePathsInStructure);
   pureAmbientDtsFiles.forEach((filePath) => {
     if (nodeMap.has(filePath)) {
       entryNodeIdsSet.add(filePath);
@@ -340,7 +236,7 @@ export async function analyzeProject(
   // --- Find Unused Files using the Calculated Reachable Nodes --- //
   const unusedFiles = findUnusedFiles(
     projectStructure,
-    trueProjectRoot,
+    projectRoot,
     reachableNodeIds, // <-- Pass calculated reachable nodes
     includeAssets,
   );

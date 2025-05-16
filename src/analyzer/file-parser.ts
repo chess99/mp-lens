@@ -29,7 +29,7 @@ export class FileParser {
   private jsonParser: JSONParser;
   private wxsParser: WXSParser;
 
-  constructor(projectRoot: string, options: AnalyzerOptions = { fileTypes: [] }) {
+  constructor(projectRoot: string, options: AnalyzerOptions) {
     this.projectRoot = projectRoot;
     this.options = options;
 

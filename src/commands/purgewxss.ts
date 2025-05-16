@@ -1,33 +1,23 @@
 import chalk from 'chalk';
-import { Command } from 'commander';
 import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import { PurgeCSS } from 'purgecss';
 import { PathResolver } from '../analyzer/utils/path-resolver';
 import { analyzeWxmlForPurge, WxmlPurgeAnalysisResult } from '../linter/wxml-analyzer';
-import { AnalyzerOptions, CommandOptions } from '../types/command-options';
+import { AnalyzerOptions, CmdPurgeWxssOptions, GlobalCliOptions } from '../types/command-options';
 import { AliasResolver } from '../utils/alias-resolver';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
 
-interface RawPurgeWxssOptions extends CommandOptions {
-  wxssFilePathInput?: string;
-  write?: boolean;
-}
-
 async function performPurge(
-  options: {
-    projectRoot: string;
-    scanRoot: string;
-    miniappRoot?: string;
-    wxssFilePathInput?: string;
-    write?: boolean;
-  },
+  projectRoot: string,
+  scanRoot: string,
+  cmdOptions: CmdPurgeWxssOptions,
   pathResolver: PathResolver,
-  mergedConfig: CommandOptions,
+  context: AnalyzerOptions,
 ): Promise<void> {
-  const { projectRoot, scanRoot, wxssFilePathInput, write } = options;
+  const { wxssFilePathInput, write } = cmdOptions;
   let commandHadErrors = false;
   let writeableChangesCount = 0;
   let totalPotentialSavings = 0;
@@ -60,7 +50,7 @@ async function performPurge(
   } else {
     const pattern = path.join(scanRoot, '**/*.wxss').replace(/\\/g, '/');
 
-    const excludePatterns = (mergedConfig as AnalyzerOptions).excludePatterns || [];
+    const excludePatterns = context.excludePatterns || [];
     const ignorePatterns = [
       path.join(scanRoot, 'node_modules/**').replace(/\\/g, '/'),
       path.join(scanRoot, 'dist/**').replace(/\\/g, '/'),
@@ -246,61 +236,15 @@ async function performPurge(
   }
 }
 
-export async function purgewxss(rawOptions: RawPurgeWxssOptions): Promise<void> {
-  const { projectRoot, mergedConfig, miniappRoot } = await initializeCommandContext(
-    rawOptions,
-    'purgewxss',
-  );
-
+export async function purgewxss(
+  cliOptions: GlobalCliOptions,
+  cmdOptions: CmdPurgeWxssOptions,
+): Promise<void> {
+  const context = await initializeCommandContext(cliOptions);
+  const { projectRoot, miniappRoot } = context;
   const scanRoot = miniappRoot || projectRoot;
-
   const aliasResolver = new AliasResolver(scanRoot);
   const hasAliasConfig = aliasResolver.initialize();
-
-  const pathResolver = new PathResolver(
-    projectRoot,
-    mergedConfig as AnalyzerOptions,
-    aliasResolver,
-    hasAliasConfig,
-  );
-
-  const purgeOptions = {
-    projectRoot,
-    scanRoot,
-    miniappRoot,
-    wxssFilePathInput: rawOptions.wxssFilePathInput,
-    write: rawOptions.write,
-  };
-
-  await performPurge(purgeOptions, pathResolver, mergedConfig);
-}
-
-export function registerPurgeWxssCommand(program: Command): void {
-  program
-    .command('purgewxss [wxss-file-path]')
-    .description(
-      '分析 WXML/WXSS 并使用 PurgeCSS 移除未使用的 CSS。未指定路径则处理项目中所有 .wxss 文件。',
-    )
-    .option('--write', '实际写入对 WXSS 文件的更改。')
-    .action(
-      async (wxssFilePathInput: string | undefined, cmdSpecificOptions: { write?: boolean }) => {
-        const globalOptions = program.opts() as CommandOptions;
-        const rawOptions: RawPurgeWxssOptions = {
-          ...globalOptions,
-          wxssFilePathInput: wxssFilePathInput,
-          write: cmdSpecificOptions.write,
-        };
-
-        process.exitCode = 0;
-        try {
-          await purgewxss(rawOptions);
-        } catch (error: any) {
-          logger.error(chalk.red(`PurgeWXSS 命令执行失败: ${error.message}`));
-          if (error.stack) {
-            logger.debug(error.stack);
-          }
-          process.exitCode = 1;
-        }
-      },
-    );
+  const pathResolver = new PathResolver(projectRoot, context, aliasResolver, hasAliasConfig);
+  await performPurge(projectRoot, scanRoot, cmdOptions, pathResolver, context);
 }

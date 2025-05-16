@@ -15,7 +15,18 @@ module.exports = {
    * 默认为 "app.json"。
    * 例: "app.js", "my-custom-entry.json"
    */
-  entryFile: 'app.json',
+  appJsonPath: 'app.json',
+
+  /**
+   * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
+   * 这在入口文件由构建工具动态生成时可能有用。
+   * 如果提供此项，将忽略 appJsonPath 选项。
+   * 例: {
+   *   "pages": ["pages/index/index"],
+   *   "subPackages": []
+   * }
+   */
+  appJsonContent: undefined,
 
   /**
    * [可选] 要分析的文件类型扩展名列表，用逗号分隔。
@@ -37,7 +48,6 @@ module.exports = {
     '**/*.test.ts',
     '**/mock/**',
   ],
-  // excludePatterns: [] // 旧的别名，与 exclude 功能相同，保留以兼容
 
   /**
    * [可选] 应始终被视为必需的文件路径列表（相对于项目根目录）。
@@ -71,36 +81,4 @@ module.exports = {
   aliases: {
     // "@": "./src", // 示例，通常会自动从 tsconfig/jsconfig 加载
   },
-  // aliasMap: {} // 旧的别名，不再推荐使用
-
-  // --- 特定命令的配置 (通常通过命令行参数指定，但也可在此配置) ---
-
-  /**
-   * [graph 命令可选] 生成依赖图的格式。
-   * 'html': 交互式 HTML 文件 (默认)
-   * 'json': JSON 格式表示图数据
-   */
-  format: 'html',
-
-  /**
-   * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
-   * 这在入口文件由构建工具动态生成时可能有用。
-   * 如果提供此项，将忽略 entryFile 选项。
-   * 例: {
-   *   "pages": ["pages/index/index"],
-   *   "subPackages": []
-   * }
-   */
-  entryContent: undefined,
-
-  /**
-   * [可选] 指定命令的输出文件路径（相对于项目根目录）。
-   * list-unused: 如果指定，列表将写入文件而非控制台。
-   * graph: 指定图文件的保存路径。
-   * 例: "reports/unused_files.txt", "dist/dependency-graph.html"
-   */
-  output: undefined,
-
-  // Global options section is removed as they are mostly covered by specific command options or CLI global flags
-  // and the duplicated graph section below is also removed.
 }; 

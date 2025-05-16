@@ -234,7 +234,7 @@ npm install --save-dev mp-lens knip
 // mp-lens.config.js
 export default {
   miniappRoot: "src", // 小程序代码主目录 (相对于项目根目录)
-  entryFile: "app.json", // 入口文件 (相对于 miniappRoot)
+  appJsonPath: "app.json", // 入口文件 (相对于 miniappRoot)
   // 分析的文件类型 (clean 命令的默认值)
   types: "js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs",
   exclude: [ // 等同于命令行中的 --exclude (Glob 模式)
@@ -255,18 +255,13 @@ export default {
     "@/*": ["src/*"],
     "@components/*": ["src/components/*"]
   },
-  // purgewxss 命令特定配置
-  purgeWxss: {
-    // 可以在这里覆盖全局的 excludePatterns，或添加针对 purgewxss 的特定排除
-    // excludePatterns: ["src/styles/global.wxss"],
-  }
 };
 ```
 
 **常用配置项说明:**
 
 * `miniappRoot` (string): 小程序源代码所在的子目录（相对于项目根目录）。
-* `entryFile` (string): 入口文件的路径（相对于 `miniappRoot`）。默认为 `app.json`。
+* `appJsonPath` (string): 入口文件的路径（相对于 `miniappRoot`）。默认为 `app.json`。
 * `types` (string): `clean` 命令默认分析的文件扩展名列表，逗号分隔。
 * `exclude` (string[]): 要排除的文件/目录的 Glob 模式列表。
 * `essentialFiles` (string[]): 应始终被视为必需的文件路径列表（相对于 `miniappRoot`）。
@@ -274,7 +269,6 @@ export default {
   * `true`: 资源文件会被纳入分析范围，可能被清理。
   * `false` (默认): 资源文件不会被视为"未使用"，也不会被清理。
 * `aliases` (object): 路径别名配置。工具会尝试自动从 `tsconfig.json` (compilerOptions.paths) 或 `jsconfig.json` 加载。此处配置可覆盖自动加载的或补充。
-* `purgeWxss` (object): `purgewxss` 命令的特定配置，例如可以有其专属的 `excludePatterns`。
 
 ## 🤝 贡献
 

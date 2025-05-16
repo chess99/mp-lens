@@ -1,54 +1,35 @@
-export interface CommandOptions {
-  project: string;
-  verbose?: boolean;
-  verboseLevel?: number;
+export interface GlobalCliOptions {
   config?: string;
-  list?: boolean;
-  delete?: boolean;
+  project: string;
   miniappRoot?: string;
-  entryFile?: string;
+  appJsonPath?: string;
+  types?: string;
+  exclude?: string[];
+  essentialFiles?: string;
+  includeAssets?: boolean; // 分析项目结构的时候是否包含资源文件
+  verboseLevel?: number;
+  verbose?: boolean;
   trace?: boolean;
 }
 
-export interface AnalyzerOptions {
-  fileTypes?: string[];
-  excludePatterns?: string[];
-  verbose?: boolean;
-  verboseLevel?: number;
-  essentialFiles?: string[];
-  miniappRoot?: string;
-  entryFile?: string;
-  entryContent?: any;
-  includeAssets?: boolean;
-}
-
-export interface OutputOptions {
-  format: 'text' | 'json';
-  projectRoot: string;
-  miniappRoot?: string;
-}
-
-export interface GraphOptions extends CommandOptions {
+export interface CmdGraphOptions {
   format?: 'html' | 'json';
   output?: string;
 }
 
-export interface CleanOptions extends CommandOptions {
-  types: string;
-  exclude: string[];
-  essentialFiles?: string;
-  miniappRoot?: string;
-  entryFile?: string;
+export interface CmdCleanOptions {
+  list?: boolean;
+  delete?: boolean;
 }
 
-export interface ListUnusedOptions extends CommandOptions {
-  types: string;
-  exclude: string[];
-  essentialFiles?: string;
-  outputFormat: 'text' | 'json';
-  output?: string;
-  miniappRoot?: string;
-  entryFile?: string;
+export interface CmdLintOptions {
+  fix?: boolean;
+  path?: string;
+}
+
+export interface CmdPurgeWxssOptions {
+  write?: boolean;
+  wxssFilePathInput?: string;
 }
 
 /**
@@ -58,13 +39,15 @@ export interface ListUnusedOptions extends CommandOptions {
 export interface ConfigFileOptions {
   // 基本选项
   miniappRoot?: string; // 小程序代码子目录
-  entryFile?: string; // 入口文件路径
+
+  // 入口文件(app.json), 如未提供会自动尝试在 miniappRoot 内查找
+  appJsonPath?: string; // 入口文件路径
+  appJsonContent?: any; // 或者直接提供入口文件内容
 
   // 文件分析相关
   types?: string; // 要检查的文件类型
   exclude?: string[]; // 要排除的文件/目录
-  excludePatterns?: string[]; // 要排除的文件/目录（兼容旧的API）
-  essentialFiles?: string[] | string; // 必要文件列表
+  essentialFiles?: string[]; // 必要文件列表
   includeAssets?: boolean; // 是否包含资源文件(png,jpg等)在清理范围
 
   // 别名相关
@@ -72,17 +55,16 @@ export interface ConfigFileOptions {
     // 别名配置
     [key: string]: string | string[];
   };
-  aliasMap?: Record<string, string>; // 别名映射（简化版）
+}
 
-  // 输出相关
-  outputFormat?: 'text' | 'json'; // list-unused命令输出格式
-
-  // 图表生成相关
-  format?: 'html' | 'json'; // graph命令输出格式
-
-  // 高级选项
-  entryContent?: any; // 自定义入口内容
-
-  // 输出路径
-  output?: string; // 输出文件路径
+export interface AnalyzerOptions {
+  miniappRoot: string;
+  fileTypes?: string[];
+  excludePatterns?: string[];
+  verbose?: boolean;
+  verboseLevel?: number;
+  essentialFiles?: string[];
+  appJsonPath: string;
+  appJsonContent?: any;
+  includeAssets?: boolean;
 }

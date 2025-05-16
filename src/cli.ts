@@ -1,10 +1,28 @@
 #!/usr/bin/env node
+import chalk from 'chalk';
 import { Command } from 'commander';
 import * as fs from 'fs'; // Import fs
 import * as path from 'path';
-import { CleanOptions, CommandOptions, GraphOptions } from './types/command-options'; // Import CommandOptions and GraphOptions
+import { clean } from './commands/clean';
+import { graph } from './commands/graph';
+import { lint } from './commands/lint';
+import { purgewxss } from './commands/purgewxss';
+import {
+  CmdCleanOptions,
+  CmdGraphOptions,
+  CmdLintOptions,
+  CmdPurgeWxssOptions,
+  GlobalCliOptions,
+} from './types/command-options';
+import { logger, LogLevel } from './utils/debug-logger';
 
-// --- Robust package.json finder ---
+// Use the finder function
+const packageJsonPath = findPackageJson(__dirname);
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { version } = require(packageJsonPath);
+const program = new Command();
+
+// Robust package.json finder
 function findPackageJson(startDir: string): string {
   let currentDir = path.resolve(startDir);
   // Loop indefinitely, but break or throw inside
@@ -21,33 +39,9 @@ function findPackageJson(startDir: string): string {
     currentDir = parentDir; // Move up for next iteration
   }
 }
-// --- End finder ---
-
-// Use the finder function
-const packageJsonPath = findPackageJson(__dirname);
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { version } = require(packageJsonPath);
-
-// Import command functions
-import { clean } from './commands/clean';
-import { graph } from './commands/graph';
-import { lint } from './commands/lint';
-import { registerPurgeWxssCommand } from './commands/purgewxss';
-import { logger, LogLevel } from './utils/debug-logger';
-
-// Remove the local mergeOptions function from cli.ts
-/*
-async function mergeOptions(cmdOptions: any, globalOptions: any) {
-  // ... removed implementation ...
-}
-*/
 
 // Helper to setup logger based on global options
 function setupLogger(globalOptions: any) {
-  // Remove unused variable
-  // const projectPath = globalOptions.project || process.cwd();
-  // const resolvedProjectPath = path.resolve(projectPath);
-
   // Configure logger verbosity
   if (globalOptions.trace) {
     logger.setLevel(LogLevel.TRACE);
@@ -64,8 +58,6 @@ function setupLogger(globalOptions: any) {
   // logger.setProjectRoot(resolvedProjectPath);
   logger.debug(`Logger level set to: ${logger.getLevel()}`);
 }
-
-const program = new Command();
 
 // Define the global options
 program
@@ -84,29 +76,17 @@ program
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）');
 
-// Define interfaces for command-specific options (these are fine for local parsing)
-interface CleanCommandArgs {
-  types?: string;
-  exclude?: string[];
-  essentialFiles?: string;
-  list?: boolean;
-  delete?: boolean;
-  includeAssets?: boolean;
-}
-
 // graph command
 program
   .command('graph')
   .description('生成依赖关系图的可视化文件')
   .option('-f, --format <format>', '输出格式 (html|json)')
   .option('-o, --output <file>', '保存图文件的路径')
-  .action(async (cmdArgs: GraphOptions) => {
-    // Use local cmdArgs type
-    const globalOptions = program.opts() as CommandOptions; // Cast globalOptions
-    setupLogger(globalOptions);
+  .action(async (cmdOptions: CmdGraphOptions) => {
+    const cliOptions = program.opts() as GlobalCliOptions; // Cast globalOptions
+    setupLogger(cliOptions);
     try {
-      // Construct the full options object and cast it to GraphOptions
-      await graph({ ...globalOptions, ...cmdArgs } as GraphOptions);
+      await graph(cliOptions, cmdOptions);
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
@@ -128,13 +108,11 @@ program
   .option('--list', '只列出将被删除的文件，不执行任何操作', false)
   .option('--delete', '直接删除文件，不进行确认提示', false)
   .option('--includeAssets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
-  .action(async (cmdArgs: CleanCommandArgs) => {
-    // Use local cmdArgs type
-    const globalOptions = program.opts() as CommandOptions; // Cast globalOptions
-    setupLogger(globalOptions);
+  .action(async (cmdOptions: CmdCleanOptions) => {
+    const cliOptions = program.opts() as GlobalCliOptions;
+    setupLogger(cliOptions);
     try {
-      // Construct the full options object and cast it to CleanOptions
-      await clean({ ...globalOptions, ...cmdArgs } as CleanOptions);
+      await clean(cliOptions, cmdOptions);
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
@@ -146,29 +124,35 @@ program
   .command('lint [path]')
   .description('分析小程序项目中组件声明与使用的一致性')
   .option('--fix', '自动修复JSON文件中"声明但未使用"的问题')
-  .action(async (...actionArgs: any[]) => {
-    const path: string | undefined = actionArgs[0] as string | undefined;
-    const cmdOptions: { fix?: boolean } = actionArgs[1] || {};
-
-    const globalOptions = program.opts();
-    const rawOptions = {
-      ...globalOptions,
-      ...cmdOptions,
-      path: path,
-      fix: !!cmdOptions.fix,
-    };
-
-    setupLogger(globalOptions);
+  .action(async (path: string, cmdOptions: CmdLintOptions) => {
+    const cliOptions = program.opts() as GlobalCliOptions;
+    setupLogger(cliOptions);
     try {
-      await lint(rawOptions);
+      await lint(cliOptions, { path, ...cmdOptions });
     } catch (error) {
       logger.error(`Command failed: ${(error as Error).message}`);
       process.exit(1);
     }
   });
 
-// purgewxss command (New command registration)
-registerPurgeWxssCommand(program);
+program
+  .command('purgewxss [wxss-file-path]')
+  .description(
+    '分析 WXML/WXSS 并使用 PurgeCSS 移除未使用的 CSS。未指定路径则处理项目中所有 .wxss 文件。',
+  )
+  .option('--write', '实际写入对 WXSS 文件的更改。')
+  .action(async (wxssFilePathInput: string, cmdOptions: CmdPurgeWxssOptions) => {
+    const cliOptions = program.opts() as GlobalCliOptions;
+    try {
+      await purgewxss(cliOptions, { wxssFilePathInput, ...cmdOptions });
+    } catch (error: any) {
+      logger.error(chalk.red(`PurgeWXSS 命令执行失败: ${error.message}`));
+      if (error.stack) {
+        logger.debug(error.stack);
+      }
+      process.exitCode = 1;
+    }
+  });
 
 // Parse arguments
 program.parse(process.argv);

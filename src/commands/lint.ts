@@ -7,6 +7,7 @@ import { PathResolver } from '../analyzer/utils/path-resolver';
 import { lintComponentUsage } from '../linter/component-linter';
 import { LintResult } from '../linter/types';
 import { analyzeWxmlTags } from '../linter/wxml-analyzer';
+import { CmdLintOptions, GlobalCliOptions } from '../types/command-options';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
 
@@ -462,18 +463,15 @@ async function applyLintFixes(result: LintResult, projectRoot: string): Promise<
 /**
  * Main lint command implementation (now uses initializeCommandContext)
  */
-export async function lint(rawOptions: any): Promise<void> {
-  const { projectRoot, mergedConfig, miniappRoot } = await initializeCommandContext(
-    rawOptions,
-    'lint',
-  );
+export async function lint(
+  cliOptions: GlobalCliOptions,
+  cmdOptions: CmdLintOptions,
+): Promise<void> {
   logger.info('开始组件使用情况检查流程...');
-  logger.debug(`Project: ${projectRoot}`);
-  if (miniappRoot) {
-    logger.debug(`Miniapp Root: ${miniappRoot}`);
-  }
+  const context = await initializeCommandContext(cliOptions);
+  const { projectRoot, miniappRoot } = context;
   const aliasResolver = null;
-  const pathResolver = new PathResolver(projectRoot, mergedConfig, aliasResolver, false);
+  const pathResolver = new PathResolver(projectRoot, context, aliasResolver, false);
   const globalComponents = await readGlobalComponents(pathResolver, miniappRoot || '');
   const result: LintResult = {
     summary: {
@@ -484,7 +482,7 @@ export async function lint(rawOptions: any): Promise<void> {
     },
     issues: [],
   };
-  const targetPath = rawOptions.path || rawOptions[0] || '';
+  const targetPath = cmdOptions.path ?? '';
   const miniappRootAbs = miniappRoot ? path.resolve(projectRoot, miniappRoot) : projectRoot;
   if (targetPath) {
     await processTargetPath(
@@ -498,7 +496,7 @@ export async function lint(rawOptions: any): Promise<void> {
   } else {
     await processWholeProject(
       projectRoot,
-      mergedConfig,
+      context,
       pathResolver,
       globalComponents,
       result,
@@ -508,7 +506,7 @@ export async function lint(rawOptions: any): Promise<void> {
   generateReport(result, miniappRootAbs, projectRoot);
 
   // Apply fixes if --fix is enabled
-  if (rawOptions.fix) {
+  if (cmdOptions.fix) {
     await applyLintFixes(result, projectRoot);
   }
 }

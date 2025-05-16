@@ -192,8 +192,12 @@ describe('JavaScriptParser', () => {
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
 
     // Setup mock PathResolver
-    // The PathResolver constructor requires (projectRoot, options, aliasResolver, hasAliasConfig)
-    const options: AnalyzerOptions = { fileTypes: [], verbose: false };
+    const options: AnalyzerOptions = {
+      fileTypes: [],
+      verbose: false,
+      miniappRoot: projectRoot,
+      appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+    };
     pathResolver = new MockedPathResolver(
       projectRoot,
       options,

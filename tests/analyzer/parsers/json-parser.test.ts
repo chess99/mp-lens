@@ -192,7 +192,12 @@ describe('JSONParser', () => {
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
 
     // Setup mock PathResolver
-    const options: AnalyzerOptions = { fileTypes: [], verbose: false };
+    const options: AnalyzerOptions = {
+      fileTypes: [],
+      verbose: false,
+      miniappRoot: projectRoot,
+      appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+    };
     pathResolver = new MockedPathResolver(
       projectRoot,
       options,

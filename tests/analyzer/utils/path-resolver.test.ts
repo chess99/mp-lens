@@ -168,7 +168,12 @@ describe('PathResolver', () => {
     (aliasResolver.resolve as jest.Mock).mockReturnValue(null);
     (aliasResolver.getAliases as jest.Mock).mockReturnValue({});
 
-    const options: AnalyzerOptions = { fileTypes: [], verbose: false };
+    const options: AnalyzerOptions = {
+      fileTypes: [],
+      verbose: false,
+      miniappRoot: projectRoot,
+      appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+    };
 
     // Create pathResolver instance
     pathResolver = new PathResolver(projectRoot, options, aliasResolver, false);
@@ -243,7 +248,12 @@ describe('PathResolver', () => {
       mockPathExists(resolvedAliasPath);
 
       // Create a new instance with hasAliasConfig=true
-      const options: AnalyzerOptions = { fileTypes: [], verbose: false };
+      const options: AnalyzerOptions = {
+        fileTypes: [],
+        verbose: false,
+        miniappRoot: projectRoot,
+        appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+      };
       const resolverWithAliases = new PathResolver(projectRoot, options, aliasResolver, true);
 
       const resolved = resolverWithAliases.resolveAnyPath(aliasPath, sourcePath, ['.js', '.ts']);
@@ -283,6 +293,17 @@ describe('PathResolver', () => {
       const resolved = pathResolver.resolveAnyPath(absolutePath, sourcePath, ['.js', '.ts']);
 
       expect(resolved).toBe(absolutePath);
+    });
+
+    it('should handle Windows paths correctly', () => {
+      // Create a Windows-style path resolver
+      const options: AnalyzerOptions = {
+        fileTypes: [],
+        verbose: false,
+        miniappRoot: projectRoot,
+        appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+      };
+      // ... existing code ...
     });
   });
 });

@@ -10,7 +10,7 @@ function isValidAppJson(content: any): boolean {
 // Result type for findAppJsonConfig
 type FindAppJsonResult =
   | {
-      entryFile: string;
+      appJsonPath: string;
       miniappRoot: string;
     }
   | null
@@ -31,18 +31,18 @@ const DEFAULT_EXCLUDE_DIRS = [
 
 /**
  * Searches for a valid app.json within a project directory to automatically determine
- * miniappRoot and entryFile.
+ * miniappRoot and appJsonPath.
  *
  * @param projectRoot The absolute path to the project's root directory.
  * @param excludeDirs Optional array of directory names to exclude from search.
- * @returns An object with absolute paths for entryFile and miniappRoot, 'ambiguous' if multiple found, or null if none found.
+ * @returns An object with absolute paths for appJsonPath and miniappRoot, 'ambiguous' if multiple found, or null if none found.
  */
 export function findAppJsonConfig(
   projectRoot: string,
   excludeDirs: string[] = DEFAULT_EXCLUDE_DIRS,
 ): FindAppJsonResult {
   logger.debug('Attempting to auto-detect app.json...');
-  const foundAppJsons: { entryFile: string; miniappRoot: string }[] = [];
+  const foundAppJsons: { appJsonPath: string; miniappRoot: string }[] = [];
   const visitedDirs = new Set<string>(); // Avoid infinite loops with symlinks if any
 
   function searchDir(currentDir: string) {
@@ -74,7 +74,7 @@ export function findAppJsonConfig(
             if (isValidAppJson(content)) {
               logger.debug(`Found valid app.json at: ${relativePath}`);
               foundAppJsons.push({
-                entryFile: fullPath, // Absolute path
+                appJsonPath: fullPath, // Absolute path
                 miniappRoot: path.dirname(fullPath), // Absolute path
               });
             } else {
@@ -94,7 +94,7 @@ export function findAppJsonConfig(
   searchDir(projectRoot);
 
   if (foundAppJsons.length === 1) {
-    logger.info(`自动检测到入口文件: ${path.relative(projectRoot, foundAppJsons[0].entryFile)}`);
+    logger.info(`自动检测到入口文件: ${path.relative(projectRoot, foundAppJsons[0].appJsonPath)}`);
     logger.info(
       `自动检测到小程序根目录: ${path.relative(projectRoot, foundAppJsons[0].miniappRoot)}`,
     );
@@ -103,7 +103,7 @@ export function findAppJsonConfig(
     logger.warn(
       `发现多个有效的 app.json 文件。无法自动检测配置。请指定 --miniapp-root 和 --entry-file。发现的位置:`,
     );
-    foundAppJsons.forEach((f) => logger.warn(`  - ${path.relative(projectRoot, f.entryFile)}`));
+    foundAppJsons.forEach((f) => logger.warn(`  - ${path.relative(projectRoot, f.appJsonPath)}`));
     return 'ambiguous';
   } else {
     logger.debug('No valid app.json found for auto-detection.');

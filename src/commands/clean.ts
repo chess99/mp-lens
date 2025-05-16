@@ -3,73 +3,38 @@ import * as fs from 'fs';
 import inquirer from 'inquirer';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { CommandOptions } from '../types/command-options';
+import { CmdCleanOptions, GlobalCliOptions } from '../types/command-options';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
-
-// Define the shape of the raw options passed from cli.ts
-interface RawCleanOptions {
-  // Global
-  project: string;
-  verbose?: boolean;
-  verboseLevel?: number;
-  config?: string;
-  miniappRoot?: string;
-  entryFile?: string;
-  trace?: boolean;
-
-  // Command specific
-  types?: string;
-  exclude?: string[];
-  essentialFiles?: string;
-  list?: boolean; // New: Replaces dryRun conceptually for listing only
-  delete?: boolean; // New: Replaces yes for direct deletion
-
-  [key: string]: any;
-}
-
-// Define CleanOptions extending CommandOptions
-interface CleanOptions extends CommandOptions {
-  types?: string; // Keep this if types can be specified per command
-  list?: boolean;
-  delete?: boolean;
-  // Allow any other config file options
-  [key: string]: any;
-}
 
 /**
  * Cleans unused files: lists, prompts for deletion, or deletes directly.
  */
-export async function clean(rawOptions: RawCleanOptions): Promise<void> {
-  // === Use Shared Initialization ===
+export async function clean(
+  cliOptions: GlobalCliOptions,
+  cmdOptions: CmdCleanOptions,
+): Promise<void> {
   const {
     projectRoot,
-    mergedConfig,
     verbose,
     verboseLevel,
     miniappRoot,
-    entryFile,
+    appJsonPath,
+    appJsonContent,
     exclude,
     essentialFilesList,
-    fileTypes, // Use fileTypes calculated by init
-    includeAssets, // Use includeAssets calculated by init
-  } = await initializeCommandContext(rawOptions, 'clean');
+    fileTypes,
+    includeAssets,
+  } = await initializeCommandContext(cliOptions);
 
-  // === Extract Clean-Specific Options ===
-  // Cast mergedConfig to CleanOptions for type safety
-  const cleanConfig: CleanOptions = mergedConfig as CleanOptions;
-  const listOnly = cleanConfig.list ?? false;
-  const deleteDirectly = cleanConfig.delete ?? false;
-  // Note: `types` is handled by initializeCommandContext now
+  const listOnly = cmdOptions.list ?? false;
+  const deleteDirectly = cmdOptions.delete ?? false;
 
-  // === Log Clean-Specific Info ===
-  // Common path/option logging is done in initializeCommandContext
   if (listOnly) logger.info(chalk.blue('ℹ️ 列表模式: 文件将被列出但不会被删除。'));
   else if (deleteDirectly) logger.info(chalk.yellow('⚠️ 删除模式: 文件将被直接删除而无需确认。'));
   else logger.info('🧹 开始清理未使用文件 (删除前会提示)...');
 
   try {
-    // Analyze project using options from context
     logger.info('正在分析项目以查找未使用文件...');
     const { unusedFiles } = await analyzeProject(projectRoot, {
       fileTypes,
@@ -78,8 +43,8 @@ export async function clean(rawOptions: RawCleanOptions): Promise<void> {
       verbose,
       verboseLevel,
       miniappRoot,
-      entryFile,
-      entryContent: cleanConfig.entryContent,
+      appJsonPath,
+      appJsonContent,
       includeAssets,
     });
 

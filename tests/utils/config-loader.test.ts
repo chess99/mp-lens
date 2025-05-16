@@ -41,7 +41,7 @@ jest.mock(
 // --- Test Constants ---
 const projectRoot = '/fake/project/root'; // Use a consistent fake root
 const mockConfig: ConfigFileOptions = {
-  entryFile: './app.json',
+  appJsonPath: './app.json',
   exclude: ['node_modules/**', 'dist/**'],
   aliases: { '@': './src' },
   miniappRoot: 'miniprogram',
@@ -108,8 +108,7 @@ describe('ConfigLoader', () => {
       if (
         normalizedPath ===
           actualPath.normalize(actualPath.resolve(projectRoot, 'my-config.json')) ||
-        normalizedPath ===
-          actualPath.normalize(actualPath.join(projectRoot, 'mp-lens.config.json'))
+        normalizedPath === actualPath.normalize(actualPath.join(projectRoot, 'mp-lens.config.json'))
       ) {
         return JSON.stringify(mockConfig);
       }
@@ -280,9 +279,7 @@ describe('ConfigLoader', () => {
     expect(fs.existsSync).toHaveBeenCalledWith(
       actualPath.resolve(projectRoot, 'mp-lens.config.ts'),
     );
-    expect(fs.existsSync).toHaveBeenCalledWith(
-      actualPath.join(projectRoot, 'mp-lens.config.json'),
-    );
+    expect(fs.existsSync).toHaveBeenCalledWith(actualPath.join(projectRoot, 'mp-lens.config.json'));
   });
 
   it('should return null and log error if JSON parsing fails', async () => {

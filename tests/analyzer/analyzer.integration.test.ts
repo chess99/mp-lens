@@ -13,9 +13,11 @@ describe('analyzeProject Integration Tests', () => {
   const defaultOptions: AnalyzerOptions = {
     fileTypes: ['js', 'json', 'wxml', 'wxss'], // Analyzer expects types without leading dots
     // excludePatterns: ['**/node_modules/**'], // Default exclusion often needed
+    miniappRoot: fixtureProjectRoot,
+    appJsonPath: actualPath.resolve(fixtureProjectRoot, 'app.json'),
   };
 
-  // Explicitly define entryContent based on test-miniprogram/app.json
+  // Explicitly define appJsonContent based on test-miniprogram/app.json
   // This helps bypass potential issues with file scanning in the test environment.
   const testEntryContent = {
     pages: ['pages/index/index'],
@@ -23,8 +25,9 @@ describe('analyzeProject Integration Tests', () => {
 
   const optionsWithEntryContent: AnalyzerOptions = {
     ...defaultOptions,
-    entryContent: testEntryContent,
-    entryFile: undefined, // Ensure entryContent takes precedence
+    appJsonContent: testEntryContent,
+    // Use empty string instead of undefined for appJsonPath since we're using appJsonContent
+    appJsonPath: '',
   };
 
   it('should correctly identify unused files in test-miniprogram', async () => {
@@ -55,7 +58,7 @@ describe('analyzeProject Integration Tests', () => {
       'mp-lens.config.js', // Default essential
     ].map((file) => actualPath.resolve(fixtureProjectRoot, file));
 
-    // Run the analyzer on the fixture project using entryContent
+    // Run the analyzer on the fixture project using appJsonContent
     const { unusedFiles } = await analyzeProject(fixtureProjectRoot, optionsWithEntryContent);
 
     // Sort arrays for consistent comparison
@@ -81,9 +84,9 @@ describe('analyzeProject Integration Tests', () => {
 
     const options: AnalyzerOptions = {
       ...defaultOptions,
-      miniappRoot: subDirMiniappPath,
-      entryContent: { pages: ['pages/page'] }, // Provide content to guide it
-      entryFile: undefined,
+      miniappRoot: actualPath.resolve(subDirFixtureRoot, subDirMiniappPath),
+      appJsonContent: { pages: ['pages/page'] }, // Provide content to guide it
+      appJsonPath: '',
     };
 
     const expectedUnusedRelativePaths = ['unused.js'];
@@ -115,8 +118,9 @@ describe('analyzeProject Integration Tests', () => {
     const options: AnalyzerOptions = {
       ...defaultOptions,
       fileTypes: [...defaultOptions.fileTypes!, 'ts'], // Add ts
-      entryContent: { pages: ['pages/page'] }, // Provide content to guide it
-      entryFile: undefined,
+      appJsonContent: { pages: ['pages/page'] }, // Provide content to guide it
+      miniappRoot: tsFixtureRoot,
+      appJsonPath: '',
     };
 
     const expectedUnusedRelativePaths = ['unused.ts'];

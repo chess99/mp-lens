@@ -16,7 +16,7 @@ export class ProjectStructureBuilder {
   private processedJsonFiles: Set<string> = new Set(); // Avoid infinite loops
 
   // --- Start: Added appJson details to constructor ---
-  private appJsonPath: string | null;
+  private appJsonPath: string | undefined;
   private appJsonContent: any;
   // --- End: Added appJson details ---
 
@@ -31,7 +31,7 @@ export class ProjectStructureBuilder {
   constructor(
     projectRoot: string,
     miniappRoot: string,
-    appJsonPath: string | null,
+    appJsonPath: string | undefined,
     appJsonContent: any,
     // --- Start: Added allFiles param ---
     allFiles: string[],

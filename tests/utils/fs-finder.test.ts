@@ -117,7 +117,7 @@ describe('findAppJsonConfig', () => {
     const result = findAppJsonConfig(projectRoot);
 
     expect(result).toEqual({
-      entryFile: path.resolve(projectRoot, 'src/app.json'),
+      appJsonPath: path.resolve(projectRoot, 'src/app.json'),
       miniappRoot: path.resolve(projectRoot, 'src'),
     });
     expect(logger.info).toHaveBeenCalledWith(
@@ -214,7 +214,7 @@ describe('findAppJsonConfig', () => {
 
     // Should find the one in src/
     expect(result).toEqual({
-      entryFile: path.resolve(projectRoot, 'src/app.json'),
+      appJsonPath: path.resolve(projectRoot, 'src/app.json'),
       miniappRoot: path.resolve(projectRoot, 'src'),
     });
     expect(logger.trace).toHaveBeenCalledWith(
@@ -267,7 +267,7 @@ describe('findAppJsonConfig', () => {
 
     // Should still find the valid one in /src
     expect(result).toEqual({
-      entryFile: path.resolve(projectRoot, 'src/app.json'),
+      appJsonPath: path.resolve(projectRoot, 'src/app.json'),
       miniappRoot: path.resolve(projectRoot, 'src'),
     });
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('读取目录'));
