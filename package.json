@@ -56,6 +56,7 @@
     "commander": "^12.1.0",
     "glob": "^10.4.1",
     "inquirer": "^12.6.0",
+    "jscpd": "^4.0.5",
     "minimatch": "^9.0.4",
     "preact": "^10.22.1",
     "purgecss": "^5.0.0"

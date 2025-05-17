@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import * as fs from 'fs'; // Import fs
 import * as path from 'path';
 import { clean } from './commands/clean';
+import { cpd } from './commands/cpd';
 import { graph } from './commands/graph';
 import { lint } from './commands/lint';
 import { purgewxss } from './commands/purgewxss';
@@ -151,6 +152,23 @@ program
         logger.debug(error.stack);
       }
       process.exitCode = 1;
+    }
+  });
+
+program
+  .command('cpd')
+  .description('检测小程序项目中的重复代码（基于 jscpd，自动识别 miniappRoot）')
+  .option('--minLines <number>', '最小重复行数', parseInt)
+  .option('--minTokens <number>', '最小重复 token 数', parseInt)
+  .option('--reporters <string>', '报告输出格式（如 html,console）')
+  .action(async (cmdOptions: any) => {
+    const cliOptions = program.opts() as GlobalCliOptions;
+    setupLogger(cliOptions);
+    try {
+      await cpd(cliOptions, cmdOptions);
+    } catch (error) {
+      logger.error(`Command failed: ${(error as Error).message}`);
+      process.exit(1);
     }
   });
 
