@@ -51,6 +51,7 @@ yarn.lock
 /dependency-graph.*
 /unused-files.*
 /output/
+/report/
 
 # Node
 node_modules
