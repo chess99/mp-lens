@@ -41,6 +41,20 @@ function setupLogger(globalOptions: any) {
   logger.debug(`Logger level set to: ${logger.getLevel()}`);
 }
 
+// Centralized error handler for commands
+function commandErrorHandler(errorMessage: string, errorStack?: string) {
+  logger.error(errorMessage);
+  if (errorStack) {
+    logger.debug(errorStack); // For stack trace or other details
+  }
+  logger.warn(
+    chalk.yellow(
+      '💡 如果您需要帮助，或怀疑这是一个程序缺陷，请前往 https://github.com/chess99/mp-lens/issues 提交issue。',
+    ),
+  );
+  process.exit(1);
+}
+
 // Define the global options
 program
   .version(version)
@@ -74,13 +88,12 @@ program
   .option('-f, --format <format>', '输出格式 (html|json)', 'html')
   .option('-o, --output <file>', '保存图文件的路径')
   .action(async (cmdOptions: CmdGraphOptions) => {
-    const cliOptions = program.opts() as GlobalCliOptions; // Cast globalOptions
+    const cliOptions = program.opts() as GlobalCliOptions;
     setupLogger(cliOptions);
     try {
       await graph(cliOptions, cmdOptions);
-    } catch (error) {
-      logger.error(`Command failed: ${(error as Error).message}`);
-      process.exit(1);
+    } catch (error: any) {
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
     }
   });
 
@@ -94,9 +107,8 @@ program
     setupLogger(cliOptions);
     try {
       await clean(cliOptions, cmdOptions);
-    } catch (error) {
-      logger.error(`Command failed: ${(error as Error).message}`);
-      process.exit(1);
+    } catch (error: any) {
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
     }
   });
 
@@ -110,9 +122,8 @@ program
     setupLogger(cliOptions);
     try {
       await lint(cliOptions, { path, ...cmdOptions });
-    } catch (error) {
-      logger.error(`Command failed: ${(error as Error).message}`);
-      process.exit(1);
+    } catch (error: any) {
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
     }
   });
 
@@ -128,11 +139,8 @@ program
     try {
       await purgewxss(cliOptions, { wxssFilePathInput, ...cmdOptions });
     } catch (error: any) {
-      logger.error(chalk.red(`PurgeWXSS 命令执行失败: ${error.message}`));
-      if (error.stack) {
-        logger.debug(error.stack);
-      }
-      process.exit(1);
+      // Consistent error handling
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
     }
   });
 
@@ -147,9 +155,8 @@ program
     setupLogger(cliOptions);
     try {
       await cpd(cliOptions, cmdOptions);
-    } catch (error) {
-      logger.error(`Command failed: ${(error as Error).message}`);
-      process.exit(1);
+    } catch (error: any) {
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
     }
   });
 
