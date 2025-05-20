@@ -16,6 +16,7 @@ import {
   GlobalCliOptions,
 } from './types/command-options';
 import { logger, LogLevel } from './utils/debug-logger';
+import { checkForUpdates } from './utils/version-check';
 
 // Use the finder function
 const packageJsonPath = findPackageJson(__dirname);
@@ -174,3 +175,6 @@ program
 
 // Parse arguments
 program.parse(process.argv);
+
+// Check for updates after command execution
+checkForUpdates();

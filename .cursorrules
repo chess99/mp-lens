@@ -6,6 +6,10 @@
 - **Address Root Causes**: Focus on understanding the underlying issues rather than just treating symptoms.
 - **Establish Patterns Over Exceptions**: Create general rules and patterns instead of writing special case code for each exception.
 
+## User Interface Language Requirement
+
+- **User-Facing Output in Chinese**: All user interface elements, including command-line outputs and prompts visible to users, must use Chinese. This ensures a consistent and localized user experience.
+
 ## Problem-Solving Methodology
 
 1. Analyze the problem thoroughly

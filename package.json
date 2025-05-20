@@ -60,7 +60,8 @@
     "minimatch": "^9.0.4",
     "modern-ahocorasick": "^2.0.4",
     "preact": "^10.22.1",
-    "purgecss": "^5.0.0"
+    "purgecss": "^5.0.0",
+    "semver": "^7.7.2"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.1",
@@ -68,6 +69,7 @@
     "@types/inquirer": "^9.0.7",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.2",
+    "@types/semver": "^7.7.0",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "eslint": "^8.57.0",
