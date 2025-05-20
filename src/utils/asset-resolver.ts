@@ -13,22 +13,23 @@ export class AssetResolver {
    * @returns 完整的文件路径
    */
   static getAssetPath(relativePath: string): string {
-    // 编译后的结构:
-    // - TypeScript 编译到: dist/cli/
+    // 编译后的结构 (当 outDir is './dist'):
+    // - TypeScript 编译到: dist/
     // - UI 资源输出到: dist/ui-assets/
-    // 因此 __dirname 在编译后会是 dist/cli/utils，而不是 dist/utils
+    // 因此 __dirname 在编译后会是 dist/utils
 
-    // 首先检查相对于当前目录的路径 (支持从编译后的dist/cli/utils目录访问)
-    const compiledPath = path.resolve(__dirname, '../../../dist/ui-assets', relativePath);
+    // 首先检查相对于当前目录的路径 (支持从编译后的dist/utils目录访问)
+    const compiledPath = path.resolve(__dirname, '../ui-assets', relativePath);
     if (fs.existsSync(compiledPath)) {
-      logger.debug(`在编译输出dist/ui-assets目录找到资源: ${compiledPath}`);
+      logger.debug(`在编译输出 dist/ui-assets 目录找到资源: ${compiledPath}`);
       return compiledPath;
     }
 
     // 检查资源是否在本地开发环境 (ts-node运行时，__dirname为src/utils)
-    const srcPath = path.resolve(__dirname, '../../../ui-assets', relativePath);
+    // 这个路径应该仍然有效，因为它尝试从 src/utils 访问 项目根目录/ui-assets 或 项目根目录/dist/ui-assets
+    const srcPath = path.resolve(__dirname, '../../../ui-assets', relativePath); // Should we adjust this for dev?
     if (fs.existsSync(srcPath)) {
-      logger.debug(`在项目根目录ui-assets找到资源: ${srcPath}`);
+      logger.debug(`在项目根目录 ui-assets 找到资源 (开发模式): ${srcPath}`);
       return srcPath;
     }
 

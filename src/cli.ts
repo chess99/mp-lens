@@ -19,6 +19,9 @@ import { checkForUpdates } from './utils/version-check';
 
 const program = new Command();
 
+// Check for updates before command execution
+checkForUpdates();
+
 // Helper to setup logger based on global options
 function setupLogger(globalOptions: any) {
   // Configure logger verbosity
@@ -129,7 +132,7 @@ program
       if (error.stack) {
         logger.debug(error.stack);
       }
-      process.exitCode = 1;
+      process.exit(1);
     }
   });
 
@@ -152,6 +155,3 @@ program
 
 // Parse arguments
 program.parse(process.argv);
-
-// Check for updates after command execution
-checkForUpdates();

@@ -13,7 +13,7 @@
     "test": "jest",
     "build:ui": "vite build --config src/ui/vite.config.mjs",
     "build:cli": "tsc -p tsconfig.json",
-    "build": "npm run build:ui && npm run build:cli",
+    "build": "npm run clean && npm run build:ui && npm run build:cli",
     "start": "ts-node src/cli.ts",
     "dev": "npm run build:ui && ts-node src/cli.ts",
     "prepare": "npm run build",
