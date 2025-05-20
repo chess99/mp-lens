@@ -210,19 +210,19 @@ async function processTargetPath(
   miniappRoot: string, // absolute path
   projectRoot: string, // absolute path
 ): Promise<void> {
-  const resolvedTargetPath = pathResolver.resolveAnyPath(targetPath, projectRoot, [
-    '',
-    '.wxml',
-    '.json',
-  ]);
-  if (!resolvedTargetPath || !fs.existsSync(resolvedTargetPath)) {
+  // 直接将 targetPath 转为绝对路径
+  const absTargetPath = path.isAbsolute(targetPath)
+    ? targetPath
+    : path.resolve(process.cwd(), targetPath);
+
+  if (!fs.existsSync(absTargetPath)) {
     logger.error(`Target path not found: ${targetPath}`);
     return;
   }
-  const stats = fs.statSync(resolvedTargetPath);
+  const stats = fs.statSync(absTargetPath);
   if (stats.isDirectory()) {
     await processDirectory(
-      resolvedTargetPath,
+      absTargetPath,
       pathResolver,
       globalComponents,
       result,
@@ -231,7 +231,7 @@ async function processTargetPath(
     );
   } else {
     await processFile(
-      resolvedTargetPath,
+      absTargetPath,
       pathResolver,
       globalComponents,
       result,
