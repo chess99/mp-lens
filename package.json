@@ -58,6 +58,7 @@
     "inquirer": "^12.6.0",
     "jscpd": "^4.0.5",
     "minimatch": "^9.0.4",
+    "modern-ahocorasick": "^2.0.4",
     "preact": "^10.22.1",
     "purgecss": "^5.0.0"
   },
