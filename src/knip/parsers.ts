@@ -18,8 +18,7 @@ export function parseWxml(text: string, _filePath: string): string {
         p.startsWith('/') ||
         p.startsWith('./') ||
         p.startsWith('../') ||
-        /^(http|https|data):/.test(p) ||
-        /{{.*?}}/.test(p)
+        /^(http|https|data):/.test(p)
       ) {
         return p;
       }
@@ -31,9 +30,12 @@ export function parseWxml(text: string, _filePath: string): string {
     let match: RegExpExecArray | null = imgRegex.exec(text);
     while (match) {
       const rawPath = match[1];
+      if (rawPath && rawPath.includes('{{')) {
+        match = imgRegex.exec(text);
+        continue;
+      }
       const normalized = normalizePath(rawPath);
-      if (normalized && !/{{.*?}}/.test(normalized) && !/^(data|http|https):/.test(normalized)) {
-        // Re-check after normalization
+      if (normalized && !/^(data|http|https):/.test(normalized)) {
         results.push(`import '${normalized}'`);
       }
       match = imgRegex.exec(text);
