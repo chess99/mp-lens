@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "declaration": true,
-    "outDir": "./dist/cli",
+    "outDir": "./dist",
     "rootDir": "./src",
     "esModuleInterop": true,
     "strict": true,

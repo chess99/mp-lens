@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
-import * as fs from 'fs'; // Import fs
-import * as path from 'path';
+import { version } from '../package.json';
 import { clean } from './commands/clean';
 import { cpd } from './commands/cpd';
 import { graph } from './commands/graph';
@@ -18,29 +17,7 @@ import {
 import { logger, LogLevel } from './utils/debug-logger';
 import { checkForUpdates } from './utils/version-check';
 
-// Use the finder function
-const packageJsonPath = findPackageJson(__dirname);
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { version } = require(packageJsonPath);
 const program = new Command();
-
-// Robust package.json finder
-function findPackageJson(startDir: string): string {
-  let currentDir = path.resolve(startDir);
-  // Loop indefinitely, but break or throw inside
-  for (;;) {
-    const filePath = path.join(currentDir, 'package.json');
-    if (fs.existsSync(filePath)) {
-      return filePath; // Found it
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      // Reached root, not found
-      throw new Error('Could not find package.json traversing up from ' + startDir);
-    }
-    currentDir = parentDir; // Move up for next iteration
-  }
-}
 
 // Helper to setup logger based on global options
 function setupLogger(globalOptions: any) {
