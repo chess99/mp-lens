@@ -3,7 +3,6 @@
 [![npm](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 [![License](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](https://github.com/chess99/mp-lens/blob/master/LICENSE)
 [![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
-[![构建状态](https://img.shields.io/travis/com/chess99/mp-lens.svg?style=flat)](https://travis-ci.com/chess99/mp-lens)
 
 **`mp-lens` 是一款专为微信小程序开发者设计的命令行工具，旨在解决项目维护中的常见痛点：**
 
@@ -63,7 +62,7 @@ mp-lens [全局选项] <命令> [命令特定选项]
 * `-p, --project <路径>`: 指定项目的根目录 (默认: 当前执行命令的目录)。
 * `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。如果未指定，工具会尝试自动检测（如 `src`, `miniprogram`）。
 * `--entry-file <路径>`: 指定入口文件路径（相对于 `miniappRoot`，默认为 `app.json`）。工具会尝试自动检测。
-* `--config <路径>`: 指定配置文件的路径 (用于更复杂的设置，详见 [配置文件](#️-configuration-file) 部分)。
+* `--config <路径>`: 指定配置文件的路径 (用于更复杂的设置，详见 [配置文件](#-配置文件) 部分)。
 * `--types <类型1,类型2,...>`: 指定要分析的文件类型扩展名，用逗号分隔 (默认: `js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs`)。
 * `--exclude <Glob模式>`: 用于排除文件/目录的 Glob 模式。可多次使用此选项以添加多个排除规则。
 * `--essential-files <文件1,文件2,...>`: 指定应被视为"必要"的文件路径（相对于 `miniappRoot`），这些文件将永远不会被报告为未使用或被清理。
@@ -223,7 +222,7 @@ npm install --save-dev mp-lens knip
 
 详细的集成指南和配置示例请查看 [mp-lens与Knip集成文档](docs/knip-integration.md)。
 
-## ⚙️ 配置文件 (`mp-lens.config.js` 或 `mp-lens.config.json`)
+## ⚙️ 配置文件
 
 对于复杂或固定的配置（如大量排除规则、路径别名等），建议在项目根目录创建 `mp-lens.config.js` (推荐，更灵活) 或 `mp-lens.config.json` 文件。也可以通过全局选项 `--config <路径>` 指定配置文件位置。
 
