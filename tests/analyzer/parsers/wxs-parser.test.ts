@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { WXSParser } from '../../../src/analyzer/parsers/wxs-parser';
+import { JavaScriptParser } from '../../../src/analyzer/parsers/javascript-parser';
 import { PathResolver } from '../../../src/analyzer/utils/path-resolver';
 import { AnalyzerOptions } from '../../../src/types/command-options';
 
@@ -26,9 +26,9 @@ jest.mock('../../../src/analyzer/utils/path-resolver');
 const MockedPathResolver = PathResolver as jest.MockedClass<typeof PathResolver>;
 const mockResolveAnyPath = jest.fn();
 
-describe('WXSParser', () => {
+describe('WXS Files (using JavaScriptParser)', () => {
   const projectRoot = '/workspace/test-project';
-  let parser: WXSParser;
+  let parser: JavaScriptParser;
   let pathResolver: PathResolver;
   // Use Sets to store mocked FS state persistently across helper calls within a test
   let mockedExistingPaths: Set<string>;
@@ -207,7 +207,7 @@ describe('WXSParser', () => {
     (pathResolver as any).resolveAnyPath = mockResolveAnyPath;
 
     // Create parser instance with mocked PathResolver
-    parser = new WXSParser(pathResolver);
+    parser = new JavaScriptParser(pathResolver);
   });
 
   describe('parse', () => {

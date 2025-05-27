@@ -8,7 +8,6 @@ import { PathResolver } from './utils/path-resolver';
 import { JavaScriptParser } from './parsers/javascript-parser';
 import { JSONParser } from './parsers/json-parser';
 import { WXMLParser } from './parsers/wxml-parser';
-import { WXSParser } from './parsers/wxs-parser';
 import { WXSSParser } from './parsers/wxss-parser';
 
 /**
@@ -27,7 +26,6 @@ export class FileParser {
   private wxmlParser: WXMLParser;
   private wxssParser: WXSSParser;
   private jsonParser: JSONParser;
-  private wxsParser: WXSParser;
 
   constructor(projectRoot: string, options: AnalyzerOptions) {
     this.projectRoot = projectRoot;
@@ -60,7 +58,6 @@ export class FileParser {
     this.wxmlParser = new WXMLParser(this.pathResolver, this.projectRoot, this.options);
     this.wxssParser = new WXSSParser(this.pathResolver);
     this.jsonParser = new JSONParser(this.pathResolver, this.projectRoot, this.options);
-    this.wxsParser = new WXSParser(this.pathResolver);
   }
 
   /**
@@ -74,6 +71,7 @@ export class FileParser {
       switch (ext) {
         case '.js':
         case '.ts':
+        case '.wxs': // WXS files are JavaScript, use the same parser
           return await this.javaScriptParser.parse(filePath);
         case '.wxml':
           return await this.wxmlParser.parse(filePath);
@@ -81,8 +79,6 @@ export class FileParser {
           return await this.wxssParser.parse(filePath);
         case '.json':
           return await this.jsonParser.parse(filePath);
-        case '.wxs':
-          return await this.wxsParser.parse(filePath);
         case '.png':
         case '.jpg':
         case '.jpeg':

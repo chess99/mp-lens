@@ -18,8 +18,12 @@ export class JavaScriptParser {
       const content = fs.readFileSync(filePath, 'utf-8');
       const dependencies = new Set<string>();
 
-      // Allowed extensions for JS/TS imports
-      const allowedExtensions = ['.js', '.ts', '.json'];
+      // Determine allowed extensions based on file type
+      const fileExt = path.extname(filePath).toLowerCase();
+      const allowedExtensions =
+        fileExt === '.wxs'
+          ? ['.wxs'] // WXS files can only import other WXS files
+          : ['.js', '.ts', '.json']; // JS/TS files can import JS/TS/JSON
 
       // Parse the file content to AST
       const ast = this.parseToAST(content, filePath);
