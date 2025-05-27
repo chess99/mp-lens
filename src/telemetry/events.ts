@@ -47,9 +47,19 @@ export function inferIssueType(errorMessage: string): string {
     message.includes('does not exist') ||
     message.includes('未找到') ||
     message.includes('not found') ||
-    message.includes('找不到')
+    message.includes('找不到') ||
+    message.includes('文件不存在')
   ) {
     return 'file-not-found';
+  }
+
+  // 输出格式错误
+  if (
+    message.includes('不支持的输出格式') ||
+    message.includes('invalid format specified') ||
+    message.includes('格式错误')
+  ) {
+    return 'invalid-format';
   }
 
   // 文件格式/类型错误
@@ -58,7 +68,7 @@ export function inferIssueType(errorMessage: string): string {
     message.includes('unsupported file type') ||
     message.includes('不是一个文件') ||
     message.includes('不是 .') ||
-    message.includes('invalid format')
+    message.includes('文件类型错误')
   ) {
     return 'invalid-file-type';
   }
@@ -68,7 +78,11 @@ export function inferIssueType(errorMessage: string): string {
     message.includes('app.json') ||
     message.includes('配置') ||
     message.includes('config') ||
-    message.includes('failed to process')
+    message.includes('failed to process') ||
+    message.includes('配置文件错误') ||
+    message.includes('configuration error') ||
+    message.includes('invalid configuration') ||
+    message.includes('配置不正确')
   ) {
     return 'config-error';
   }
@@ -87,7 +101,9 @@ export function inferIssueType(errorMessage: string): string {
   if (
     message.includes('permission') ||
     message.includes('权限') ||
-    message.includes('access denied')
+    message.includes('access denied') ||
+    message.includes('权限不足') ||
+    message.includes('没有权限')
   ) {
     return 'permission-error';
   }

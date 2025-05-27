@@ -34,8 +34,11 @@ async function performPurge(
       if (!statResult.isFile()) {
         throw new HandledError(`指定的 WXSS 输入不是一个文件: ${absolutePath}`);
       }
-    } catch (e) {
-      throw new HandledError(`WXSS 文件未找到: ${absolutePath}`);
+    } catch (e: any) {
+      if (e.code === 'ENOENT') {
+        throw new HandledError(`WXSS 文件未找到: ${absolutePath}`);
+      }
+      throw new HandledError(`无法访问 WXSS 文件: ${absolutePath} (${e.message})`);
     }
 
     if (path.extname(absolutePath) !== '.wxss') {

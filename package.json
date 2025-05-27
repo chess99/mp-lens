@@ -10,7 +10,11 @@
   "scripts": {
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "test": "jest",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
+    "test:integration:watch": "jest --config jest.integration.config.js --watch",
+    "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
     "build:ui": "vite build --config src/ui/vite.config.mjs",
     "build:cli": "tsc -p tsconfig.json",
     "build": "npm run clean && npm run build:ui && npm run build:cli",
