@@ -103,25 +103,8 @@ export class JavaScriptParser {
         if (t.isStringLiteral(source)) {
           const importPath = source.value;
 
-          // Skip type-only imports in TypeScript
-          if (path.node.importKind === 'type') {
-            logger.trace(`Skipping type-only import: '${importPath}' in ${filePath}`);
-            return;
-          }
-
-          // Check if any specifiers are type-only
-          const hasValueImports = path.node.specifiers.some((spec) => {
-            if (t.isImportSpecifier(spec)) {
-              return spec.importKind !== 'type';
-            }
-            return true; // Default and namespace imports are always value imports
-          });
-
-          if (!hasValueImports) {
-            logger.trace(`Skipping type-only import: '${importPath}' in ${filePath}`);
-            return;
-          }
-
+          // All imports should be considered dependencies, including type-only imports
+          // Type-only imports are still important for source code maintenance and compilation
           this.addDependency(importPath, filePath, allowedExtensions, dependencies);
         }
       },

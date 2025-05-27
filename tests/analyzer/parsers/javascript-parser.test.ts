@@ -340,5 +340,241 @@ describe('JavaScriptParser', () => {
 
       await expect(parser.parse(filePath)).rejects.toThrow();
     });
+
+    it('should parse type-only imports in TypeScript files', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'src/app.ts');
+      const fileContent = `
+        // Type-only imports should be included as dependencies
+        import type { UserType } from './types/user';
+        import type { Config } from '../config/types';
+        
+        // Mixed imports with type specifiers
+        import { type ApiResponse, fetchData } from './api';
+        
+        // Regular imports
+        import { utils } from './utils';
+      `;
+      mockFileContent('src/app.ts', fileContent);
+
+      const userTypePath = actualPath.resolve(projectRoot, 'src/types/user.ts');
+      const configTypePath = actualPath.resolve(projectRoot, 'config/types.ts');
+      const apiPath = actualPath.resolve(projectRoot, 'src/api.ts');
+      const utilsPath = actualPath.resolve(projectRoot, 'src/utils.ts');
+
+      // Mock PathResolver responses
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, containingFile: string, extensions: string[]) => {
+          if (importPath === './types/user') return userTypePath;
+          if (importPath === '../config/types') return configTypePath;
+          if (importPath === './api') return apiPath;
+          if (importPath === './utils') return utilsPath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(4);
+      expect(dependencies).toContain(userTypePath);
+      expect(dependencies).toContain(configTypePath);
+      expect(dependencies).toContain(apiPath);
+      expect(dependencies).toContain(utilsPath);
+
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./types/user', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('../config/types', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./api', filePath, ['.js', '.ts', '.json']);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./utils', filePath, ['.js', '.ts', '.json']);
+    });
+
+    it('should parse side-effect imports', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'src/main.js');
+      const fileContent = `
+        // Side-effect imports (no specifiers)
+        import './polyfills';
+        import '../styles/global.css';
+        import './init-app';
+        
+        // Regular import for comparison
+        import { startApp } from './app';
+      `;
+      mockFileContent('src/main.js', fileContent);
+
+      const polyfillsPath = actualPath.resolve(projectRoot, 'src/polyfills.js');
+      const stylesPath = actualPath.resolve(projectRoot, 'styles/global.css');
+      const initPath = actualPath.resolve(projectRoot, 'src/init-app.js');
+      const appPath = actualPath.resolve(projectRoot, 'src/app.js');
+
+      // Mock PathResolver responses
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, containingFile: string, extensions: string[]) => {
+          if (importPath === './polyfills') return polyfillsPath;
+          if (importPath === '../styles/global.css') return stylesPath;
+          if (importPath === './init-app') return initPath;
+          if (importPath === './app') return appPath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(4);
+      expect(dependencies).toContain(polyfillsPath);
+      expect(dependencies).toContain(stylesPath);
+      expect(dependencies).toContain(initPath);
+      expect(dependencies).toContain(appPath);
+
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./polyfills', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('../styles/global.css', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./init-app', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./app', filePath, ['.js', '.ts', '.json']);
+    });
+
+    it('should parse dynamic imports', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'src/lazy-loader.js');
+      const fileContent = `
+        async function loadModule() {
+          // Dynamic imports
+          const module1 = await import('./modules/feature1');
+          const module2 = await import('../shared/utils');
+          
+          return { module1, module2 };
+        }
+        
+        // Regular import for comparison
+        import { baseConfig } from './config';
+      `;
+      mockFileContent('src/lazy-loader.js', fileContent);
+
+      const feature1Path = actualPath.resolve(projectRoot, 'src/modules/feature1.js');
+      const utilsPath = actualPath.resolve(projectRoot, 'shared/utils.js');
+      const configPath = actualPath.resolve(projectRoot, 'src/config.js');
+
+      // Mock PathResolver responses
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, containingFile: string, extensions: string[]) => {
+          if (importPath === './modules/feature1') return feature1Path;
+          if (importPath === '../shared/utils') return utilsPath;
+          if (importPath === './config') return configPath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(3);
+      expect(dependencies).toContain(feature1Path);
+      expect(dependencies).toContain(utilsPath);
+      expect(dependencies).toContain(configPath);
+
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./modules/feature1', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('../shared/utils', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./config', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+    });
+
+    it('should handle complex TypeScript import scenarios', async () => {
+      const filePath = actualPath.resolve(projectRoot, 'src/complex.ts');
+      const fileContent = `
+        // Various TypeScript import patterns
+        import type { User, Admin } from './types/users';
+        import { type Config, defaultConfig, validateConfig } from './config';
+        import type * as ApiTypes from './types/api';
+        import { createUser } from './services/user';
+        import './setup';
+        
+        // Dynamic import with type assertion
+        const loadFeature = () => import('./features/advanced') as Promise<typeof import('./features/advanced')>;
+      `;
+      mockFileContent('src/complex.ts', fileContent);
+
+      const usersTypePath = actualPath.resolve(projectRoot, 'src/types/users.ts');
+      const configPath = actualPath.resolve(projectRoot, 'src/config.ts');
+      const apiTypePath = actualPath.resolve(projectRoot, 'src/types/api.ts');
+      const userServicePath = actualPath.resolve(projectRoot, 'src/services/user.ts');
+      const setupPath = actualPath.resolve(projectRoot, 'src/setup.ts');
+      const advancedFeaturePath = actualPath.resolve(projectRoot, 'src/features/advanced.ts');
+
+      // Mock PathResolver responses
+      mockResolveAnyPath.mockImplementation(
+        (importPath: string, containingFile: string, extensions: string[]) => {
+          if (importPath === './types/users') return usersTypePath;
+          if (importPath === './config') return configPath;
+          if (importPath === './types/api') return apiTypePath;
+          if (importPath === './services/user') return userServicePath;
+          if (importPath === './setup') return setupPath;
+          if (importPath === './features/advanced') return advancedFeaturePath;
+          return null;
+        },
+      );
+
+      const dependencies = await parser.parse(filePath);
+
+      expect(dependencies).toHaveLength(6);
+      expect(dependencies).toContain(usersTypePath);
+      expect(dependencies).toContain(configPath);
+      expect(dependencies).toContain(apiTypePath);
+      expect(dependencies).toContain(userServicePath);
+      expect(dependencies).toContain(setupPath);
+      expect(dependencies).toContain(advancedFeaturePath);
+
+      // Verify all imports were processed
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./types/users', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./config', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./types/api', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./services/user', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./setup', filePath, ['.js', '.ts', '.json']);
+      expect(mockResolveAnyPath).toHaveBeenCalledWith('./features/advanced', filePath, [
+        '.js',
+        '.ts',
+        '.json',
+      ]);
+    });
   });
 });
