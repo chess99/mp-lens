@@ -1,10 +1,14 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Could not find a declaration file for module '@wxml/parser'
+import { parse, Program, WXNode } from '@wxml/parser';
 import * as fs from 'fs';
 import { AnalyzerOptions } from '../../types/command-options';
 import { logger } from '../../utils/debug-logger';
+import { normalizeWxmlImportPath } from '../../utils/wxml-path';
 import { PathResolver } from '../utils/path-resolver';
 
 /**
- * Parser for WXML files that finds dependencies to other files.
+ * Parser for WXML files that finds dependencies to other files using AST parsing.
  *
  * Path resolution rules for WeChat Mini Program WXML files:
  * 1. Paths starting with '/' are relative to the mini program root
@@ -33,9 +37,12 @@ export class WXMLParser {
       const content = fs.readFileSync(filePath, 'utf-8');
       const dependencies = new Set<string>();
 
-      this.processImportIncludeTags(content, filePath, dependencies);
-      this.processWxsTags(content, filePath, dependencies);
-      this.processImageSources(content, filePath, dependencies);
+      // Parse WXML content to AST
+      const ast = parse(content);
+
+      this.processImportIncludeTags(ast, filePath, dependencies);
+      this.processWxsTags(ast, filePath, dependencies);
+      this.processImageSources(ast, filePath, dependencies);
       // NOTE: processCustomComponents is intentionally omitted as component
       // dependencies are defined in JSON files.
 
@@ -47,95 +54,76 @@ export class WXMLParser {
   }
 
   private processImportIncludeTags(
-    content: string,
+    ast: WXNode | Program,
     filePath: string,
     dependencies: Set<string>,
   ): void {
-    const importRegex = /<(?:import|include)\s+src=['"](.*?)['"]\s*\/?\s*>/g;
     const allowedExtensions = ['.wxml'];
 
-    let match;
-    while ((match = importRegex.exec(content)) !== null) {
-      if (match[1]) {
-        const importPath = match[1];
-
-        if (importPath.includes('{{')) {
-          logger.trace(`Skipping dynamic import/include path: ${importPath} in ${filePath}`);
-          continue;
-        }
-
-        // Handle root-relative paths explicitly for <import> and <include>
-        if (importPath.startsWith('/')) {
-          // Use PathResolver.resolveAnyPath for consistency, treating it as non-relative.
-          const resolvedPath = this.pathResolver.resolveAnyPath(
-            importPath,
-            filePath,
-            allowedExtensions,
-          );
-          if (resolvedPath) {
-            dependencies.add(resolvedPath);
-          } else if (this.options.verbose) {
-            logger.trace(
-              `processImportIncludeTags: Could not resolve root path ${importPath} from ${filePath}`,
-            );
-          }
-        } else {
-          // Ensure non-absolute, non-relative paths are treated as relative to current dir
-          // This follows WeChat Mini Program conventions where paths like "templates/foo.wxml"
-          // are treated as "./templates/foo.wxml"
-          const normalizedPath = importPath.startsWith('.') ? importPath : './' + importPath;
-
-          // Handle relative paths using resolveAnyPath
-          const depPath = this.pathResolver.resolveAnyPath(
-            normalizedPath,
-            filePath,
-            allowedExtensions,
-          );
-          if (depPath) dependencies.add(depPath);
-        }
+    this.findImportIncludeTags(ast, (importPath: string) => {
+      if (importPath.includes('{{')) {
+        logger.trace(`Skipping dynamic import/include path: ${importPath} in ${filePath}`);
+        return;
       }
-    }
-  }
 
-  private processWxsTags(content: string, filePath: string, dependencies: Set<string>): void {
-    const wxsRegex = /<wxs\s+(?:[^>]*?\s+)?src=['"](.*?)['"]/g;
-    const allowedExtensions = ['.wxs'];
+      // Normalize the import path using the utility function
+      const normalizedPath = normalizeWxmlImportPath(importPath);
 
-    let match;
-    while ((match = wxsRegex.exec(content)) !== null) {
-      if (match[1]) {
-        const wxsPath = match[1];
-
-        if (wxsPath.includes('{{')) {
-          logger.trace(`Skipping dynamic wxs path: ${wxsPath} in ${filePath}`);
-          continue;
+      // Handle root-relative paths explicitly for <import> and <include>
+      if (normalizedPath.startsWith('/')) {
+        // Use PathResolver.resolveAnyPath for consistency, treating it as non-relative.
+        const resolvedPath = this.pathResolver.resolveAnyPath(
+          normalizedPath,
+          filePath,
+          allowedExtensions,
+        );
+        if (resolvedPath) {
+          dependencies.add(resolvedPath);
+        } else if (this.options.verbose) {
+          logger.trace(
+            `processImportIncludeTags: Could not resolve root path ${normalizedPath} from ${filePath}`,
+          );
         }
-
-        // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
-        const normalizedPath =
-          wxsPath.startsWith('/') || wxsPath.startsWith('.') ? wxsPath : './' + wxsPath;
-
-        // Use resolveAnyPath - it handles root-relative, relative, and alias paths
+      } else {
+        // Handle relative paths using resolveAnyPath
         const depPath = this.pathResolver.resolveAnyPath(
           normalizedPath,
           filePath,
           allowedExtensions,
         );
-        if (depPath) {
-          dependencies.add(depPath);
-        }
+        if (depPath) dependencies.add(depPath);
       }
-    }
+    });
   }
 
-  private processImageSources(content: string, filePath: string, dependencies: Set<string>): void {
-    // Added 's' flag (dotAll) to allow . to match newline characters
-    const IMAGE_SRC_REGEX = /<image[\s\S]*?src=["'](.*?)["']/gs;
-    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
-    const matches = [...content.matchAll(IMAGE_SRC_REGEX)];
+  private processWxsTags(ast: WXNode | Program, filePath: string, dependencies: Set<string>): void {
+    const allowedExtensions = ['.wxs'];
 
-    matches.forEach((match) => {
-      const src = match[1];
+    this.findWxsTags(ast, (wxsPath: string) => {
+      if (wxsPath.includes('{{')) {
+        logger.trace(`Skipping dynamic wxs path: ${wxsPath} in ${filePath}`);
+        return;
+      }
+
+      // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
+      const normalizedPath = normalizeWxmlImportPath(wxsPath);
+
+      // Use resolveAnyPath - it handles root-relative, relative, and alias paths
+      const depPath = this.pathResolver.resolveAnyPath(normalizedPath, filePath, allowedExtensions);
+      if (depPath) {
+        dependencies.add(depPath);
+      }
+    });
+  }
+
+  private processImageSources(
+    ast: WXNode | Program,
+    filePath: string,
+    dependencies: Set<string>,
+  ): void {
+    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+
+    this.findImageTags(ast, (src: string) => {
       if (!src || src.includes('{{') || /^data:/.test(src) || /^(http|https):/.test(src)) {
         let reason = 'empty';
         if (src) {
@@ -155,7 +143,7 @@ export class WXMLParser {
       }
 
       // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
-      const normalizedPath = src.startsWith('/') || src.startsWith('.') ? src : './' + src;
+      const normalizedPath = normalizeWxmlImportPath(src);
 
       const resolvedPath = this.pathResolver.resolveAnyPath(
         normalizedPath,
@@ -166,5 +154,108 @@ export class WXMLParser {
         dependencies.add(resolvedPath);
       }
     });
+  }
+
+  /**
+   * Recursively finds import and include tags in the AST
+   */
+  private findImportIncludeTags(ast: WXNode | Program, callback: (path: string) => void): void {
+    if (ast.type === 'WXElement' && (ast.name === 'import' || ast.name === 'include')) {
+      // Find src attribute from startTag.attributes
+      const attrs = ast.startTag?.attributes;
+      if (attrs && Array.isArray(attrs)) {
+        const srcAttr = attrs.find((attr) => attr.key === 'src');
+        if (srcAttr && srcAttr.value) {
+          callback(srcAttr.value);
+        }
+      }
+    }
+
+    // Recursively process children
+    if (ast.type === 'WXElement' && Array.isArray(ast.children)) {
+      for (const child of ast.children) {
+        this.findImportIncludeTags(child, callback);
+      }
+    }
+
+    // Handle Program/body
+    if (ast.type === 'Program' && Array.isArray(ast.body)) {
+      for (const node of ast.body) {
+        this.findImportIncludeTags(node, callback);
+      }
+    }
+  }
+
+  /**
+   * Recursively finds wxs tags in the AST
+   */
+  private findWxsTags(ast: WXNode | Program, callback: (path: string) => void): void {
+    // Handle WXScript (wxs tags)
+    if (ast.type === 'WXScript' && ast.name === 'wxs') {
+      // Find src attribute from startTag.attributes
+      const attrs = ast.startTag?.attributes;
+      if (attrs && Array.isArray(attrs)) {
+        const srcAttr = attrs.find((attr) => attr.key === 'src');
+        if (srcAttr && srcAttr.value) {
+          callback(srcAttr.value);
+        }
+      }
+    }
+
+    // Also handle WXElement in case wxs is parsed as a regular element
+    if (ast.type === 'WXElement' && ast.name === 'wxs') {
+      // Find src attribute from startTag.attributes
+      const attrs = ast.startTag?.attributes;
+      if (attrs && Array.isArray(attrs)) {
+        const srcAttr = attrs.find((attr) => attr.key === 'src');
+        if (srcAttr && srcAttr.value) {
+          callback(srcAttr.value);
+        }
+      }
+    }
+
+    // Recursively process children
+    if (ast.type === 'WXElement' && Array.isArray(ast.children)) {
+      for (const child of ast.children) {
+        this.findWxsTags(child, callback);
+      }
+    }
+
+    // Handle Program/body
+    if (ast.type === 'Program' && Array.isArray(ast.body)) {
+      for (const node of ast.body) {
+        this.findWxsTags(node, callback);
+      }
+    }
+  }
+
+  /**
+   * Recursively finds image tags in the AST
+   */
+  private findImageTags(ast: WXNode | Program, callback: (src: string) => void): void {
+    if (ast.type === 'WXElement' && ast.name === 'image') {
+      // Find src attribute from startTag.attributes
+      const attrs = ast.startTag?.attributes;
+      if (attrs && Array.isArray(attrs)) {
+        const srcAttr = attrs.find((attr) => attr.key === 'src');
+        if (srcAttr && srcAttr.value) {
+          callback(srcAttr.value);
+        }
+      }
+    }
+
+    // Recursively process children
+    if (ast.type === 'WXElement' && Array.isArray(ast.children)) {
+      for (const child of ast.children) {
+        this.findImageTags(child, callback);
+      }
+    }
+
+    // Handle Program/body
+    if (ast.type === 'Program' && Array.isArray(ast.body)) {
+      for (const node of ast.body) {
+        this.findImageTags(node, callback);
+      }
+    }
   }
 }
