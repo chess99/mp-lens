@@ -462,7 +462,8 @@ async function applyLintFixes(result: LintResult, projectRoot: string): Promise<
  */
 export async function lint(
   cliOptions: GlobalCliOptions,
-  cmdOptions: CmdLintOptions,
+  targetPath?: string, // 位置参数
+  cmdOptions?: CmdLintOptions,
 ): Promise<void> {
   logger.info('开始组件使用情况检查流程...');
   const context = await initializeCommandContext(cliOptions);
@@ -479,11 +480,14 @@ export async function lint(
     },
     issues: [],
   };
-  const targetPath = cmdOptions.path ?? '';
+
+  // 使用位置参数，如果没有则使用 cmdOptions.path，最后默认为空字符串
+  const finalTargetPath = targetPath || cmdOptions?.path || '';
   const miniappRootAbs = miniappRoot ? path.resolve(projectRoot, miniappRoot) : projectRoot;
-  if (targetPath) {
+
+  if (finalTargetPath) {
     await processTargetPath(
-      targetPath,
+      finalTargetPath,
       pathResolver,
       globalComponents,
       result,
@@ -503,7 +507,7 @@ export async function lint(
   generateReport(result, miniappRootAbs, projectRoot);
 
   // Apply fixes if --fix is enabled
-  if (cmdOptions.fix) {
+  if (cmdOptions?.fix) {
     await applyLintFixes(result, projectRoot);
   }
 }

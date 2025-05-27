@@ -231,7 +231,8 @@ async function performPurge(
 
 export async function purgewxss(
   cliOptions: GlobalCliOptions,
-  cmdOptions: CmdPurgeWxssOptions,
+  wxssFilePath?: string,
+  cmdOptions?: CmdPurgeWxssOptions,
 ): Promise<void> {
   const context = await initializeCommandContext(cliOptions);
   const { projectRoot, miniappRoot } = context;
@@ -239,5 +240,11 @@ export async function purgewxss(
   const aliasResolver = new AliasResolver(scanRoot);
   const hasAliasConfig = aliasResolver.initialize();
   const pathResolver = new PathResolver(projectRoot, context, aliasResolver, hasAliasConfig);
-  await performPurge(projectRoot, scanRoot, cmdOptions, pathResolver, context);
+
+  const enhancedCmdOptions = {
+    ...cmdOptions,
+    wxssFilePathInput: wxssFilePath || cmdOptions?.wxssFilePathInput,
+  };
+
+  await performPurge(projectRoot, scanRoot, enhancedCmdOptions, pathResolver, context);
 }

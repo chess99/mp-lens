@@ -7,7 +7,7 @@ import { cpd } from './commands/cpd';
 import { graph } from './commands/graph';
 import { lint } from './commands/lint';
 import { purgewxss } from './commands/purgewxss';
-import { shutdownTelemetry, telemetry } from './telemetry';
+import { inferIssueType, shutdownTelemetry, telemetry } from './telemetry';
 import { GlobalCliOptions } from './types/command-options';
 import { logger, LogLevel } from './utils/debug-logger';
 import { HandledError } from './utils/errors';
@@ -95,7 +95,18 @@ function withTelemetryAction<T>(
     try {
       await action(cliOptions, ...args);
     } catch (error: any) {
-      if (!(error instanceof HandledError)) {
+      if (error instanceof HandledError) {
+        // 上报用户遇到的预期问题
+        telemetry.capture({
+          event: 'user-issue',
+          command: commandName,
+          issueType: inferIssueType(error.message),
+          issueMessage: error.message,
+          version,
+          args: commandArgs,
+        } as Omit<import('./telemetry').UserIssueEvent, 'userId' | 'timestamp'>);
+      } else {
+        // 上报系统错误
         telemetry.capture({
           event: 'error',
           command: commandName,
