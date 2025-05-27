@@ -3,6 +3,7 @@ import * as glob from 'glob';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
+import { HandledError } from '../utils/errors';
 import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
 import { GraphLink, ProjectStructure } from './project-structure';
 import { ProjectStructureBuilder } from './project-structure-builder';
@@ -173,7 +174,7 @@ export async function analyzeProject(
     const errorMsg =
       '分析失败: 没有找到有效的 app.json 内容。请确保小程序项目根目录中存在 app.json 文件，或通过配置提供 appJsonContent。';
     logger.error(errorMsg);
-    throw new Error(errorMsg);
+    throw new HandledError(errorMsg);
   }
 
   // --- Initial File Scan --- //

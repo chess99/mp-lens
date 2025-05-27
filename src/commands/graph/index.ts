@@ -3,6 +3,7 @@ import { analyzeProject } from '../../analyzer/analyzer';
 import { CmdGraphOptions, GlobalCliOptions } from '../../types/command-options';
 import { initializeCommandContext } from '../../utils/command-init';
 import { logger } from '../../utils/debug-logger';
+import { HandledError } from '../../utils/errors';
 import { generateHtmlGraph, generateJsonGraph } from './graph-utils';
 
 /**
@@ -73,7 +74,7 @@ export async function graph(
     } else if (format === 'json') {
       generateJsonGraph(projectStructure, outputPathAbsolute);
     } else {
-      throw new Error(`不支持的输出格式: ${format}`);
+      throw new HandledError(`不支持的输出格式: ${format}`);
     }
   } catch (error) {
     logger.error(`依赖图生成失败: ${(error as Error).message}`);

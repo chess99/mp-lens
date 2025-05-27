@@ -10,6 +10,7 @@ import { analyzeWxmlTags } from '../linter/wxml-analyzer';
 import { CmdLintOptions, GlobalCliOptions } from '../types/command-options';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
+import { HandledError } from '../utils/errors';
 
 /**
  * Reads global components from app.json
@@ -172,16 +173,13 @@ async function processFile(
     jsonPath = filePath;
     wxmlPath = path.join(dirPath, `${baseName}.wxml`);
   } else {
-    logger.error(`Unsupported file type: ${filePath}`);
-    return;
+    throw new HandledError(`不支持的文件类型: ${filePath}. 只支持 .wxml 或 .json 文件。`);
   }
   if (!fs.existsSync(wxmlPath)) {
-    logger.error(`WXML file not found: ${wxmlPath}`);
-    return;
+    throw new HandledError(`对应的 WXML 文件未找到: ${wxmlPath}`);
   }
   if (!fs.existsSync(jsonPath)) {
-    logger.error(`JSON file not found: ${jsonPath}`);
-    return;
+    throw new HandledError(`对应的 JSON 文件未找到: ${jsonPath}`);
   }
   await processFilePair({
     wxmlPath,
@@ -216,8 +214,7 @@ async function processTargetPath(
     : path.resolve(process.cwd(), targetPath);
 
   if (!fs.existsSync(absTargetPath)) {
-    logger.error(`Target path not found: ${targetPath}`);
-    return;
+    throw new HandledError(`目标路径未找到: ${targetPath}`);
   }
   const stats = fs.statSync(absTargetPath);
   if (stats.isDirectory()) {

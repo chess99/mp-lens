@@ -59,9 +59,11 @@
     "jscpd": "^4.0.5",
     "minimatch": "^9.0.4",
     "modern-ahocorasick": "^2.0.4",
+    "posthog-node": "^4.17.1",
     "preact": "^10.22.1",
     "purgecss": "^5.0.0",
-    "semver": "^7.7.2"
+    "semver": "^7.7.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.1",

@@ -9,6 +9,7 @@ import { AnalyzerOptions, CmdPurgeWxssOptions, GlobalCliOptions } from '../types
 import { AliasResolver } from '../utils/alias-resolver';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
+import { HandledError } from '../utils/errors';
 
 async function performPurge(
   projectRoot: string,
@@ -31,20 +32,14 @@ async function performPurge(
     try {
       const statResult = await fs.stat(absolutePath);
       if (!statResult.isFile()) {
-        logger.error(chalk.red(`指定的 WXSS 输入不是一个文件: ${absolutePath}`));
-        process.exitCode = 1;
-        return;
+        throw new HandledError(`指定的 WXSS 输入不是一个文件: ${absolutePath}`);
       }
     } catch (e) {
-      logger.error(chalk.red(`WXSS 文件未找到: ${absolutePath}`));
-      process.exitCode = 1;
-      return;
+      throw new HandledError(`WXSS 文件未找到: ${absolutePath}`);
     }
 
     if (path.extname(absolutePath) !== '.wxss') {
-      logger.error(chalk.red(`输入文件不是 .wxss 文件: ${absolutePath}`));
-      process.exitCode = 1;
-      return;
+      throw new HandledError(`输入文件不是 .wxss 文件: ${absolutePath}`);
     }
     wxssFilesToProcess.push(absolutePath);
   } else {
@@ -67,9 +62,7 @@ async function performPurge(
         cwd: scanRoot,
       });
     } catch (err: any) {
-      logger.error(chalk.red(`扫描 WXSS 文件时出错: ${err.message}`));
-      process.exitCode = 1;
-      return;
+      throw new Error(`扫描 WXSS 文件时出错: ${err.message}`);
     }
 
     if (wxssFilesToProcess.length === 0) {

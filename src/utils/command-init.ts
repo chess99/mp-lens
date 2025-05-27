@@ -4,6 +4,7 @@ import { ConfigFileOptions, GlobalCliOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { ConfigLoader } from './config-loader';
 import { logger } from './debug-logger';
+import { HandledError } from './errors';
 import { findAppJsonConfig } from './fs-finder';
 import { loadTsConfigTypes } from './tsconfig-helper';
 
@@ -36,7 +37,7 @@ export async function initializeCommandContext(
   logger.setProjectRoot(projectRoot);
   logger.debug(`Resolved project root: ${projectRoot}`);
   if (!fs.existsSync(projectRoot)) {
-    throw new Error(`Project directory does not exist: ${projectRoot}`);
+    throw new HandledError(`Project directory does not exist: ${projectRoot}`);
   }
 
   // 2. Load config file
@@ -212,7 +213,7 @@ function resolveAppJson(
         return { appJsonPath, appJsonContent: effectiveAppJsonContent };
       } catch (error) {
         logger.error(`Failed to read or parse custom entry file ${appJsonPath}:`, error);
-        throw new Error(`Failed to process entry file: ${appJsonPath}`);
+        throw new HandledError(`Failed to process entry file: ${appJsonPath}`);
       }
     } else {
       logger.warn(
@@ -231,7 +232,7 @@ function resolveAppJson(
       effectiveAppJsonContent = JSON.parse(content);
     } catch (error) {
       logger.error(`Failed to read or parse default app.json ${appJsonPath}:`, error);
-      throw new Error(`Failed to process default app.json`);
+      throw new HandledError(`Failed to process default app.json: ${appJsonPath}`);
     }
   } else {
     logger.warn(

@@ -7,14 +7,10 @@ import { cpd } from './commands/cpd';
 import { graph } from './commands/graph';
 import { lint } from './commands/lint';
 import { purgewxss } from './commands/purgewxss';
-import {
-  CmdCleanOptions,
-  CmdGraphOptions,
-  CmdLintOptions,
-  CmdPurgeWxssOptions,
-  GlobalCliOptions,
-} from './types/command-options';
+import { shutdownTelemetry, telemetry } from './telemetry';
+import { GlobalCliOptions } from './types/command-options';
 import { logger, LogLevel } from './utils/debug-logger';
+import { HandledError } from './utils/errors';
 import { checkForUpdates } from './utils/version-check';
 
 const program = new Command();
@@ -45,14 +41,15 @@ function setupLogger(globalOptions: any) {
 function commandErrorHandler(errorMessage: string, errorStack?: string) {
   logger.error(errorMessage);
   if (errorStack) {
-    logger.debug(errorStack); // For stack trace or other details
+    logger.debug(errorStack);
   }
   logger.warn(
     chalk.yellow(
       '💡 如果您需要帮助，或怀疑这是一个程序缺陷，请前往 https://github.com/chess99/mp-lens/issues 提交issue。',
     ),
   );
-  process.exit(1);
+  // 不再直接调用 process.exit(1)，而是抛出异常，让主流程自然结束
+  process.exitCode = 1;
 }
 
 // Define the global options
@@ -81,51 +78,61 @@ program
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
   .option('--include-assets', '在分析和清理中包含图片等资源文件 (默认不包含)', false);
 
+function withTelemetryAction<T>(
+  commandName: string,
+  action: (cliOptions: GlobalCliOptions, ...args: any[]) => Promise<T>,
+) {
+  return async (...args: any[]) => {
+    const commandArgs = process.argv.slice(2);
+    telemetry.capture({
+      event: 'command',
+      command: commandName,
+      version,
+      args: commandArgs,
+    } as Omit<import('./telemetry').CommandEvent, 'userId' | 'timestamp'>);
+    const cliOptions = program.opts() as GlobalCliOptions;
+    setupLogger(cliOptions);
+    try {
+      await action(cliOptions, ...args);
+    } catch (error: any) {
+      if (!(error instanceof HandledError)) {
+        telemetry.capture({
+          event: 'error',
+          command: commandName,
+          version,
+          errorMessage: error.message,
+          stack: error.stack,
+          args: commandArgs,
+        } as Omit<import('./telemetry').ErrorEvent, 'userId' | 'timestamp'>);
+      }
+      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
+    } finally {
+      await shutdownTelemetry();
+    }
+  };
+}
+
 // graph command
 program
   .command('graph')
   .description('生成依赖关系图的可视化文件')
   .option('-f, --format <format>', '输出格式 (html|json)', 'html')
   .option('-o, --output <file>', '保存图文件的路径')
-  .action(async (cmdOptions: CmdGraphOptions) => {
-    const cliOptions = program.opts() as GlobalCliOptions;
-    setupLogger(cliOptions);
-    try {
-      await graph(cliOptions, cmdOptions);
-    } catch (error: any) {
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
-    }
-  });
+  .action(withTelemetryAction('graph', graph));
 
 // clean command
 program
   .command('clean')
   .description('分析项目并删除未使用的文件。默认会先列出文件并提示确认。')
   .option('--write', '实际写入更改（删除文件）', false)
-  .action(async (cmdOptions: CmdCleanOptions) => {
-    const cliOptions = program.opts() as GlobalCliOptions;
-    setupLogger(cliOptions);
-    try {
-      await clean(cliOptions, cmdOptions);
-    } catch (error: any) {
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
-    }
-  });
+  .action(withTelemetryAction('clean', clean));
 
 // lint command
 program
   .command('lint [path]')
   .description('分析小程序项目中组件声明与使用的一致性')
   .option('--fix', '自动修复JSON文件中"声明但未使用"的问题')
-  .action(async (path: string, cmdOptions: CmdLintOptions) => {
-    const cliOptions = program.opts() as GlobalCliOptions;
-    setupLogger(cliOptions);
-    try {
-      await lint(cliOptions, { path, ...cmdOptions });
-    } catch (error: any) {
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
-    }
-  });
+  .action(withTelemetryAction('lint', lint));
 
 program
   .command('purgewxss [wxss-file-path]')
@@ -133,16 +140,7 @@ program
     '分析 WXML/WXSS 并使用 PurgeCSS 移除未使用的 CSS。未指定路径则处理项目中所有 .wxss 文件。',
   )
   .option('--write', '实际写入对 WXSS 文件的更改。')
-  .action(async (wxssFilePathInput: string, cmdOptions: CmdPurgeWxssOptions) => {
-    const cliOptions = program.opts() as GlobalCliOptions;
-    setupLogger(cliOptions);
-    try {
-      await purgewxss(cliOptions, { wxssFilePathInput, ...cmdOptions });
-    } catch (error: any) {
-      // Consistent error handling
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
-    }
-  });
+  .action(withTelemetryAction('purgewxss', purgewxss));
 
 program
   .command('cpd')
@@ -150,15 +148,7 @@ program
   .option('--minLines <number>', '最小重复行数', parseInt)
   .option('--minTokens <number>', '最小重复 token 数', parseInt)
   .option('--reporters <string>', '报告输出格式（如 html,console）')
-  .action(async (cmdOptions: any) => {
-    const cliOptions = program.opts() as GlobalCliOptions;
-    setupLogger(cliOptions);
-    try {
-      await cpd(cliOptions, cmdOptions);
-    } catch (error: any) {
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
-    }
-  });
+  .action(withTelemetryAction('cpd', cpd));
 
 // Parse arguments
 program.parse(process.argv);
