@@ -163,17 +163,13 @@ export class FileParser {
   }
 
   /**
-   * Determines if a path likely refers to an image file
+   * Determines if a path refers to an image file based on its extension
    */
-  private isImagePath(path: string): boolean {
+  private isImagePath(filePath: string): boolean {
     const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
-    const lowerPath = path.toLowerCase();
-    return (
-      imageExtensions.some((ext) => lowerPath.includes(ext)) ||
-      lowerPath.includes('image') ||
-      lowerPath.includes('icon') ||
-      lowerPath.includes('avatar') ||
-      lowerPath.includes('logo')
-    );
+    const ext = path.extname(filePath).toLowerCase();
+
+    // Strictly check if the file extension is an image extension
+    return imageExtensions.includes(ext);
   }
 }
