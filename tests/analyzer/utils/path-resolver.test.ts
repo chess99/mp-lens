@@ -78,8 +78,8 @@ describe('PathResolver', () => {
     // Helper to normalize paths for consistent lookups in mocks
     const normalizePathForMock = (p: fs.PathLike): string => {
       const pathStr = p.toString();
-      // Always resolve paths against projectRoot if they aren't already absolute.
-      // Use normalize to handle separators and segments like '.' or '..' if possible.
+      // For absolute paths, just normalize them directly
+      // For relative paths, resolve them against projectRoot
       const absPath = actualPath.isAbsolute(pathStr)
         ? actualPath.normalize(pathStr)
         : actualPath.resolve(projectRoot, pathStr);

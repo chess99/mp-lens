@@ -1,35 +1,23 @@
 import { parse, ParserPlugin } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
-import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../../utils/debug-logger';
-import { PathResolver } from '../utils/path-resolver';
 
 export class JavaScriptParser {
-  private pathResolver: PathResolver;
-
-  constructor(pathResolver: PathResolver) {
-    this.pathResolver = pathResolver;
+  constructor() {
+    // No dependencies needed for pure text analysis
   }
 
-  async parse(filePath: string): Promise<string[]> {
+  async parse(content: string, filePath: string): Promise<string[]> {
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
       const dependencies = new Set<string>();
-
-      // Determine allowed extensions based on file type
-      const fileExt = path.extname(filePath).toLowerCase();
-      const allowedExtensions =
-        fileExt === '.wxs'
-          ? ['.wxs'] // WXS files can only import other WXS files
-          : ['.js', '.ts', '.json']; // JS/TS files can import JS/TS/JSON
 
       // Parse the file content to AST
       const ast = this.parseToAST(content, filePath);
 
       // Traverse AST to find import/require statements
-      this.traverseAST(ast, filePath, allowedExtensions, dependencies);
+      this.traverseAST(ast, dependencies);
 
       return Array.from(dependencies);
     } catch (e: any) {
@@ -90,22 +78,14 @@ export class JavaScriptParser {
     }
   }
 
-  private traverseAST(
-    ast: any,
-    filePath: string,
-    allowedExtensions: string[],
-    dependencies: Set<string>,
-  ): void {
+  private traverseAST(ast: any, dependencies: Set<string>): void {
     traverse(ast, {
       // Handle ES6 import statements
       ImportDeclaration: (path) => {
         const source = path.node.source;
         if (t.isStringLiteral(source)) {
           const importPath = source.value;
-
-          // All imports should be considered dependencies, including type-only imports
-          // Type-only imports are still important for source code maintenance and compilation
-          this.addDependency(importPath, filePath, allowedExtensions, dependencies);
+          dependencies.add(importPath);
         }
       },
 
@@ -121,7 +101,7 @@ export class JavaScriptParser {
           t.isStringLiteral(node.arguments[0])
         ) {
           const requirePath = node.arguments[0].value;
-          this.addDependency(requirePath, filePath, allowedExtensions, dependencies);
+          dependencies.add(requirePath);
         }
       },
 
@@ -134,21 +114,9 @@ export class JavaScriptParser {
           t.isStringLiteral(parent.arguments[0])
         ) {
           const importPath = parent.arguments[0].value;
-          this.addDependency(importPath, filePath, allowedExtensions, dependencies);
+          dependencies.add(importPath);
         }
       },
     });
-  }
-
-  private addDependency(
-    importPath: string,
-    filePath: string,
-    allowedExtensions: string[],
-    dependencies: Set<string>,
-  ): void {
-    const depPath = this.pathResolver.resolveAnyPath(importPath, filePath, allowedExtensions);
-    if (depPath) {
-      dependencies.add(depPath);
-    }
   }
 }

@@ -1,11 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Could not find a declaration file for module '@wxml/parser'
 import { parse, Program, WXNode } from '@wxml/parser';
-import * as fs from 'fs';
-import { AnalyzerOptions } from '../../types/command-options';
 import { logger } from '../../utils/debug-logger';
 import { normalizeWxmlImportPath } from '../../utils/wxml-path';
-import { PathResolver } from '../utils/path-resolver';
 
 /**
  * Parser for WXML files that finds dependencies to other files using AST parsing.
@@ -22,27 +19,20 @@ import { PathResolver } from '../utils/path-resolver';
  *    This parser automatically adds the './' prefix to follow Mini Program conventions.
  */
 export class WXMLParser {
-  private pathResolver: PathResolver;
-  private projectRoot: string; // Needed for root-relative paths in imports/includes/wxs
-  private options: AnalyzerOptions; // Needed for verbose logging option
-
-  constructor(pathResolver: PathResolver, projectRoot: string, options: AnalyzerOptions) {
-    this.pathResolver = pathResolver;
-    this.projectRoot = projectRoot;
-    this.options = options;
+  constructor() {
+    // No dependencies needed for pure text analysis
   }
 
-  async parse(filePath: string): Promise<string[]> {
+  async parse(content: string, filePath: string): Promise<string[]> {
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
       const dependencies = new Set<string>();
 
       // Parse WXML content to AST
       const ast = parse(content);
 
-      this.processImportIncludeTags(ast, filePath, dependencies);
-      this.processWxsTags(ast, filePath, dependencies);
-      this.processImageSources(ast, filePath, dependencies);
+      this.processImportIncludeTags(ast, dependencies);
+      this.processWxsTags(ast, dependencies);
+      this.processImageSources(ast, dependencies);
       // NOTE: processCustomComponents is intentionally omitted as component
       // dependencies are defined in JSON files.
 
@@ -53,106 +43,41 @@ export class WXMLParser {
     }
   }
 
-  private processImportIncludeTags(
-    ast: WXNode | Program,
-    filePath: string,
-    dependencies: Set<string>,
-  ): void {
-    const allowedExtensions = ['.wxml'];
-
-    this.findImportIncludeTags(ast, (importPath: string) => {
-      if (importPath.includes('{{')) {
-        logger.trace(`Skipping dynamic import/include path: ${importPath} in ${filePath}`);
-        return;
-      }
-
-      // Normalize the import path using the utility function
-      const normalizedPath = normalizeWxmlImportPath(importPath);
-
-      // Handle root-relative paths explicitly for <import> and <include>
-      if (normalizedPath.startsWith('/')) {
-        // Use PathResolver.resolveAnyPath for consistency, treating it as non-relative.
-        const resolvedPath = this.pathResolver.resolveAnyPath(
-          normalizedPath,
-          filePath,
-          allowedExtensions,
-        );
-        if (resolvedPath) {
-          dependencies.add(resolvedPath);
-        } else if (this.options.verbose) {
-          logger.trace(
-            `processImportIncludeTags: Could not resolve root path ${normalizedPath} from ${filePath}`,
-          );
-        }
-      } else {
-        // Handle relative paths using resolveAnyPath
-        const depPath = this.pathResolver.resolveAnyPath(
-          normalizedPath,
-          filePath,
-          allowedExtensions,
-        );
-        if (depPath) dependencies.add(depPath);
-      }
+  /**
+   * Processes import and include tags to extract template dependencies
+   */
+  private processImportIncludeTags(ast: Program, dependencies: Set<string>): void {
+    this.findImportIncludeTags(ast, (path: string) => {
+      const normalizedPath = normalizeWxmlImportPath(path);
+      logger.debug(`Found import/include: ${path} -> normalized: ${normalizedPath}`);
+      dependencies.add(normalizedPath);
     });
   }
 
-  private processWxsTags(ast: WXNode | Program, filePath: string, dependencies: Set<string>): void {
-    const allowedExtensions = ['.wxs'];
-
-    this.findWxsTags(ast, (wxsPath: string) => {
-      if (wxsPath.includes('{{')) {
-        logger.trace(`Skipping dynamic wxs path: ${wxsPath} in ${filePath}`);
-        return;
-      }
-
-      // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
-      const normalizedPath = normalizeWxmlImportPath(wxsPath);
-
-      // Use resolveAnyPath - it handles root-relative, relative, and alias paths
-      const depPath = this.pathResolver.resolveAnyPath(normalizedPath, filePath, allowedExtensions);
-      if (depPath) {
-        dependencies.add(depPath);
-      }
+  /**
+   * Processes wxs tags to extract WXS script dependencies
+   */
+  private processWxsTags(ast: Program, dependencies: Set<string>): void {
+    this.findWxsTags(ast, (path: string) => {
+      const normalizedPath = normalizeWxmlImportPath(path);
+      logger.debug(`Found wxs: ${path} -> normalized: ${normalizedPath}`);
+      dependencies.add(normalizedPath);
     });
   }
 
-  private processImageSources(
-    ast: WXNode | Program,
-    filePath: string,
-    dependencies: Set<string>,
-  ): void {
-    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
-
+  /**
+   * Processes image tags to extract image dependencies
+   */
+  private processImageSources(ast: Program, dependencies: Set<string>): void {
     this.findImageTags(ast, (src: string) => {
-      if (!src || src.includes('{{') || /^data:/.test(src) || /^(http|https):/.test(src)) {
-        let reason = 'empty';
-        if (src) {
-          // src is not empty, determine other reason
-          if (src.includes('{{')) {
-            reason = 'dynamic (contains {{)';
-          } else if (/^data:/.test(src)) {
-            reason = 'data URI';
-          } else if (/^(http|https):/.test(src)) {
-            reason = 'HTTP/HTTPS URL';
-          }
-        }
-        logger.trace(
-          `Skipping image src resolution for '${src}' in file '${filePath}'. Reason: ${reason}.`,
-        );
+      // Skip data URIs, remote URLs, and template expressions
+      if (src.startsWith('data:') || /^(http|https):\/\//.test(src) || /{{.*?}}/.test(src)) {
         return;
       }
 
-      // Normalize paths to ensure non-absolute, non-relative paths are treated as relative
       const normalizedPath = normalizeWxmlImportPath(src);
-
-      const resolvedPath = this.pathResolver.resolveAnyPath(
-        normalizedPath,
-        filePath,
-        allowedExtensions,
-      );
-      if (resolvedPath) {
-        dependencies.add(resolvedPath);
-      }
+      logger.debug(`Found image: ${src} -> normalized: ${normalizedPath}`);
+      dependencies.add(normalizedPath);
     });
   }
 

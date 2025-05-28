@@ -224,6 +224,11 @@ export class PathResolver {
    * on the file system or with aliases.
    */
   private isNpmPackageImport(importPath: string): boolean {
+    // First check: if it's an absolute path, it's definitely not an npm package
+    if (path.isAbsolute(importPath)) {
+      return false;
+    }
+
     if (importPath.startsWith('@')) {
       const scope = importPath.split('/')[0];
       if (this.hasAliasConfig && this.aliasResolver) {

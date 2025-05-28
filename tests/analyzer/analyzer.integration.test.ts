@@ -33,6 +33,10 @@ describe('analyzeProject Integration Tests', () => {
   it('should correctly identify unused files in test-miniprogram', async () => {
     // Expected unused files based on manual analysis and CLI output
     const expectedUnusedRelativePaths = [
+      'alias-test.js', // Uses commented-out alias imports
+      'api/service.js', // Has commented-out alias imports
+      'config/settings.js', // Not actually imported anywhere
+      'utils/helpers.js', // Only imported via commented-out alias imports
       'unused-script.js',
       'unused-styles.wxss',
       'isolated/a.js',
