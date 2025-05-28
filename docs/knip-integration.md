@@ -154,6 +154,126 @@ ignoreExportsUsedInFile: true, // 忽略在同一文件中使用的导出
 MP_LENS_LOG_LEVEL=debug npm run find-unused
 ```
 
+## 安全删除导出：配置 ESLint 校验机制
+
+### 为什么需要额外的校验机制？
+
+虽然 Knip 能够有效识别未使用的导出，但在删除这些导出时仍需要谨慎。JavaScript/TypeScript 的模块系统允许从存在的文件中导入不存在的导出，此时导入的变量会是 `undefined`，这可能导致运行时错误而不是编译时错误。
+
+例如：
+
+```typescript
+// 文件 A：删除了某个导出
+const SOME_CONSTANT = 'value';
+// export { SOME_CONSTANT }; // 被删除了
+
+// 文件 B：仍在尝试导入（ESLint 可能不会报错）
+import { SOME_CONSTANT } from './A'; // SOME_CONSTANT 会是 undefined
+```
+
+### 推荐的 ESLint 配置
+
+为了确保删除导出的安全性，建议在项目中配置以下 ESLint 规则：
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  // ... 其他配置
+  extends: [
+    'eslint:recommended',
+    '@typescript-eslint/recommended',
+    'plugin:import/recommended',
+    'plugin:import/typescript'
+  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 2020,
+    sourceType: 'module',
+    project: './tsconfig.json',
+  },
+  plugins: ['@typescript-eslint', 'import'],
+  settings: {
+    'import/resolver': {
+      typescript: {
+        alwaysTryTypes: true,
+        project: './tsconfig.json',
+      },
+    },
+  },
+  rules: {
+    // 🔥 关键规则：检查命名导入是否真实存在
+    'import/named': 'error',
+    
+    // 🔥 关键规则：检查导出声明的有效性
+    'import/export': 'error',
+    
+    // 🔥 关键规则：检查模块是否能解析
+    'import/no-unresolved': 'error',
+    
+    // 辅助规则：避免其他导入问题
+    'import/no-duplicates': 'error',
+    'import/no-self-import': 'error',
+    'import/no-cycle': ['error', { maxDepth: 10 }],
+    'import/no-absolute-path': 'error',
+    
+    // TypeScript 相关
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        vars: 'all',
+        args: 'after-used',
+        ignoreRestSiblings: true,
+        varsIgnorePattern: '^_',
+        argsIgnorePattern: '^_',
+      },
+    ],
+  },
+};
+```
+
+### 安全删除工作流程
+
+推荐按照以下步骤安全地删除未使用的导出：
+
+#### 1. 运行 Knip 分析
+
+```bash
+npm run find-unused
+```
+
+#### 2. 删除 Knip 标识的未使用导出
+
+根据 Knip 的报告，删除确实未使用的导出。
+
+#### 3. 运行 ESLint 检查
+
+```bash
+# 检查所有文件的导入问题
+npm run lint
+
+# 或者只检查特定文件
+npx eslint src/**/*.{js,ts} --rule '{"import/named": "error", "import/export": "error"}'
+```
+
+#### 4. 修复检测到的问题
+
+如果 ESLint 检测到 `import/named` 或 `import/export` 错误，说明有地方仍在尝试导入已删除的导出，需要：
+
+- 删除无效的导入语句
+- 或者恢复被误删的导出
+
+#### 5. 运行类型检查（TypeScript 项目）
+
+```bash
+npx tsc --noEmit
+```
+
+#### 6. 运行测试确认
+
+```bash
+npm test
+```
+
 ## 故障排除
 
 如果遇到问题，请尝试：
