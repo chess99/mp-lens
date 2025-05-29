@@ -22,11 +22,8 @@ jobs:
       - name: Run tests
         run: npm test
 
-      # Build step might be redundant if prepublishOnly is set,
-      # but explicit build is often good practice in CI.
-      # The prepublishOnly script will run again before publish anyway.
-      # - name: Build
-      #   run: npm run build
+      - name: Build
+        run: npm run build
 
       - name: Publish to npm
         run: npm publish --access public # Add --access public if publishing a scoped package for the first time

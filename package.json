@@ -1,6 +1,6 @@
 {
   "name": "mp-lens",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "微信小程序分析工具 (Unused Code, Dependencies, Visualization)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,7 @@
     "build": "npm run clean && npm run build:ui && npm run build:cli",
     "start": "ts-node src/cli.ts",
     "dev": "npm run build:ui && ts-node src/cli.ts",
-    "prepare": "husky",
+    "prepare": "npm run build && husky",
     "clean": "rimraf dist",
     "knip:fix": "npx knip --fix",
     "release": "bash scripts/publish.sh"
