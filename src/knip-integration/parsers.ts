@@ -5,80 +5,24 @@
  * @see https://knip.dev/features/compilers
  */
 
+import { JavaScriptParser } from '../parser/javascript-parser';
+import { WXMLParser } from '../parser/wxml-parser';
+import { WXSSParser } from '../parser/wxss-parser';
+
 /**
  * Parse WXML files for dependencies
  * Extracts imports from image sources, template imports, includes, and WXS modules.
  */
-export function parseWxml(text: string, _filePath: string): string {
-  const results: string[] = [];
+export async function parseWxml(text: string, filePath: string): Promise<string> {
   try {
-    const normalizePath = (p: string): string => {
-      if (
-        !p ||
-        p.startsWith('/') ||
-        p.startsWith('./') ||
-        p.startsWith('../') ||
-        /^(http|https|data):/.test(p)
-      ) {
-        return p;
-      }
-      return './' + p;
-    };
-
-    // Match image sources
-    const imgRegex = /<image[^>]+src=["']([^"']+)["']/g;
-    let match: RegExpExecArray | null = imgRegex.exec(text);
-    while (match) {
-      const rawPath = match[1];
-      if (rawPath && rawPath.includes('{{')) {
-        match = imgRegex.exec(text);
-        continue;
-      }
-      const normalized = normalizePath(rawPath);
-      if (normalized && !/^(data|http|https):/.test(normalized)) {
-        results.push(`import '${normalized}'`);
-      }
-      match = imgRegex.exec(text);
-    }
-
-    // Match template imports
-    const importRegex = /<import\s+src=["']([^"']+)["']/g;
-    match = importRegex.exec(text);
-    while (match) {
-      const rawPath = match[1];
-      const normalized = normalizePath(rawPath);
-      if (normalized) {
-        results.push(`import '${normalized}'`);
-      }
-      match = importRegex.exec(text);
-    }
-
-    // Match template includes
-    const includeRegex = /<include\s+src=["']([^"']+)["']/g;
-    match = includeRegex.exec(text);
-    while (match) {
-      const rawPath = match[1];
-      const normalized = normalizePath(rawPath);
-      if (normalized) {
-        results.push(`import '${normalized}'`);
-      }
-      match = includeRegex.exec(text);
-    }
-
-    // Match WXS module imports
-    const wxsRegex = /<wxs\s+src=["']([^"']+)["']/g;
-    match = wxsRegex.exec(text);
-    while (match) {
-      const rawPath = match[1];
-      const normalized = normalizePath(rawPath);
-      if (normalized) {
-        results.push(`import '${normalized}'`);
-      }
-      match = wxsRegex.exec(text);
-    }
-
-    return results.join('\n');
-  } catch {
+    const parser = new WXMLParser();
+    const dependencies = await parser.parse(text, filePath);
+    // WXMLParser returns normalized paths (e.g., adds './' and handles relative paths).
+    // It also filters out http, data URIs, and template expressions for images.
+    return dependencies.map((dep) => `import '${dep}'`).join('\n');
+  } catch (e) {
+    // Maintain original behavior: return empty string on error.
+    // The WXMLParser might log errors internally.
     return '';
   }
 }
@@ -87,20 +31,33 @@ export function parseWxml(text: string, _filePath: string): string {
  * Parse WXSS files for dependencies
  * Extracts style imports using @import statements.
  */
-export function parseWxss(text: string, _filePath: string): string {
-  const results: string[] = [];
+export async function parseWxss(text: string, filePath: string): Promise<string> {
   try {
-    // Match style imports
-    const importRegex = /@import\s+["']([^"']+)["']/g;
-    let match: RegExpExecArray | null = importRegex.exec(text);
-    while (match) {
-      results.push(`@import '${match[1]}'`);
-      match = importRegex.exec(text);
+    const parser = new WXSSParser();
+    const dependencies = await parser.parse(text, filePath);
+
+    // The WXSSParser extracts both @import and url() paths.
+    // For knip, we are only interested in @import statements, similar to the original regex parser.
+    // The original regex also did not normalize paths like adding './'.
+    // We need to filter for actual @import paths found in the original text
+    // and maintain their original form as WXSSParser doesn't change them.
+
+    const importRegex = /@import\s+['"]([^'"]+)['"]/g;
+    const originalImports = new Set<string>();
+    let match;
+    while ((match = importRegex.exec(text)) !== null) {
+      if (match[1]) {
+        originalImports.add(match[1]);
+      }
     }
 
-    return results.join('\n');
-  } catch {
-    return '';
+    // Filter dependencies to only include those that were actual @import statements
+    const importDependencies = dependencies.filter((dep) => originalImports.has(dep));
+
+    return importDependencies.map((dep) => `@import '${dep}'`).join('\n');
+  } catch (e) {
+    // console.error(`Error parsing WXSS with AST parser: ${filePath}`, e);
+    return ''; // Keep original behavior on error
   }
 }
 
@@ -108,20 +65,22 @@ export function parseWxss(text: string, _filePath: string): string {
  * Parse WXS files for dependencies
  * Extracts require statements that reference other modules.
  */
-export function parseWxs(text: string, _filePath: string): string {
-  const results: string[] = [];
+export async function parseWxs(text: string, filePath: string): Promise<string> {
   try {
-    // Match require statements
-    const requireRegex = /require\s*\(\s*["']([^"']+)["']\s*\)/g;
-    let match: RegExpExecArray | null = requireRegex.exec(text);
-    while (match) {
-      results.push(`import '${match[1]}'`);
-      match = requireRegex.exec(text);
-    }
+    const parser = new JavaScriptParser();
+    // JavaScriptParser can handle both .js and .wxs, as .wxs is a subset of JavaScript.
+    const dependencies = await parser.parse(text, filePath);
 
-    return results.join('\n');
-  } catch {
-    return '';
+    // The original parseWxs converted require('path') to import 'path'.
+    // JavaScriptParser returns the path directly from require or import statements.
+    // We need to format them as `import 'path'`.
+    // Path normalization (e.g. adding './') was not done by the original regex parser
+    // for paths not starting with './' or '../', and JavaScriptParser also doesn't do this.
+    // So, paths like 'module/utils' will remain as 'module/utils'.
+    return dependencies.map((dep) => `import '${dep}'`).join('\n');
+  } catch (e) {
+    // console.error(`Error parsing WXS with AST parser: ${filePath}`, e);
+    return ''; // Keep original behavior on error
   }
 }
 
@@ -133,4 +92,21 @@ export function parseWxs(text: string, _filePath: string): string {
 //    JSON files as project files, so they can be analyzed for usage
 export function parseJson(text: string): string {
   return text;
+}
+
+/**
+ * Parse WXML files for dependencies
+ * Extracts imports from image sources, template imports, includes, and WXS modules.
+ */
+export async function parseWxmlAst(text: string, filePath: string): Promise<string> {
+  try {
+    const parser = new WXMLParser();
+    const dependencies = await parser.parse(text, filePath);
+    // The WXMLParser already normalizes paths including adding './' for relative paths.
+    // And it filters out http, data URIs.
+    return dependencies.map((dep) => `import '${dep}';`).join('\n');
+  } catch (e) {
+    // console.error(`Error parsing WXML with AST parser: ${filePath}`, e);
+    return ''; // Keep original behavior on error
+  }
 }
