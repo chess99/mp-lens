@@ -56,7 +56,8 @@ jest.mock('fs', () => ({
       return Array.from(entries).map((name) => ({
         name,
         isDirectory: () => mockFs.dirs.has(path.resolve(normalizedDirPath, name)),
-        isFile: () => mockFs.files.hasOwnProperty(path.resolve(normalizedDirPath, name)),
+        isFile: () =>
+          Object.prototype.hasOwnProperty.call(mockFs.files, path.resolve(normalizedDirPath, name)),
         // Add other Dirent methods if needed (isSymbolicLink, etc.)
       }));
     }
@@ -65,7 +66,7 @@ jest.mock('fs', () => ({
   // Mock readFileSync
   readFileSync: jest.fn((filePath: string, encoding: string) => {
     const normalizedPath = path.resolve(filePath);
-    if (mockFs.files.hasOwnProperty(normalizedPath)) {
+    if (Object.prototype.hasOwnProperty.call(mockFs.files, normalizedPath)) {
       if (encoding !== 'utf-8') throw new Error('Mock only supports utf-8');
       return mockFs.files[normalizedPath];
     }
@@ -74,7 +75,10 @@ jest.mock('fs', () => ({
   // Mock existsSync if needed (though readdir/readFile checks might suffice)
   existsSync: jest.fn((filePath: string) => {
     const normalizedPath = path.resolve(filePath);
-    return mockFs.files.hasOwnProperty(normalizedPath) || mockFs.dirs.has(normalizedPath);
+    return (
+      Object.prototype.hasOwnProperty.call(mockFs.files, normalizedPath) ||
+      mockFs.dirs.has(normalizedPath)
+    );
   }),
 }));
 
@@ -231,7 +235,6 @@ describe('findAppJsonConfig', () => {
     mockFs.dirs.add(path.resolve(projectRoot, 'unreadable')); // Add the dir
 
     // Mock readdirSync to throw an error for a specific directory
-    const originalReaddirSync = jest.requireActual('fs').readdirSync;
     (fs.readdirSync as jest.Mock).mockImplementation((dirPath, options) => {
       if (path.resolve(dirPath) === path.resolve(projectRoot, 'unreadable')) {
         throw new Error('EACCES: permission denied');
@@ -257,7 +260,11 @@ describe('findAppJsonConfig', () => {
         return Array.from(entries).map((name) => ({
           name,
           isDirectory: () => mockFs.dirs.has(path.resolve(normalizedDirPath, name)),
-          isFile: () => mockFs.files.hasOwnProperty(path.resolve(normalizedDirPath, name)),
+          isFile: () =>
+            Object.prototype.hasOwnProperty.call(
+              mockFs.files,
+              path.resolve(normalizedDirPath, name),
+            ),
         }));
       }
       return Array.from(entries);

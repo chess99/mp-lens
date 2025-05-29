@@ -36,7 +36,7 @@ describe('PathResolver', () => {
   let mockedStats: Map<string, Partial<fs.Stats>>; // Store stat results
 
   // Helper to setup file content mocks
-  const mockFileContent = (filePath: string, content: string) => {
+  const _mockFileContent = (filePath: string, content: string) => {
     const absPath = actualPath.resolve(projectRoot, filePath);
     mockedFileContents.set(absPath, content);
     mockedExistingPaths.add(absPath); // If we mock content, assume it exists
@@ -236,7 +236,7 @@ describe('PathResolver', () => {
       const resolvedAliasPath = actualPath.resolve(projectRoot, 'src/utils/helper.js');
 
       // Mock the AliasResolver behavior
-      (aliasResolver.resolve as jest.Mock).mockImplementation((path, source) => {
+      (aliasResolver.resolve as jest.Mock).mockImplementation((path, _source) => {
         if (path === aliasPath) {
           return actualPath.resolve(projectRoot, 'src/utils/helper');
         }
@@ -293,17 +293,6 @@ describe('PathResolver', () => {
       const resolved = pathResolver.resolveAnyPath(absolutePath, sourcePath, ['.js', '.ts']);
 
       expect(resolved).toBe(absolutePath);
-    });
-
-    it('should handle Windows paths correctly', () => {
-      // Create a Windows-style path resolver
-      const options: AnalyzerOptions = {
-        fileTypes: [],
-        verbose: false,
-        miniappRoot: projectRoot,
-        appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
-      };
-      // ... existing code ...
     });
   });
 });

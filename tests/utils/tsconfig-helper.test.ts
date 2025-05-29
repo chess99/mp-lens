@@ -64,11 +64,11 @@ jest.mock('fs', () => ({
   },
   existsSync: jest.fn((p: string) => {
     const absP = path.resolve(p);
-    return mockFs.files.hasOwnProperty(absP) || mockFs.dirs.has(absP);
+    return Object.prototype.hasOwnProperty.call(mockFs.files, absP) || mockFs.dirs.has(absP);
   }),
   readFileSync: jest.fn((p: string, enc: string) => {
     const absP = path.resolve(p);
-    if (mockFs.files.hasOwnProperty(absP)) {
+    if (Object.prototype.hasOwnProperty.call(mockFs.files, absP)) {
       if (enc !== 'utf-8') throw new Error('Mock only supports utf-8');
       return mockFs.files[absP];
     }
@@ -102,7 +102,7 @@ jest.mock('fs', () => ({
   }),
   statSync: jest.fn((p: string) => {
     const absP = path.resolve(p);
-    if (mockFs.stats.hasOwnProperty(absP)) {
+    if (Object.prototype.hasOwnProperty.call(mockFs.stats, absP)) {
       return mockFs.stats[absP];
     }
     throw new Error(`ENOENT: no such file or directory, stat '${p}'`);

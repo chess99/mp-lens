@@ -3,7 +3,7 @@
  * 在所有测试开始前运行一次
  */
 
-export default async function globalSetup() {
+export default async function setup(): Promise<void> {
   console.log('🚀 开始运行集成测试...');
 
   // 设置测试环境变量

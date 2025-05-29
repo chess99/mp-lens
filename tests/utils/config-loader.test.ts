@@ -1,7 +1,7 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigFileOptions } from '../../src/types/command-options';
 import { ConfigLoader } from '../../src/utils/config-loader';
-const path = require('path');
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
@@ -297,7 +297,6 @@ describe('ConfigLoader', () => {
 
   it('should return null and log error if JS loading fails (require throws)', async () => {
     const configPath = 'error.js';
-    const fullConfigPath = actualPath.resolve(projectRoot, configPath); // Calculate for assertion
     // The mock for '/fake/project/root/error.js' throws an error via jest.mock
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
@@ -310,7 +309,6 @@ describe('ConfigLoader', () => {
 
   it('should return null and log error if TS loading fails because ts-node require fails', async () => {
     const configPath = 'my-config.ts';
-    const fullConfigPath = actualPath.resolve(projectRoot, configPath); // Calculate for assertion
     const requireError = new Error('TS Require Error');
 
     // Temporarily override the globally mocked module *for this test*
@@ -333,7 +331,6 @@ describe('ConfigLoader', () => {
 
   it('should return null and log error if TS loading fails because ts-node registration fails', async () => {
     const configPath = 'my-config.ts';
-    const fullConfigPath = actualPath.resolve(projectRoot, configPath); // Calculate for assertion
     const registrationError = new Error('ts-node registration failed');
 
     // Make the ts-node mock itself throw
@@ -361,7 +358,6 @@ describe('ConfigLoader', () => {
 
   it('should return null and log warning for unsupported config file extensions', async () => {
     const configPath = 'my-config.yaml';
-    const fullConfigPath = actualPath.resolve(projectRoot, configPath);
 
     const loadedConfig = await ConfigLoader.loadConfig(configPath, projectRoot);
 

@@ -87,7 +87,7 @@ describe('AliasResolver', () => {
         );
         if (funcName && typeof actualPath[funcName] === 'function') {
           mockFn.mockImplementation((...args: any[]) =>
-            (actualPath[funcName] as Function)(...args),
+            (actualPath[funcName] as (...args: any[]) => any)(...args),
           );
         } else {
           // Attempt to re-apply based on common names if direct reference is lost
@@ -96,7 +96,7 @@ describe('AliasResolver', () => {
           );
           if (commonName && typeof actualPath[commonName] === 'function') {
             mockFn.mockImplementation((...args: any[]) =>
-              (actualPath[commonName] as Function)(...args),
+              (actualPath[commonName] as (...args: any[]) => any)(...args),
             );
           }
         }

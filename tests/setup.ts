@@ -16,8 +16,8 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // 清理控制台输出（可选）
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
+const _originalConsoleError = console.error;
+const _originalConsoleWarn = console.warn;
 
 beforeEach(() => {
   // 可以在这里添加每个测试前的设置

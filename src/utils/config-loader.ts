@@ -23,11 +23,7 @@ export class ConfigLoader {
     }
 
     // 默认配置文件名称（支持多种格式）
-    const possibleConfigs = [
-      'mp-lens.config.js',
-      'mp-lens.config.ts',
-      'mp-lens.config.json',
-    ];
+    const possibleConfigs = ['mp-lens.config.js', 'mp-lens.config.ts', 'mp-lens.config.json'];
 
     // 从项目根目录查找配置文件
     for (const configName of possibleConfigs) {
@@ -89,9 +85,11 @@ export class ConfigLoader {
     try {
       // 删除可能的缓存，以确保获取最新的配置
       const absolutePath = path.resolve(filePath);
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       delete require.cache[absolutePath];
 
       // 动态导入JavaScript配置文件
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const config = require(absolutePath);
 
       // 如果配置导出为函数，则执行它
@@ -123,6 +121,7 @@ export class ConfigLoader {
       // 尝试注册ts-node
       try {
         // 直接引用ts-node模块
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const tsNode = require('ts-node');
 
         tsNode.register({

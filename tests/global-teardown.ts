@@ -1,15 +1,15 @@
 /**
- * Jest 全局清理文件
- * 在所有测试结束后运行一次
+ * Jest 全局清理
+ * 在所有测试结束后执行一次
  */
+export default async function teardown(): Promise<void> {
+  // 清理测试后的全局状态
+  console.log('🧹 Jest 全局清理开始');
 
-export default async function globalTeardown() {
-  console.log('🧹 开始清理测试环境...');
+  // 这里可以添加清理逻辑，比如：
+  // - 清理临时文件
+  // - 关闭数据库连接
+  // - 清理测试环境变量等
 
-  // 可以在这里添加全局清理，比如：
-  // - 关闭测试数据库
-  // - 删除测试文件夹
-  // - 清理测试配置
-
-  console.log('✅ 全局清理完成');
+  console.log('✅ Jest 全局清理完成');
 }

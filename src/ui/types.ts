@@ -52,8 +52,8 @@ export interface NodeDetailsProps {
   node: TreeNodeData;
 }
 
-// 图表组件Props类型
-interface ChartProps {
+// 图表组件Props类型 (暂未使用，但保留供将来扩展)
+interface _ChartProps {
   title: string;
   data: ChartData;
   type: 'pie' | 'bar';
