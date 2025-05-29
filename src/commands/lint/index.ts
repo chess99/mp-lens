@@ -1,16 +1,33 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { analyzeProject } from '../analyzer/analyzer';
-import { getNodeIdAndLabel } from '../analyzer/utils/node-utils';
-import { PathResolver } from '../analyzer/utils/path-resolver';
-import { lintComponentUsage } from '../linter/component-linter';
-import { LintResult } from '../linter/types';
-import { analyzeWxmlTags } from '../linter/wxml-analyzer';
-import { CmdLintOptions, GlobalCliOptions } from '../types/command-options';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
-import { HandledError } from '../utils/errors';
+import { analyzeProject } from '../../analyzer/analyzer';
+import { CmdLintOptions, GlobalCliOptions } from '../../types/command-options';
+import { initializeCommandContext } from '../../utils/command-init';
+import { logger } from '../../utils/debug-logger';
+import { HandledError } from '../../utils/errors';
+import { PathResolver } from '../../utils/path-resolver';
+import { analyzeWxmlTags } from './analyzeWxmlTags';
+import { lintComponentUsage } from './component-linter';
+import { LintResult } from './types';
+
+/**
+ * 生成 Page/Component 节点的 id 和 label
+ * @param type 'Page' | 'Component'
+ * @param basePath 绝对路径
+ * @param miniappRoot miniapp 根目录
+ */
+export function getNodeIdAndLabel(
+  type: 'Page' | 'Component',
+  basePath: string,
+  miniappRoot: string,
+): { id: string; label: string } {
+  const rel = path.relative(miniappRoot, basePath).replace(/\\/g, '/');
+  return {
+    id: type === 'Page' ? `page:${rel}` : `comp:${rel}`,
+    label: rel,
+  };
+}
 
 /**
  * Reads global components from app.json

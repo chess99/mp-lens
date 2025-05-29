@@ -1,4 +1,4 @@
-import { WXSSParser } from '../../../src/analyzer/parsers/wxss-parser';
+import { WXSSParser } from '../../src/parser/wxss-parser';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');

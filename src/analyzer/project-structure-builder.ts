@@ -1,9 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { FileParser } from '../parser/file-parser';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
-import { FileParser } from './file-parser';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
 
 export class ProjectStructureBuilder {

@@ -3,13 +3,17 @@ import fs from 'fs/promises';
 import { glob } from 'glob';
 import path from 'path';
 import { PurgeCSS } from 'purgecss';
-import { PathResolver } from '../analyzer/utils/path-resolver';
-import { analyzeWxmlForPurge, WxmlPurgeAnalysisResult } from '../linter/wxml-analyzer';
-import { AnalyzerOptions, CmdPurgeWxssOptions, GlobalCliOptions } from '../types/command-options';
-import { AliasResolver } from '../utils/alias-resolver';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
-import { HandledError } from '../utils/errors';
+import {
+  AnalyzerOptions,
+  CmdPurgeWxssOptions,
+  GlobalCliOptions,
+} from '../../types/command-options';
+import { AliasResolver } from '../../utils/alias-resolver';
+import { initializeCommandContext } from '../../utils/command-init';
+import { logger } from '../../utils/debug-logger';
+import { HandledError } from '../../utils/errors';
+import { PathResolver } from '../../utils/path-resolver';
+import { analyzeWxmlForPurge, WxmlPurgeAnalysisResult } from './analyzeWxmlForPurge';
 
 async function performPurge(
   projectRoot: string,

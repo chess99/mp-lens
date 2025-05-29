@@ -1,4 +1,4 @@
-import { JavaScriptParser } from '../../../src/analyzer/parsers/javascript-parser';
+import { JavaScriptParser } from '../../src/parser/javascript-parser';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');

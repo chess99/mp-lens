@@ -2,7 +2,7 @@ import { parse, ParserPlugin } from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import * as path from 'path';
-import { logger } from '../../utils/debug-logger';
+import { logger } from '../utils/debug-logger';
 
 export class JavaScriptParser {
   constructor() {

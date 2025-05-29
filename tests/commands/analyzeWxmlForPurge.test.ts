@@ -1,4 +1,4 @@
-import { isSafeClassExpression } from '../../src/linter/wxml-analyzer';
+import { isSafeClassExpression } from '../../src/commands/purgewxss/analyzeWxmlForPurge';
 
 describe('isSafeClassExpression', () => {
   // Test cases for safe expressions

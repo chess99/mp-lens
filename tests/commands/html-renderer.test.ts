@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { GraphLink, GraphNode, ProjectStructure } from '../../src/analyzer/project-structure';
+import { HtmlGeneratorOptions, HtmlGeneratorPreact } from '../../src/commands/graph/html-renderer';
 import { AssetResolver } from '../../src/utils/asset-resolver';
-import { HtmlGeneratorOptions, HtmlGeneratorPreact } from '../../src/visualizer/html-renderer';
 
 // Mock AssetResolver
 jest.mock('../../src/utils/asset-resolver');

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { logger } from '../../utils/debug-logger';
-import { HtmlGeneratorPreact } from '../../visualizer/html-renderer';
+import { HtmlGeneratorPreact } from './html-renderer';
 
 /**
  * Generates HTML format graph

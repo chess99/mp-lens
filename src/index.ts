@@ -1,10 +1,10 @@
 // 导出公共API
 import { analyzeProject } from './analyzer/analyzer';
 import { DependencyGraph } from './analyzer/dependency-graph';
-import { findMiniProgramEntryPoints } from './knip/entry-finder';
-import { parseJson, parseWxml, parseWxs, parseWxss } from './knip/parsers';
+import { HtmlGeneratorPreact } from './commands/graph/html-renderer';
+import { findMiniProgramEntryPoints } from './knip-integration/entry-finder';
+import { parseJson, parseWxml, parseWxs, parseWxss } from './knip-integration/parsers';
 import { findUnusedAssets } from './utils/asset-usage-analyzer';
-import { HtmlGeneratorPreact } from './visualizer/html-renderer';
 
 export {
   analyzeProject,

@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PathResolver } from '../../../src/analyzer/utils/path-resolver';
-import { AnalyzerOptions } from '../../../src/types/command-options';
-import { AliasResolver } from '../../../src/utils/alias-resolver';
+import { AnalyzerOptions } from '../../src/types/command-options';
+import { AliasResolver } from '../../src/utils/alias-resolver';
+import { PathResolver } from '../../src/utils/path-resolver';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
@@ -22,7 +22,7 @@ jest.mock('path', () => ({
 }));
 
 // Mock AliasResolver
-jest.mock('../../../src/utils/alias-resolver');
+jest.mock('../../src/utils/alias-resolver');
 const MockedAliasResolver = AliasResolver as jest.MockedClass<typeof AliasResolver>;
 
 describe('PathResolver', () => {

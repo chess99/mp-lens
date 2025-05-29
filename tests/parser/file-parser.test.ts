@@ -1,4 +1,4 @@
-import { FileParser } from '../../src/analyzer/file-parser';
+import { FileParser } from '../../src/parser/file-parser';
 import { AnalyzerOptions } from '../../src/types/command-options';
 
 // 暴露私有方法进行测试的技巧

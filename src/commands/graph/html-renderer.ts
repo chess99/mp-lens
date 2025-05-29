@@ -1,6 +1,6 @@
-import { ProjectStructure } from '../analyzer/project-structure';
+import { ProjectStructure } from '../../analyzer/project-structure';
 // import { TreeNodeData } from '../ui/types'; // No longer needed here
-import { AssetResolver } from '../utils/asset-resolver';
+import { AssetResolver } from '../../utils/asset-resolver';
 // import { logger } from '../utils/debug-logger'; // Potentially remove if not used elsewhere
 
 /**

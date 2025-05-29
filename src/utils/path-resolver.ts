@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AnalyzerOptions } from '../../types/command-options';
-import { AliasResolver } from '../../utils/alias-resolver';
-import { logger } from '../../utils/debug-logger';
+import { AnalyzerOptions } from '../types/command-options';
+import { AliasResolver } from './alias-resolver';
+import { logger } from './debug-logger';
 
 export class PathResolver {
   private projectRoot: string;

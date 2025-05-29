@@ -1,8 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Could not find a declaration file for module '@wxml/parser'
 import { parse, Program, WXNode } from '@wxml/parser';
-import { logger } from '../../utils/debug-logger';
-import { normalizeWxmlImportPath } from '../../utils/wxml-path';
+import { logger } from '../utils/debug-logger';
+import { normalizeWxmlImportPath } from '../utils/wxml-path';
 
 /**
  * Parser for WXML files that finds dependencies to other files using AST parsing.

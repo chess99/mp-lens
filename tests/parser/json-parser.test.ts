@@ -1,5 +1,4 @@
-import * as fs from 'fs';
-import { JSONParser } from '../../../src/analyzer/parsers/json-parser';
+import { JSONParser } from '../../src/parser/json-parser';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
@@ -9,18 +8,6 @@ jest.mock('fs');
 
 describe('JSONParser', () => {
   let parser: JSONParser;
-
-  // Helper function to mock file content
-  const mockFileContent = (filePath: string, content: string) => {
-    (fs.readFileSync as jest.Mock).mockImplementation((file: string) => {
-      const normalizedFile = actualPath.normalize(file);
-      const normalizedTarget = actualPath.normalize(filePath);
-      if (normalizedFile === normalizedTarget) {
-        return content;
-      }
-      throw new Error(`File not found: ${file}`);
-    });
-  };
 
   beforeEach(() => {
     jest.clearAllMocks();

@@ -3,13 +3,13 @@ import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { AliasResolver } from '../utils/alias-resolver';
 import { logger } from '../utils/debug-logger';
-import { PathResolver } from './utils/path-resolver';
+import { PathResolver } from '../utils/path-resolver';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
-import { JavaScriptParser } from './parsers/javascript-parser';
-import { JSONParser } from './parsers/json-parser';
-import { WXMLParser } from './parsers/wxml-parser';
-import { WXSSParser } from './parsers/wxss-parser';
+import { JavaScriptParser } from './javascript-parser';
+import { JSONParser } from './json-parser';
+import { WXMLParser } from './wxml-parser';
+import { WXSSParser } from './wxss-parser';
 
 /**
  * FileParser: Orchestrates parsing of different file types in a WeChat Mini Program.

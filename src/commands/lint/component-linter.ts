@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from '../utils/debug-logger';
+import { logger } from '../../utils/debug-logger';
 import { filterStandardWxmlTags } from './standard-wxml-tags';
 import { LintIssue } from './types';
 

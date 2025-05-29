@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { logger } from '../../utils/debug-logger';
+import { logger } from '../utils/debug-logger';
 
 export class JSONParser {
   constructor() {
