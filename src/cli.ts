@@ -1,3 +1,6 @@
+// Node.js 14 兼容性 polyfill - 必须在所有其他导入之前
+import './polyfills/node14-compat';
+
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { clean } from './commands/clean';
