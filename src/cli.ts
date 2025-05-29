@@ -1,7 +1,5 @@
-#!/usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { version } from '../package.json';
 import { clean } from './commands/clean';
 import { cpd } from './commands/cpd';
 import { graph } from './commands/graph';
@@ -12,6 +10,7 @@ import { GlobalCliOptions } from './types/command-options';
 import { logger, LogLevel } from './utils/debug-logger';
 import { HandledError } from './utils/errors';
 import { checkForUpdates } from './utils/version-check';
+import { version } from './version';
 
 const program = new Command();
 

@@ -94,65 +94,54 @@ describe('PathResolver', () => {
     });
 
     // statSync: Reads from the mocked stats Map
-    mockFs.statSync.mockImplementation(
-      (p: fs.PathLike, options?: fs.StatSyncOptions): fs.Stats | undefined => {
-        // Handle potential file descriptor input if necessary
-        if (typeof p === 'number') {
-          throw new Error(`ENOENT: statSync mock doesn't handle file descriptors`);
-        }
-        const normalizedPath = normalizePathForMock(p);
+    mockFs.statSync.mockImplementation((p: fs.PathLike): fs.Stats => {
+      // Handle potential file descriptor input if necessary
+      if (typeof p === 'number') {
+        throw new Error(`ENOENT: statSync mock doesn't handle file descriptors`);
+      }
+      const normalizedPath = normalizePathForMock(p);
 
-        if (mockedStats.has(normalizedPath)) {
-          const partialStats = mockedStats.get(normalizedPath)!;
-          const fullStats = {
-            isFile: () => false,
-            isDirectory: () => false,
-            isBlockDevice: () => false,
-            isCharacterDevice: () => false,
-            isSymbolicLink: () => false,
-            isFIFO: () => false,
-            isSocket: () => false,
-            dev: 0,
-            ino: 0,
-            mode: 0,
-            nlink: 0,
-            uid: 0,
-            gid: 0,
-            rdev: 0,
-            size: 0,
-            blksize: 0,
-            blocks: 0,
-            atimeMs: 0,
-            mtimeMs: 0,
-            ctimeMs: 0,
-            birthtimeMs: 0,
-            atime: new Date(),
-            mtime: new Date(),
-            ctime: new Date(),
-            birthtime: new Date(),
-            ...partialStats,
-          } as fs.Stats;
+      if (mockedStats.has(normalizedPath)) {
+        const partialStats = mockedStats.get(normalizedPath)!;
+        const fullStats = {
+          isFile: () => false,
+          isDirectory: () => false,
+          isBlockDevice: () => false,
+          isCharacterDevice: () => false,
+          isSymbolicLink: () => false,
+          isFIFO: () => false,
+          isSocket: () => false,
+          dev: 0,
+          ino: 0,
+          mode: 0,
+          nlink: 0,
+          uid: 0,
+          gid: 0,
+          rdev: 0,
+          size: 0,
+          blksize: 0,
+          blocks: 0,
+          atimeMs: 0,
+          mtimeMs: 0,
+          ctimeMs: 0,
+          birthtimeMs: 0,
+          atime: new Date(),
+          mtime: new Date(),
+          ctime: new Date(),
+          birthtime: new Date(),
+          ...partialStats,
+        } as fs.Stats;
 
-          // Handle throwIfNoEntry option
-          if (options?.throwIfNoEntry === false) {
-            return fullStats;
-          }
-          return fullStats;
-        }
+        return fullStats;
+      }
 
-        // Handle throwIfNoEntry option when file doesn't exist
-        if (options?.throwIfNoEntry === false) {
-          return undefined;
-        }
-
-        // Throw ENOENT if no stats are mocked for the path
-        const error: NodeJS.ErrnoException = new Error(
-          `ENOENT: no such file or directory, stat '${p}' (Normalized: ${normalizedPath})`,
-        );
-        error.code = 'ENOENT';
-        throw error;
-      },
-    );
+      // Throw ENOENT if no stats are mocked for the path
+      const error: NodeJS.ErrnoException = new Error(
+        `ENOENT: no such file or directory, stat '${p}' (Normalized: ${normalizedPath})`,
+      );
+      error.code = 'ENOENT';
+      throw error;
+    });
     // --- End FS Mocks ---
 
     // Reset path mocks (ensure they call actual path)

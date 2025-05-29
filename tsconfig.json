@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "lib": ["ES2019", "DOM"],
+    "lib": ["ES2018", "ES2019", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "types": ["node", "jest"]

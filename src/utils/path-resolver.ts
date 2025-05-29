@@ -128,28 +128,21 @@ export class PathResolver {
    */
   private findExistingPath(potentialPath: string, allowedExtensions: string[]): string | null {
     logger.trace(
-      `Finding existing path for '${potentialPath}' with extensions [${allowedExtensions.join(
-        ', ',
-      )}]`,
+      `Looking for existing path: ${potentialPath} with extensions: ${allowedExtensions}`,
     );
 
     let potentialPathIsDir = false;
     try {
-      const stats = fs.statSync(potentialPath, { throwIfNoEntry: false });
-      if (stats) {
-        if (stats.isFile()) {
-          logger.trace(`Check 1: Exact path exists and is a file: ${potentialPath}`);
-          return potentialPath; // Exact match and is a file
-        } else if (stats.isDirectory()) {
-          logger.trace(`Check 1: Exact path exists and is a directory: ${potentialPath}`);
-          potentialPathIsDir = true; // It's a directory, continue to check index files
-        }
-      } else {
-        logger.trace(`Check 1: Exact path does not exist: ${potentialPath}`);
+      const stats = fs.statSync(potentialPath);
+      if (stats.isFile()) {
+        logger.trace(`Check 1: Exact path exists and is a file: ${potentialPath}`);
+        return potentialPath; // Exact match and is a file
+      } else if (stats.isDirectory()) {
+        logger.trace(`Check 1: Exact path exists and is a directory: ${potentialPath}`);
+        potentialPathIsDir = true; // It's a directory, continue to check index files
       }
     } catch (e: any) {
-      // Should not happen with throwIfNoEntry: false, but catch defensively
-      logger.trace(`Check 1: Error stating exact path ${potentialPath}: ${e.message}`);
+      logger.trace(`Check 1: Exact path does not exist: ${potentialPath}`);
     }
 
     // Check 2: Try appending allowed extensions if it wasn't a directory
@@ -159,8 +152,8 @@ export class PathResolver {
         const pathWithExt = potentialPath + ext;
         logger.trace(`Check 2a: Checking path with extension: ${pathWithExt}`);
         try {
-          const stats = fs.statSync(pathWithExt, { throwIfNoEntry: false });
-          if (stats?.isFile()) {
+          const stats = fs.statSync(pathWithExt);
+          if (stats.isFile()) {
             logger.trace(`Check 2b: Found file with extension: ${pathWithExt}`);
             return pathWithExt;
           } else {
@@ -178,8 +171,8 @@ export class PathResolver {
       const indexFilePath = path.join(potentialPath, 'index' + ext);
       logger.trace(`Check 3a: Checking index file: ${indexFilePath}`);
       try {
-        const stats = fs.statSync(indexFilePath, { throwIfNoEntry: false });
-        if (stats?.isFile()) {
+        const stats = fs.statSync(indexFilePath);
+        if (stats.isFile()) {
           logger.trace(`Check 3b: Found index file: ${indexFilePath}`);
           return indexFilePath;
         } else {

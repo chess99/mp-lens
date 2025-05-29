@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import semver from 'semver';
-import { version } from '../../package.json';
+import { version } from '../version';
 
 export async function checkForUpdates(): Promise<void> {
   try {

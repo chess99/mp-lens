@@ -11,7 +11,7 @@ module.exports = {
   },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
-  ignorePatterns: ['dist/**', 'node_modules/**', 'tests/fixtures/**'],
+  ignorePatterns: ['dist/**', 'node_modules/**', 'tests/fixtures/**', 'scripts/**'],
   rules: {
     '@typescript-eslint/explicit-module-boundary-types': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',

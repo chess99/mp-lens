@@ -16,9 +16,11 @@
     "test:integration": "jest --config jest.integration.config.js",
     "test:integration:watch": "jest --config jest.integration.config.js --watch",
     "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
+    "test:node14": "node scripts/node14-compatibility-test.js",
     "build:ui": "vite build --config src/ui/vite.config.mjs",
-    "build:cli": "tsc -p tsconfig.json",
+    "build:cli": "node esbuild.config.js",
     "build": "npm run clean && npm run build:ui && npm run build:cli",
+    "build:test": "npm run build && npm run test:node14",
     "start": "ts-node src/cli.ts",
     "dev": "npm run build:ui && ts-node src/cli.ts",
     "prepare": "npm run build && husky",
@@ -53,6 +55,9 @@
     "url": "https://github.com/chess99/mp-lens/issues"
   },
   "homepage": "https://github.com/chess99/mp-lens#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "dependencies": {
     "@antv/g6": "^4.8.21",
     "@babel/parser": "^7.27.3",
@@ -84,6 +89,7 @@
     "@types/semver": "^7.7.0",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
+    "esbuild": "^0.25.5",
     "eslint": "^8.57.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
