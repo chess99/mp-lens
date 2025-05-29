@@ -1,0 +1,29 @@
+# 构建产物
+dist/
+*.js.map
+*.d.ts.map
+
+# 依赖
+node_modules/
+
+# 测试覆盖率报告
+coverage/
+
+# 临时文件
+*.log
+*.tmp
+
+# IDE 配置
+.vscode/
+.idea/
+
+# 测试固定文件
+tests/fixtures/
+
+# 生成的文件
+*.min.js
+*.min.css
+
+# 配置文件的特殊格式
+.github/
+.husky/ 

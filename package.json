@@ -9,6 +9,7 @@
   },
   "scripts": {
     "lint": "eslint . --ext .ts",
+    "lint:staged": "lint-staged",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "jest",
@@ -20,7 +21,7 @@
     "build": "npm run clean && npm run build:ui && npm run build:cli",
     "start": "ts-node src/cli.ts",
     "dev": "npm run build:ui && ts-node src/cli.ts",
-    "prepare": "npm run build",
+    "prepare": "husky",
     "clean": "rimraf dist",
     "knip:fix": "npx knip --fix",
     "release": "bash scripts/publish.sh"
@@ -84,7 +85,9 @@
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "eslint": "^8.57.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "lint-staged": "^16.1.0",
     "prettier": "^3.3.1",
     "rimraf": "^5.0.7",
     "ts-jest": "^29.1.4",
