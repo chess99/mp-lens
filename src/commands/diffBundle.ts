@@ -1,4 +1,7 @@
 import chalk from 'chalk';
+import * as fs from 'fs';
+import { sync as globSync } from 'glob';
+import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { GraphNode } from '../analyzer/project-structure';
 import { CmdDiffOptions, GlobalCliOptions } from '../types/command-options';
@@ -11,6 +14,8 @@ import {
   isGitRepository,
   isWorkingDirectoryClean,
 } from '../utils/git-helper';
+
+const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
 
 interface PackageAnalysisResult {
   totalSize: number;
@@ -44,11 +49,47 @@ async function getProjectPackageSizes(
   cliOptions: GlobalCliOptions,
   projectRoot: string, // Pass projectRoot explicitly for clarity with git operations
 ): Promise<PackageAnalysisResult> {
-  // Create a new context for each analysis, as global options might be shared
-  // but the project state (due to git checkout) is specific to this call.
   const analysisSpecificCliOptions = { ...cliOptions, project: projectRoot };
   const context = await initializeCommandContext(analysisSpecificCliOptions);
 
+  const files = new Map<string, number>();
+  let totalSize = 0;
+
+  // 1. Analyze assets (images) using glob
+  if (context.miniappRoot) {
+    const imagePattern = `**/*.{${imageExtensions.join(',')}}`;
+    logger.debug(`开始使用glob模式扫描图片资源: ${imagePattern} 于目录: ${context.miniappRoot}`);
+    try {
+      const assetFiles = globSync(imagePattern, {
+        cwd: context.miniappRoot,
+        nodir: true,
+        absolute: false, // Get paths relative to cwd
+      });
+
+      logger.debug(`Glob扫描到 ${assetFiles.length} 个潜在图片资源文件。`);
+      for (const relativeAssetPath of assetFiles) {
+        const absoluteAssetPath = path.join(context.miniappRoot, relativeAssetPath);
+        try {
+          const stats = fs.statSync(absoluteAssetPath);
+          if (stats.isFile()) {
+            files.set(relativeAssetPath, stats.size);
+          }
+        } catch (err) {
+          logger.warn(
+            `无法获取资源文件 ${absoluteAssetPath} 的状态: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    } catch (globError) {
+      logger.error(
+        `扫描图片资源时发生错误: ${globError instanceof Error ? globError.message : String(globError)}`,
+      );
+    }
+  } else {
+    logger.warn('miniappRoot 未定义，跳过图片资源扫描。');
+  }
+
+  // 2. Analyze project structure (non-assets and non-globbed assets)
   const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
     fileTypes: context.fileTypes,
     excludePatterns: context.exclude,
@@ -58,25 +99,28 @@ async function getProjectPackageSizes(
     miniappRoot: context.miniappRoot,
     appJsonPath: context.appJsonPath,
     appJsonContent: context.appJsonContent,
-    includeAssets: context.includeAssets,
+    includeAssets: false, // Key change: analyzeProject will not primarily look for assets
   });
-
-  let totalSize = 0;
-  const files = new Map<string, number>();
 
   projectStructure.nodes.forEach((node: GraphNode) => {
-    // Only include reachable nodes that are actual files with a size
     if (
       reachableNodeIds.has(node.id) &&
-      node.properties?.absolutePath &&
+      node.properties?.absolutePath && // Ensure it's a file node
       node.properties?.fileSize !== undefined
     ) {
-      // Store path relative to miniappRoot for consistent comparison
-      // node.id is already the relative path for file nodes
-      files.set(node.id, node.properties.fileSize);
-      totalSize += node.properties.fileSize;
+      const nodePath = node.id; // node.id is relative path for file nodes
+      // If this path is NOT already in our 'files' map (i.e., it wasn't added by the asset glob scan),
+      // then add it from analyzeProject. This prioritizes glob-scanned assets.
+      if (!files.has(nodePath)) {
+        files.set(nodePath, node.properties.fileSize);
+      }
     }
   });
+
+  // 3. Calculate total size and file count from the 'files' map
+  for (const size of files.values()) {
+    totalSize += size;
+  }
 
   return {
     totalSize,
@@ -140,19 +184,25 @@ export async function diffBundle(
   }
 
   // --- Compare and Display Results ---
-  logger.info(chalk.bold('\n📊 包大小差异对比结果:'));
+  console.log(chalk.bold('\n📊 包大小差异对比结果:'));
+  console.log(chalk.dim(`  基准 (Base): ${baseRef}`));
+  console.log(chalk.dim(`  目标 (Target): ${targetRef}\n`));
 
   const sizeDiff = targetSizes.totalSize - baseSizes.totalSize;
   const filesDiff = targetSizes.totalFiles - baseSizes.totalFiles;
 
-  logger.info(
-    `总包大小: ${formatBytes(targetSizes.totalSize)} (较 ${baseRef} ${formatBytes(sizeDiff, true)})`,
+  console.log(
+    `  总包大小: ${formatBytes(baseSizes.totalSize)} -> ${formatBytes(
+      targetSizes.totalSize,
+    )} (${formatBytes(sizeDiff, true)})`,
   );
-  logger.info(
-    `总文件数: ${targetSizes.totalFiles} (较 ${baseRef} ${filesDiff > 0 ? '+' : ''}${filesDiff})`,
+  console.log(
+    `  总文件数: ${baseSizes.totalFiles} -> ${targetSizes.totalFiles} (${
+      filesDiff > 0 ? '+' : ''
+    }${filesDiff})`,
   );
 
-  logger.info(chalk.bold('📄 文件级别变化:'));
+  console.log(chalk.bold('\n📄 文件级别变化明细:'));
 
   interface FileChange {
     type: 'added' | 'deleted' | 'modified';
