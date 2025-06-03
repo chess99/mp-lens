@@ -1,5 +1,4 @@
 const { build } = require('esbuild');
-const { resolve } = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 
