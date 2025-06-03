@@ -45,10 +45,10 @@ async function buildAll() {
   try {
     console.log('🔨 开始构建...');
 
-    // 清理dist目录
-    if (fs.existsSync('dist')) {
-      fs.rmSync('dist', { recursive: true, force: true });
-    }
+    // 这里不需要清理dist目录, 外层统一清理
+    // if (fs.existsSync('dist')) {
+    //   fs.rmSync('dist', { recursive: true, force: true });
+    // }
     fs.mkdirSync('dist', { recursive: true });
 
     // 构建CLI入口
