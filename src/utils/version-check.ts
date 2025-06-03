@@ -5,6 +5,12 @@ import { version } from '../version';
 
 export async function checkForUpdates(): Promise<void> {
   try {
+    // 如果当前版本是 unknown，跳过版本检查
+    if (version === 'unknown') {
+      console.debug('当前版本未知，跳过版本检查');
+      return;
+    }
+
     // 获取最新版本
     const latestVersion = execSync('npm view mp-lens version').toString().trim();
 
