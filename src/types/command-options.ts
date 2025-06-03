@@ -33,6 +33,11 @@ export interface CmdPurgeWxssOptions {
   wxssFilePathInput?: string;
 }
 
+export interface CmdDiffOptions {
+  base?: string; // 基准分支或提交，默认为 'master'
+  target?: string; // 目标分支或提交，默认为 'HEAD' 或当前工作目录
+}
+
 /**
  * 配置文件中可用的选项
  * 包含从配置文件加载的所有可能选项

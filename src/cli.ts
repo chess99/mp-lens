@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { clean } from './commands/clean';
 import { cpd } from './commands/cpd';
+import { diffBundle } from './commands/diffBundle';
 import { graph } from './commands/graph';
 import { lint } from './commands/lint';
 import { purgewxss } from './commands/purgewxss';
@@ -162,6 +163,13 @@ program
   .option('--minTokens <number>', '最小重复 token 数', parseInt)
   .option('--reporters <string>', '报告输出格式（如 html,console）')
   .action(withTelemetryAction('cpd', cpd));
+
+program
+  .command('diff')
+  .description('比较两个 Git 分支或提交之间的包大小差异')
+  .option('--base <string>', '基准分支或提交 (默认为 master)')
+  .option('--target <string>', '目标分支或提交 (默认为 HEAD)')
+  .action(withTelemetryAction('diff', diffBundle));
 
 // Parse arguments
 program.parse(process.argv);
