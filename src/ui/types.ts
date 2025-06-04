@@ -32,12 +32,6 @@ interface Statistics {
   sizeByType: Record<string, number>;
 }
 
-// 应用程序Props类型
-export interface AppProps {
-  data: TreeNodeData;
-  statistics?: Statistics;
-}
-
 // 树状图组件Props类型
 export interface TreeViewProps {
   data: TreeNodeData;

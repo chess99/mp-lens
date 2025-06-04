@@ -84,7 +84,6 @@ async function buildAll() {
         ...sharedConfig.external,
         // 库使用者自己提供这些依赖
         'modern-ahocorasick',
-        'minimatch',
         'glob',
         'chalk',
         'commander',

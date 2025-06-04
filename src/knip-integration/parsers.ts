@@ -93,20 +93,3 @@ export async function parseWxs(text: string, filePath: string): Promise<string> 
 export function parseJson(text: string): string {
   return text;
 }
-
-/**
- * Parse WXML files for dependencies
- * Extracts imports from image sources, template imports, includes, and WXS modules.
- */
-export async function parseWxmlAst(text: string, filePath: string): Promise<string> {
-  try {
-    const parser = new WXMLParser();
-    const dependencies = await parser.parse(text, filePath);
-    // The WXMLParser already normalizes paths including adding './' for relative paths.
-    // And it filters out http, data URIs.
-    return dependencies.map((dep) => `import '${dep}';`).join('\n');
-  } catch (e) {
-    // console.error(`Error parsing WXML with AST parser: ${filePath}`, e);
-    return ''; // Keep original behavior on error
-  }
-}

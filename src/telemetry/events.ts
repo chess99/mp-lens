@@ -1,6 +1,6 @@
 // telemetry/events.ts
 
-export interface TelemetryBaseEvent {
+interface TelemetryBaseEvent {
   event: string; // 事件名称
   timestamp: number;
   userId: string;

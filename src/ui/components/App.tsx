@@ -35,7 +35,7 @@ const emptyTreeNode: TreeNodeData = {
 };
 
 // AppProps might no longer need a `data` prop if tree is built internally
-export interface AppProps {
+interface AppProps {
   // No props are expected for now
   // If we need to pass something specific from main.tsx later, it can be added here.
 }

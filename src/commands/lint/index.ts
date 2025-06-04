@@ -17,7 +17,7 @@ import { LintResult } from './types';
  * @param basePath 绝对路径
  * @param miniappRoot miniapp 根目录
  */
-export function getNodeIdAndLabel(
+function getNodeIdAndLabel(
   type: 'Page' | 'Component',
   basePath: string,
   miniappRoot: string,

@@ -11,7 +11,7 @@
 /**
  * Set of standard WXML tags (顺序与官方文档一致)
  */
-export const STANDARD_WXML_TAGS = new Set<string>([
+const STANDARD_WXML_TAGS = new Set<string>([
   // 视图容器
   'cover-image',
   'cover-view',
@@ -133,7 +133,7 @@ export const STANDARD_WXML_TAGS = new Set<string>([
  * @param tag Tag name to check
  * @returns true if the tag is a standard WXML tag
  */
-export function isStandardWxmlTag(tag: string): boolean {
+function isStandardWxmlTag(tag: string): boolean {
   return STANDARD_WXML_TAGS.has(tag);
 }
 

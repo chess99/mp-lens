@@ -2,6 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "src/cli/cli.ts", // Main CLI entry point
+    "src/index.ts", // Entry point for the package, not used in the CLI or UI
     "src/ui/main.tsx", // UI entry point
   ],
   "project": ["src/**/*"],
@@ -9,9 +10,11 @@
     "src/ui/vite.config.mjs", // UI build config
     "src/index.ts", // Entry point for the package, not used in the CLI or UI
     "test-miniprogram/**/*", // Intentional unused fixture
+    "src/polyfills/node14-compat.ts", // Polyfill for node 14 compatibility
   ],
   "ignoreDependencies": [
     "@preact/preset-vite", // Used by vite.config.mjs for UI build
+    "jscpd", // Used by cpd.ts
   ],
   "ignoreExportsUsedInFile": false, // Helps with types/interfaces used only within the same file
 }

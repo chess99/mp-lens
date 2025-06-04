@@ -5,7 +5,7 @@ import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
 import styles from './NodeDetails.module.css'; // Import CSS Module
 
 // Update NodeDetailsProps to include fullGraphData and the callback
-export interface ExtendedNodeDetailsProps extends NodeDetailsProps {
+interface ExtendedNodeDetailsProps extends NodeDetailsProps {
   fullGraphData: ProjectStructure;
   onChildNodeSelect: (nodeId: string) => void;
 }

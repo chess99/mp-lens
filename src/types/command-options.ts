@@ -33,6 +33,12 @@ export interface CmdPurgeWxssOptions {
   wxssFilePathInput?: string;
 }
 
+export interface CmdCpdOptions {
+  minLines?: number;
+  minTokens?: number;
+  reporters?: string;
+}
+
 export interface CmdDiffOptions {
   base?: string; // 基准分支或提交，默认为 'master'
   target?: string; // 目标分支或提交，默认为 'HEAD' 或当前工作目录

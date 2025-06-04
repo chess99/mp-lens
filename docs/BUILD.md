@@ -66,7 +66,6 @@ npm run test:node14
 - `chalk@4.1.2`
 - `semver@7.7.2`
 - `glob@10.4.1`
-- `minimatch@9.0.4`
 
 #### 保留为外部依赖
 

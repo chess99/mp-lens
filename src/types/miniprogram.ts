@@ -5,7 +5,7 @@
 /**
  * 页面窗口表现配置
  */
-export interface MiniProgramWindowConfig {
+interface MiniProgramWindowConfig {
   navigationBarBackgroundColor?: string;
   navigationBarTextStyle?: 'black' | 'white';
   navigationBarTitleText?: string;
@@ -27,7 +27,7 @@ export interface MiniProgramWindowConfig {
 /**
  * TabBar 配置项
  */
-export interface MiniProgramTabBarItem {
+interface MiniProgramTabBarItem {
   pagePath: string;
   text: string;
   iconPath?: string;
@@ -37,7 +37,7 @@ export interface MiniProgramTabBarItem {
 /**
  * TabBar 配置
  */
-export interface MiniProgramTabBar {
+interface MiniProgramTabBar {
   color?: string;
   selectedColor?: string;
   backgroundColor?: string;
@@ -50,7 +50,7 @@ export interface MiniProgramTabBar {
 /**
  * 网络超时配置
  */
-export interface MiniProgramNetworkTimeout {
+interface MiniProgramNetworkTimeout {
   request?: number;
   connectSocket?: number;
   uploadFile?: number;
@@ -60,29 +60,29 @@ export interface MiniProgramNetworkTimeout {
 /**
  * 权限配置
  */
-export interface MiniProgramPermission {
-  scope: string;
-  desc: string;
-}
+// interface MiniProgramPermission {
+//   scope: string;
+//   desc: string;
+// }
 
 /**
  * 用于声明式组件
  */
-export interface MiniProgramUsingComponents {
+interface MiniProgramUsingComponents {
   [componentName: string]: string;
 }
 
 /**
  * Worker 配置
  */
-export interface MiniProgramWorkers {
-  workers: string;
-}
+// interface MiniProgramWorkers {
+//   workers: string;
+// }
 
 /**
  * 分包配置
  */
-export interface MiniProgramSubPackage {
+interface MiniProgramSubPackage {
   root: string;
   name?: string;
   pages: string[];
@@ -92,7 +92,7 @@ export interface MiniProgramSubPackage {
 /**
  * 插件配置
  */
-export interface MiniProgramPlugins {
+interface MiniProgramPlugins {
   [pluginName: string]: {
     version: string;
     provider: string;
@@ -102,7 +102,7 @@ export interface MiniProgramPlugins {
 /**
  * 预加载规则
  */
-export interface MiniProgramPreloadRule {
+interface MiniProgramPreloadRule {
   [path: string]: {
     network?: 'all' | 'wifi';
     packages: string[];

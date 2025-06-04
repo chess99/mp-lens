@@ -33,7 +33,7 @@ export function isWorkingDirectoryClean(projectRoot: string): boolean {
 /**
  * 获取当前分支名
  */
-export function getCurrentBranch(projectRoot: string): string {
+function getCurrentBranch(projectRoot: string): string {
   try {
     return execSync('git rev-parse --abbrev-ref HEAD', {
       cwd: projectRoot,
@@ -62,7 +62,7 @@ export function branchOrCommitExists(projectRoot: string, ref: string): boolean 
 /**
  * 切换到指定分支或提交
  */
-export function checkoutBranch(projectRoot: string, ref: string): void {
+function checkoutBranch(projectRoot: string, ref: string): void {
   try {
     logger.info(`正在切换到: ${ref}`);
     execSync(`git checkout ${ref}`, {
