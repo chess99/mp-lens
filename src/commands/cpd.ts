@@ -40,6 +40,7 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
 
   logger.info(`Running jscpd (CLI) on ${miniappRoot} ...`);
 
+  // 优先用本地 node_modules/.bin/jscpd
   const jscpdBin = path.resolve(
     process.cwd(),
     'node_modules',
@@ -65,18 +66,10 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
     String(minLines),
     '--min-tokens',
     String(minTokens),
-    '--silent',
   ];
 
   try {
-    const result = await execa(commandToRun, args, { reject: false });
-
-    if (result.stdout) {
-      logger.debug(`jscpd stdout:\n${result.stdout}`);
-    }
-    if (result.stderr) {
-      logger.debug(`jscpd stderr:\n${result.stderr}`);
-    }
+    const result = await execa(commandToRun, args, { reject: false, stdio: 'inherit' });
 
     if (result.failed) {
       if (
@@ -89,18 +82,6 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
       }
       const errorMessage = result.stderr || `Process failed with exit code ${result.exitCode}`;
       throw new Error(`jscpd 执行失败 (command: ${commandToRun}): ${errorMessage}`);
-    }
-
-    if (reporters.includes('html')) {
-      logger.info('HTML 报告已生成，默认在 report/html/index.html (如果 jscpd 成功运行)。');
-    }
-
-    if (result.exitCode === 0) {
-      logger.info('jscpd 检查完成 (未发现重复)。');
-    } else if (result.exitCode === 1) {
-      logger.warn('jscpd 检查完成。可能发现重复代码或有其他警告 (jscpd exit code 1)。');
-    } else {
-      throw new Error(`jscpd 返回了预料之外的退出码: ${result.exitCode}. Stderr: ${result.stderr}`);
     }
   } catch (error) {
     if (error instanceof HandledError || error instanceof Error) {
