@@ -44,7 +44,10 @@
   "author": "chess99",
   "license": "MIT",
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.css",
+    "!dist/**/*.map",
     "README.md",
     "LICENSE"
   ],
