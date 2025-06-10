@@ -230,8 +230,19 @@ export class ProjectStructureBuilder {
       );
     }
 
+    // Normalize the path to ensure that '.../comp' and '.../comp/index' are treated as the same entity.
+    // The canonical form for IDs and basePaths will be WITHOUT '/index'.
+    let canonicalBasePath = absoluteBasePath;
+    const indexSuffix = path.sep + 'index';
+    if (absoluteBasePath.endsWith(indexSuffix)) {
+      canonicalBasePath = absoluteBasePath.slice(0, -indexSuffix.length);
+      logger.trace(
+        `[processComponent] Normalized component path from '${absoluteBasePath}' to '${canonicalBasePath}' for ID and basePath.`,
+      );
+    }
+
     // Create a canonical ID relative to the miniapp root
-    const canonicalRelativePath = path.relative(this.miniappRoot, absoluteBasePath);
+    const canonicalRelativePath = path.relative(this.miniappRoot, canonicalBasePath);
     // Ensure canonical path doesn't start with '../' if resolution somehow failed
     if (canonicalRelativePath.startsWith('..')) {
       logger.warn(
@@ -261,7 +272,7 @@ export class ProjectStructureBuilder {
       id: canonicalComponentId,
       type: 'Component',
       label: componentLabel,
-      properties: { basePath: absoluteBasePath }, // Store absolute path for reference
+      properties: { basePath: canonicalBasePath }, // Store canonical absolute path for reference
     });
     this.addLink(parentId, canonicalComponentId, 'Structure');
 
