@@ -276,11 +276,11 @@ npm install --save-dev mp-lens knip
 
 ```javascript
 // mp-lens.config.js
-export default {
+module.exports = {
   miniappRoot: 'src', // 小程序代码主目录 (相对于项目根目录)
   appJsonPath: 'app.json', // 入口文件 (相对于 miniappRoot)
   // 分析的文件类型 (clean 命令的默认值)
-  types: 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs',
+  types: 'js,ts,wxml,wxss,json,wxs',
   exclude: [
     // 等同于命令行中的 --exclude (Glob 模式)
     '**/node_modules/**',
