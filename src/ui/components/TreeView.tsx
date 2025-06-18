@@ -66,8 +66,6 @@ function TreeNode({
         )}
         {!hasChildren && <span className={styles.toggle}>&nbsp;</span>} {/* Placeholder */}
         <span className={styles.label}>{node.label}</span>
-        <span className={styles.stats}>({node.properties?.fileCount || 0} files)</span>
-        {/* Optionally display size: formatBytes(node.properties?.size || 0) */}
       </div>
       {hasChildren && isExpanded && (
         <ul>

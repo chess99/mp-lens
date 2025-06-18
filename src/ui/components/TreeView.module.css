@@ -2,6 +2,7 @@
 .treeView {
   font-size: 0.9em;
   overflow-y: auto; /* Allow vertical scroll if needed */
+  overflow-x: auto; /* Allow horizontal scroll if content is too wide */
   user-select: none; /* Disable text selection */
   display: flex; /* Allow controls and list to be arranged */
   flex-direction: column; /* Stack controls above list */
@@ -34,6 +35,8 @@
   margin: 0;
   flex-grow: 1; /* Allow list to take remaining space */
   overflow-y: auto; /* Scroll tree list independently if needed */
+  overflow-x: auto; /* Allow horizontal scroll for long content */
+  min-width: max-content; /* Ensure content doesn't get compressed */
 }
 
 /* REMOVED nested ul padding rule */
@@ -52,8 +55,8 @@
   align-items: center;
   padding: 4px 8px;
   cursor: pointer;
-  white-space: nowrap; /* Prevent wrapping */
-  overflow: hidden; /* Hide overflow */
+  white-space: nowrap; /* Prevent wrapping - keep this to maintain single line */
+  min-width: max-content; /* Ensure item takes full width needed */
 }
 
 .treeNodeItem:hover {
@@ -79,9 +82,8 @@
 
 .label {
   flex-grow: 1;
-  overflow: hidden; /* Hide overflow within label span */
-  text-overflow: ellipsis; /* Add ellipsis for long labels */
   margin-right: 8px; /* Space before stats */
+  white-space: nowrap; /* Keep text on single line */
 }
 
 .stats {
