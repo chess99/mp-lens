@@ -80,7 +80,6 @@ export function App(props: AppProps) {
 
   const handleNodeSelect = (node: TreeNodeData) => {
     setSelectedNode(node);
-    setCurrentMode('tree');
   };
 
   const handleGraphNodeSelect = (nodeId: string) => {

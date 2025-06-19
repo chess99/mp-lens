@@ -52,6 +52,7 @@ function TreeNode({
   return (
     <li>
       <div
+        data-node-id={node.id} // Add data attribute for easier selection
         onClick={handleNodeClick} // Single click selects
         onDblClick={handleNodeDoubleClick} // Double click toggles
         className={`${styles.treeNodeItem} ${isSelected ? styles.selected : ''}`}
@@ -165,6 +166,24 @@ export function TreeView({
     }
     // Dependency: selectedNodeId (prop) and data (prop, unlikely to change but good practice)
   }, [selectedNodeId, data]);
+
+  // Scroll to selected node when it changes
+  useEffect(() => {
+    if (selectedNodeId) {
+      // Use a timeout to ensure the DOM has been updated after any potential expansions
+      const timer = setTimeout(() => {
+        const element = document.querySelector(`[data-node-id="${selectedNodeId}"]`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+          });
+        }
+      }, 100); // A small delay is sometimes necessary
+
+      return () => clearTimeout(timer); // Cleanup timeout
+    }
+  }, [selectedNodeId]);
 
   const toggleNode = (nodeId: string) => {
     setExpandedNodes((prev) => {
