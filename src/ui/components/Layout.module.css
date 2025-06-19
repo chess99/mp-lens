@@ -15,8 +15,6 @@
 .sidebar {
   width: 450px; /* Wider fixed width */
   border-right: 1px solid #dee2e6;
-  padding: 15px;
-  overflow-y: auto; /* Allow sidebar to scroll */
   flex-shrink: 0;
   background-color: #fff;
   transition:

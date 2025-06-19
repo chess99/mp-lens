@@ -201,18 +201,21 @@ export function TreeView({
         <button onClick={handleExpandAll}>Expand All</button>
         <button onClick={handleCollapseAll}>Collapse All</button>
       </div>
-      <ul>
-        <TreeNode
-          key={data.id}
-          node={data}
-          onNodeSelect={onNodeSelect}
-          selectedNodeId={selectedNodeId}
-          isExpanded={isNodeExpanded(data.id)}
-          toggleNode={toggleNode}
-          isNodeExpandedCheck={isNodeExpanded}
-          depth={0}
-        />
-      </ul>
+
+      <div className={styles.treeContainer}>
+        <ul>
+          <TreeNode
+            key={data.id}
+            node={data}
+            onNodeSelect={onNodeSelect}
+            selectedNodeId={selectedNodeId}
+            isExpanded={isNodeExpanded(data.id)}
+            toggleNode={toggleNode}
+            isNodeExpandedCheck={isNodeExpanded}
+            depth={0}
+          />
+        </ul>
+      </div>
     </div>
   );
 }

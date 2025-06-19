@@ -187,13 +187,11 @@ export function App(props: AppProps) {
       <main className={mainContainerClassName}>
         {currentMode === 'tree' && (
           <aside className={layoutStyles.sidebar}>
-            <div className="tree-container">
-              <TreeView
-                data={initialTreeData} // Pass the dynamically built tree with stats
-                onNodeSelect={handleNodeSelect}
-                selectedNodeId={selectedNode.id}
-              />
-            </div>
+            <TreeView
+              data={initialTreeData} // Pass the dynamically built tree with stats
+              onNodeSelect={handleNodeSelect}
+              selectedNodeId={selectedNode.id}
+            />
           </aside>
         )}
 

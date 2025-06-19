@@ -1,15 +1,15 @@
 /* TreeView Specific */
 .treeView {
   font-size: 0.9em;
-  overflow-y: auto; /* Allow vertical scroll if needed */
-  overflow-x: auto; /* Allow horizontal scroll if content is too wide */
   user-select: none; /* Disable text selection */
   display: flex; /* Allow controls and list to be arranged */
   flex-direction: column; /* Stack controls above list */
+  height: 100%; /* Make TreeView take full height of its container */
+  flex-shrink: 0; /* Prevent controls from shrinking */
 }
 
 .treeControls {
-  padding: 5px 8px; /* Match tree-node-item padding */
+  padding: 8px 16px; /* Match tree-node-item padding */
   margin-bottom: 5px;
   border-bottom: 1px solid #eee;
   display: flex; /* Layout buttons */
@@ -29,13 +29,16 @@
   background-color: #e0e0e0;
 }
 
+.treeContainer {
+  overflow-y: auto; /* Scroll tree list independently if needed */
+  overflow-x: auto; /* Allow horizontal scroll for long content */
+}
+
 .treeView ul {
   padding-left: 0;
   list-style-type: none;
   margin: 0;
   flex-grow: 1; /* Allow list to take remaining space */
-  overflow-y: auto; /* Scroll tree list independently if needed */
-  overflow-x: auto; /* Allow horizontal scroll for long content */
   min-width: max-content; /* Ensure content doesn't get compressed */
 }
 
