@@ -313,4 +313,88 @@ describe('Lint Command Integration Tests', () => {
       }
     });
   });
+
+  describe('Path Normalization Analysis', () => {
+    let testProjectRoot: string;
+
+    beforeEach(() => {
+      // 创建一个隔离的测试项目目录
+      testProjectRoot = path.join(tempDir, `norm-test-${Date.now()}`);
+      fs.mkdirSync(testProjectRoot, { recursive: true });
+    });
+
+    afterEach(() => {
+      // 清理测试项目目录
+      fs.rmSync(testProjectRoot, { recursive: true, force: true });
+    });
+
+    it('should correctly handle both direct and index-style component paths', async () => {
+      // 1. 创建组件和页面文件结构
+      // a. 直接风格组件 (正确使用)
+      const directCompDir = path.join(testProjectRoot, 'components');
+      fs.mkdirSync(directCompDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(directCompDir, 'direct-comp.wxml'),
+        '<view>Direct Style Component</view>',
+      );
+      fs.writeFileSync(
+        path.join(directCompDir, 'direct-comp.json'),
+        JSON.stringify({ component: true }),
+      );
+
+      // b. index风格组件 (声明但未使用)
+      const indexCompDir = path.join(testProjectRoot, 'components', 'index-comp');
+      fs.mkdirSync(indexCompDir, { recursive: true });
+      fs.writeFileSync(path.join(indexCompDir, 'index.wxml'), '<view>Index Style Component</view>');
+      fs.writeFileSync(path.join(indexCompDir, 'index.json'), JSON.stringify({ component: true }));
+
+      // c. 页面
+      const pagesDir = path.join(testProjectRoot, 'pages');
+      fs.mkdirSync(pagesDir, { recursive: true });
+      fs.writeFileSync(path.join(pagesDir, 'main.wxml'), '<direct-comp /><undeclared-comp />');
+      fs.writeFileSync(
+        path.join(pagesDir, 'main.json'),
+        JSON.stringify({
+          usingComponents: {
+            'direct-comp': '/components/direct-comp',
+            'index-comp': '/components/index-comp', // 声明但未使用
+          },
+        }),
+      );
+
+      // d. 创建 app.json 来注册页面
+      fs.writeFileSync(
+        path.join(testProjectRoot, 'app.json'),
+        JSON.stringify({
+          pages: ['pages/main'],
+        }),
+      );
+
+      // 2. 运行 lint 命令
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const cliOptions: GlobalCliOptions = {
+        ...baseCliOptions,
+        project: testProjectRoot,
+      };
+
+      try {
+        await lint(cliOptions);
+        const output = consoleSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+
+        // 3. 验证输出
+        // 检查页面ID (pages/main)
+        expect(output).toContain('pages/main');
+        // 检查 "index-comp" 是否被报告为 "已声明但未使用"
+        expect(output).toContain('已在 JSON 中声明但在 WXML 中未使用:');
+        expect(output).toContain('- index-comp');
+        // 检查 "undeclared-comp" 是否被报告为 "已使用但未声明"
+        expect(output).toContain('已在 WXML 中使用但在 JSON 中未声明:');
+        expect(output).toContain('- undeclared-comp');
+        // 确保 "direct-comp" 没有被报告为问题
+        expect(output).not.toContain('direct-comp');
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+  });
 });

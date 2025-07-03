@@ -251,6 +251,7 @@ export class ProjectStructureBuilder {
       return null; // Or handle error differently
     }
 
+    // TODO: 使用 id-helper.ts 中的函数来生成 ID 和 label
     const canonicalComponentId = `comp:${canonicalRelativePath}`;
     const componentLabel = canonicalRelativePath; // Use the normalized path for label
 

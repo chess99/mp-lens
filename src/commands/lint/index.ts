@@ -6,28 +6,11 @@ import { CmdLintOptions, GlobalCliOptions } from '../../types/command-options';
 import { initializeCommandContext } from '../../utils/command-init';
 import { logger } from '../../utils/debug-logger';
 import { HandledError } from '../../utils/errors';
+import { generateNodeIdAndLabel } from '../../utils/id-helper';
 import { PathResolver } from '../../utils/path-resolver';
 import { analyzeWxmlTags } from './analyzeWxmlTags';
 import { lintComponentUsage } from './component-linter';
 import { LintResult } from './types';
-
-/**
- * 生成 Page/Component 节点的 id 和 label
- * @param type 'Page' | 'Component'
- * @param basePath 绝对路径
- * @param miniappRoot miniapp 根目录
- */
-function getNodeIdAndLabel(
-  type: 'Page' | 'Component',
-  basePath: string,
-  miniappRoot: string,
-): { id: string; label: string } {
-  const rel = path.relative(miniappRoot, basePath).replace(/\\/g, '/');
-  return {
-    id: type === 'Page' ? `page:${rel}` : `comp:${rel}`,
-    label: rel,
-  };
-}
 
 /**
  * Reads global components from app.json
@@ -84,16 +67,17 @@ async function processFilePair(ctx: FilePairContext): Promise<void> {
     result.summary.filesScanned++;
     // Analyze WXML tags
     const usedTagToFiles = await analyzeWxmlTags(wxmlPath, pathResolver);
-    // Read and parse JSON file to determine type
+    // Lint component usage
+    const lintIssue = lintComponentUsage(wxmlPath, jsonPath, usedTagToFiles, globalComponents);
+
+    // Read and parse JSON file to determine type and generate canonical ID
     const jsonContent = fs.readFileSync(jsonPath, 'utf-8');
     const jsonData = JSON.parse(jsonContent);
     const isComponent = jsonData.component === true;
     const type = isComponent ? 'Component' : 'Page';
-    const basePath = wxmlPath.replace(/\.wxml$/, '');
-    const { id } = getNodeIdAndLabel(type, basePath, miniappRoot);
-    // Lint component usage
-    const lintIssue = lintComponentUsage(wxmlPath, jsonPath, usedTagToFiles, globalComponents);
+    const { id } = generateNodeIdAndLabel(type, wxmlPath, miniappRoot);
     lintIssue.id = id;
+
     if (lintIssue.declaredNotUsed.length > 0 || lintIssue.usedNotDeclared.length > 0) {
       result.summary.filesWithIssues++;
       result.summary.declaredNotUsedCount += lintIssue.declaredNotUsed.length;
@@ -282,9 +266,28 @@ async function processWholeProject(
     for (const node of nodes) {
       const basePath = node.properties?.basePath;
       if (!basePath) continue;
-      const wxmlFilePath = basePath + '.wxml';
-      const jsonFilePath = basePath + '.json';
-      if (fs.existsSync(wxmlFilePath) && fs.existsSync(jsonFilePath)) {
+
+      let wxmlFilePath: string | undefined;
+      let jsonFilePath: string | undefined;
+
+      // Check for basePath.wxml
+      const directWxmlPath = basePath + '.wxml';
+      const directJsonPath = basePath + '.json';
+
+      if (fs.existsSync(directWxmlPath) && fs.existsSync(directJsonPath)) {
+        wxmlFilePath = directWxmlPath;
+        jsonFilePath = directJsonPath;
+      } else {
+        // Check for basePath/index.wxml
+        const indexWxmlPath = path.join(basePath, 'index.wxml');
+        const indexJsonPath = path.join(basePath, 'index.json');
+        if (fs.existsSync(indexWxmlPath) && fs.existsSync(indexJsonPath)) {
+          wxmlFilePath = indexWxmlPath;
+          jsonFilePath = indexJsonPath;
+        }
+      }
+
+      if (wxmlFilePath && jsonFilePath) {
         await processFilePair({
           wxmlPath: wxmlFilePath,
           jsonPath: jsonFilePath,
