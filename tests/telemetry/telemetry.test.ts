@@ -16,6 +16,7 @@ jest.mock('../../src/telemetry/user', () => ({
   getOrCreateUserId: jest.fn(() => 'test-user-id'),
 }));
 
+import { isTelemetryEnabled } from '../../src/telemetry/config';
 import { sendToPostHog } from '../../src/telemetry/posthog';
 
 describe('Telemetry Integration Tests', () => {
@@ -23,6 +24,8 @@ describe('Telemetry Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Initialize telemetry before each test
+    telemetry.init({ telemetry: true });
   });
 
   describe('Command Event Tracking', () => {
@@ -296,38 +299,21 @@ describe('Telemetry Integration Tests', () => {
   });
 
   describe('Telemetry Disabled', () => {
-    beforeEach(() => {
+    it('should not send events when telemetry is disabled', () => {
       // Mock telemetry as disabled
-      jest.doMock('../../src/telemetry/config', () => ({
-        isTelemetryEnabled: jest.fn(() => false),
-      }));
+      (isTelemetryEnabled as jest.Mock).mockReturnValue(false);
 
-      // Re-import telemetry service to pick up the new config
-      jest.resetModules();
-    });
+      // Initialize telemetry as disabled
+      telemetry.init({ telemetry: false });
 
-    it('should not send events when telemetry is disabled', async () => {
-      // Import the disabled telemetry service
-      const { telemetry: disabledTelemetry } = await import('../../src/telemetry/service');
-
-      // Test with disabled telemetry
-      disabledTelemetry.capture({
+      telemetry.capture({
         event: 'command',
         command: 'test',
         args: [],
         version: '1.0.0',
       });
 
-      // PostHog should not be called when telemetry is disabled
       expect(mockSendToPostHog).not.toHaveBeenCalled();
-    });
-
-    afterEach(() => {
-      // Reset modules and mocks
-      jest.resetModules();
-      jest.doMock('../../src/telemetry/config', () => ({
-        isTelemetryEnabled: jest.fn(() => true),
-      }));
     });
   });
 });

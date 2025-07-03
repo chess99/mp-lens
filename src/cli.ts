@@ -79,13 +79,17 @@ program
     [],
   )
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
-  .option('--include-assets', '在分析和清理中包含图片等资源文件 (默认不包含)', false);
+  .option('--include-assets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
+  .option('--telemetry <boolean>', '是否启用遥测 (默认 true)', true);
 
 function withTelemetryAction<T>(
   commandName: string,
   action: (cliOptions: GlobalCliOptions, ...args: any[]) => Promise<T>,
 ) {
   return async (...args: any[]) => {
+    const cliOptions = program.opts() as GlobalCliOptions;
+    // 初始化遥测服务，并传入命令行选项
+    telemetry.init({ telemetry: cliOptions.telemetry });
     const commandArgs = process.argv.slice(2);
     telemetry.capture({
       event: 'command',
@@ -93,7 +97,6 @@ function withTelemetryAction<T>(
       version,
       args: commandArgs,
     } as Omit<import('./telemetry').CommandEvent, 'userId' | 'timestamp'>);
-    const cliOptions = program.opts() as GlobalCliOptions;
     setupLogger(cliOptions);
     try {
       await action(cliOptions, ...args);

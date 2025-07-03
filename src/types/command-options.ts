@@ -12,6 +12,7 @@ export interface GlobalCliOptions {
   verboseLevel?: number;
   verbose?: boolean;
   trace?: boolean;
+  telemetry?: boolean;
 }
 
 export interface CmdGraphOptions {

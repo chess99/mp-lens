@@ -4,12 +4,16 @@ import { sendToPostHog } from './posthog';
 import { getOrCreateUserId } from './user';
 
 class TelemetryService {
-  private enabled: boolean;
-  private userId: string;
+  private enabled: boolean = true; // Default to true, will be properly set in init
+  private userId: string = '';
+  private initialized: boolean = false;
 
-  constructor() {
-    this.enabled = isTelemetryEnabled();
-    this.userId = getOrCreateUserId();
+  init(options: { telemetry?: boolean }) {
+    this.enabled = isTelemetryEnabled(options.telemetry);
+    if (this.enabled) {
+      this.userId = getOrCreateUserId();
+    }
+    this.initialized = true;
   }
 
   capture(event: Omit<TelemetryEvent, 'userId' | 'timestamp'>) {
