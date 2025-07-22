@@ -222,6 +222,7 @@ export class PathResolver {
       return false;
     }
 
+    // Check for scoped packages (@scope/package)
     if (importPath.startsWith('@')) {
       const scope = importPath.split('/')[0];
       if (this.hasAliasConfig && this.aliasResolver) {
@@ -236,18 +237,42 @@ export class PathResolver {
       return true; // Starts with @ and doesn't match a configured alias scope
     }
 
-    // Basic check: if it doesn't start with '.', '/', or match an alias, it *might* be an npm package.
-    if (
-      !importPath.startsWith('.') &&
-      !importPath.startsWith('/') &&
-      !this.isAliasPath(importPath)
-    ) {
-      logger.trace(
-        `Path '${importPath}' is non-relative, non-absolute, non-alias. Considering as NPM package.`,
-      );
-      return true; // MODIFIED: Was false, now true for paths like 'lodash'
+    // Check if it's a known alias
+    if (this.isAliasPath(importPath)) {
+      return false;
     }
 
-    return false; // Default to false if none of the above conditions met (e.g. relative paths)
+    // Check if it looks like a local path within mini-program
+    // Mini-program local paths often look like 'pages/index', 'utils/helper', etc.
+    if (
+      importPath.includes('/') && 
+      (importPath.startsWith('pages/') || 
+       importPath.startsWith('components/') || 
+       importPath.startsWith('utils/') || 
+       importPath.startsWith('lib/') ||
+       importPath.startsWith('common/') ||
+       importPath.startsWith('assets/'))
+    ) {
+      logger.trace(`Path '${importPath}' appears to be a local mini-program path, not an NPM package.`);
+      return false;
+    }
+
+    // For remaining non-relative, non-absolute paths, check if they contain common NPM package patterns
+    if (
+      !importPath.startsWith('.') &&
+      !importPath.startsWith('/')
+    ) {
+      // If it's a simple name without slashes, it's likely an NPM package
+      if (!importPath.includes('/')) {
+        logger.trace(`Path '${importPath}' is a simple package name, considering as NPM package.`);
+        return true;
+      }
+      
+      // If it has slashes but doesn't match mini-program patterns, it could be an NPM package
+      logger.trace(`Path '${importPath}' doesn't match known mini-program patterns, considering as NPM package.`);
+      return true;
+    }
+
+    return false; // Default to false for relative paths
   }
 }

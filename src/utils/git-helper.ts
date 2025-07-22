@@ -49,7 +49,13 @@ function getCurrentBranch(projectRoot: string): string {
  */
 export function branchOrCommitExists(projectRoot: string, ref: string): boolean {
   try {
-    execSync(`git rev-parse --verify ${ref}`, {
+    // Sanitize ref to prevent command injection
+    const sanitizedRef = ref.replace(/[;&|`$()]/g, '');
+    if (sanitizedRef !== ref) {
+      logger.warn(`Git ref contains potentially dangerous characters and was sanitized: ${ref} -> ${sanitizedRef}`);
+    }
+    
+    execSync(`git rev-parse --verify "${sanitizedRef}"`, {
       cwd: projectRoot,
       stdio: 'ignore',
     });
@@ -64,8 +70,14 @@ export function branchOrCommitExists(projectRoot: string, ref: string): boolean 
  */
 function checkoutBranch(projectRoot: string, ref: string): void {
   try {
-    logger.info(`正在切换到: ${ref}`);
-    execSync(`git checkout ${ref}`, {
+    // Sanitize ref to prevent command injection
+    const sanitizedRef = ref.replace(/[;&|`$()]/g, '');
+    if (sanitizedRef !== ref) {
+      logger.warn(`Git ref contains potentially dangerous characters and was sanitized: ${ref} -> ${sanitizedRef}`);
+    }
+    
+    logger.info(`正在切换到: ${sanitizedRef}`);
+    execSync(`git checkout "${sanitizedRef}"`, {
       cwd: projectRoot,
       stdio: 'inherit',
     });

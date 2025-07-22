@@ -89,12 +89,29 @@ export async function clean(
     for (const file of unusedFiles) {
       try {
         const relativePath = path.relative(projectRoot, file);
+        
+        // Check if file exists before attempting deletion to avoid race conditions
+        if (!fs.existsSync(file)) {
+          logger.debug(`文件已不存在，跳过删除: ${relativePath}`);
+          processedCount++;
+          continue;
+        }
+        
         fs.unlinkSync(file);
         logger.debug(`已删除: ${relativePath}`);
         processedCount++;
       } catch (err) {
-        logger.error(`处理文件 ${file} 失败: ${(err as Error).message}`);
-        errorCount++;
+        const errorMessage = (err as Error).message;
+        const relativePath = path.relative(projectRoot, file);
+        
+        // Handle specific error cases more gracefully
+        if (errorMessage.includes('ENOENT')) {
+          logger.debug(`文件在删除过程中消失，可能被其他进程删除: ${relativePath}`);
+          processedCount++;
+        } else {
+          logger.error(`处理文件 ${relativePath} 失败: ${errorMessage}`);
+          errorCount++;
+        }
       }
     }
 
