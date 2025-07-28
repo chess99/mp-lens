@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
 import { clean } from './commands/clean';
