@@ -37,14 +37,18 @@ module.exports = {
    * 这些文件不会被分析，也不会被列为未使用或被清理。
    * 支持使用 minimatch 语法 (https://github.com/isaacs/minimatch)
    */
-  // 例: ["**/node_modules/**", "dist/**", "**/*.mock.js"]
+  // eg: 排除根目录的 script / bin 目录，以及根目录下以点开头的文件
+  // 说明：' .* ' 仅匹配项目根目录的隐藏文件/目录；.git/** 等已在默认排除中覆盖
   exclude: [
-    '**/node_modules/**',
-    '**/miniprogram_npm/**',
-    '**/dist/**',
-    '**/*.spec.ts',
-    '**/*.test.ts',
-    '**/mock/**',
+    '.*',
+    '.*/**',
+    'script/**',
+    'bin/**',
+    // 任意位置包含 mock / demo 的文件或目录
+    '**/*mock*',
+    '**/*mock*/**',
+    '**/*demo*',
+    '**/*demo*/**',
   ],
 
   /**

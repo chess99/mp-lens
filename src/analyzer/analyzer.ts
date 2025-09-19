@@ -109,22 +109,11 @@ function findAllFiles(rootDir: string, fileTypes: string[], excludePatterns: str
   }
   const globPattern = `**/*.{${safeFileTypes.join(',')}}`;
 
-  // Default ignore patterns (consider refining these)
-  const defaultIgnorePatterns = [
-    '**/node_modules/**',
-    '**/miniprogram_npm/**',
-    // Add other common build/output dirs if necessary, e.g., '**/dist/**'?
-    // Keep output patterns from original
-    '**/output/dependency-graph.*',
-    '**/output/unused-files.*',
-    'dependency-graph.*',
-    'unused-files.*',
-  ];
-
+  // Centralize ignore patterns: rely solely on excludePatterns passed from context
   const globOptions = {
     cwd: rootDir,
     absolute: true,
-    ignore: [...defaultIgnorePatterns, ...excludePatterns],
+    ignore: [...excludePatterns],
     nodir: true,
     dot: true, // Include hidden files/folders if not excluded
   };

@@ -106,13 +106,8 @@ export async function initializeCommandContext(
   const verboseLevel = mergedConfig.verboseLevel ?? 3;
   const miniappRoot = mergedConfig.miniappRoot ?? projectRoot;
   const appJsonPath = mergedConfig.appJsonPath;
-  // Exclude: only use CLI when provided and non-empty; else fall back to config
-  const exclude =
-    Array.isArray(cliOptions.exclude) && cliOptions.exclude.length > 0
-      ? cliOptions.exclude
-      : Array.isArray(fileConfig?.exclude)
-        ? fileConfig!.exclude!
-        : [];
+  // Exclude: centralized initialization (defaults + .gitignore + config + CLI)
+  const exclude = buildExcludePatterns(projectRoot, fileConfig?.exclude, cliOptions.exclude);
 
   // Essential files: use the fully merged result from processEssentialFiles
   const essentialFilesList = allEssentialFiles;
@@ -297,5 +292,106 @@ function loadAliasesFromTsConfig(projectRoot: string): { [key: string]: string[]
   } catch (e) {
     logger.warn(`无法解析 tsconfig.json 以加载别名: ${(e as Error).message}`);
     return {};
+  }
+}
+
+// === Exclude building helpers ===
+
+const DEFAULT_EXCLUDE_PATTERNS = [
+  // Dependencies
+  '**/node_modules/**',
+  '**/miniprogram_npm/**',
+
+  // VCS
+  '.git/**',
+  '.svn/**',
+  '.hg/**',
+
+  // Caches
+  '.cache/**',
+  '.parcel-cache/**',
+  '.turbo/**',
+
+  // Build outputs and artifacts
+  'dist/**',
+  'build/**',
+  '.next/**',
+  'out/**',
+  'coverage/**',
+  'tmp/**',
+  'temp/**',
+
+  // Tests (files/dirs typically not part of runtime)
+  '**/__tests__/**',
+  '**/*.spec.js',
+  '**/*.spec.ts',
+  '**/*.test.js',
+  '**/*.test.ts',
+
+  // Root-level project meta/config files
+  'package.json',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'tsconfig.json',
+  'tsconfig.*.json',
+  'jsconfig.json',
+  '.gitignore',
+  '.gitattributes',
+  '.editorconfig',
+];
+
+function buildExcludePatterns(
+  projectRoot: string,
+  configExclude?: string[],
+  cliExclude?: string[],
+): string[] {
+  const gitignore = loadGitignoreExcludes(projectRoot);
+  const parts = [
+    ...DEFAULT_EXCLUDE_PATTERNS,
+    ...gitignore,
+    ...(Array.isArray(configExclude) ? configExclude : []),
+    ...(Array.isArray(cliExclude) ? cliExclude : []),
+  ];
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const p of parts) {
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    unique.push(p);
+  }
+  logger.debug('Final merged exclude patterns:', unique);
+  return unique;
+}
+
+function loadGitignoreExcludes(projectRoot: string): string[] {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) return [];
+  try {
+    const content = fs.readFileSync(gitignorePath, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    const globs: string[] = [];
+    for (let line of lines) {
+      line = line.trim();
+      if (!line || line.startsWith('#')) continue;
+      if (line.startsWith('!')) continue; // Ignore negations for exclude context
+
+      const isDir = line.endsWith('/');
+      let pattern = line.replace(/^\//, '');
+
+      if (isDir && !pattern.endsWith('**')) {
+        pattern = pattern + '**';
+      }
+
+      if (!pattern.includes('/') && !pattern.includes('*')) {
+        pattern = `**/${pattern}/**`;
+      }
+
+      globs.push(pattern);
+    }
+    return globs;
+  } catch (e) {
+    logger.warn(`读取 .gitignore 失败: ${(e as Error).message}`);
+    return [];
   }
 }
