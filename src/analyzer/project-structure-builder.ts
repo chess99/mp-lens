@@ -3,7 +3,9 @@ import * as path from 'path';
 import { FileParser } from '../parser/file-parser';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
+import { AliasResolver } from '../utils/alias-resolver';
 import { logger } from '../utils/debug-logger';
+import { PathResolver } from '../utils/path-resolver';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
 
 export class ProjectStructureBuilder {
@@ -12,6 +14,7 @@ export class ProjectStructureBuilder {
   private miniappRoot: string;
   private projectRoot: string;
   private fileParser: FileParser;
+  private pathResolver: PathResolver;
   private options: AnalyzerOptions;
   private rootNodeId: string | null = null;
   private processedJsonFiles: Set<string> = new Set(); // Avoid infinite loops
@@ -53,6 +56,20 @@ export class ProjectStructureBuilder {
       ...options,
       miniappRoot: miniappRoot,
     });
+
+    // Initialize alias + path resolvers for non-AST path resolutions (e.g., JSON usingComponents)
+    const aliasResolver = new AliasResolver(projectRoot);
+    const hasAliasConfig = aliasResolver.initialize();
+    if (hasAliasConfig) {
+      logger.debug('已检测到别名配置，已自动启用别名解析');
+      logger.debug('别名配置:', aliasResolver.getAliases());
+    }
+    this.pathResolver = new PathResolver(
+      projectRoot,
+      { ...options, miniappRoot },
+      aliasResolver,
+      hasAliasConfig,
+    );
 
     // --- Start: Initialize all nodes first --- //
     logger.debug(`Initializing nodes for ${this.allFiles.length} found files.`);
@@ -215,18 +232,35 @@ export class ProjectStructureBuilder {
     currentRoot: string, // Directory of the JSON file that declared the component
   ): Promise<GraphNode | null> {
     let absoluteBasePath: string;
-    // Handle absolute paths (relative to miniapp root) vs relative paths
-    if (componentBasePath.startsWith('/')) {
-      // Resolve from miniapp root, remove leading '/' for path.join/resolve
-      absoluteBasePath = path.resolve(this.miniappRoot, componentBasePath.substring(1));
+
+    // 找到 usingComponents 指定的组件的路径, 内有 alias 的替换等处理
+    const resolutionContextPath = path.join(currentRoot, 'index.json');
+    const resolvedEntryPath = this.pathResolver.resolveAnyPath(
+      componentBasePath,
+      resolutionContextPath,
+      ['.json'],
+    );
+
+    if (resolvedEntryPath) {
+      const baseName = path.basename(resolvedEntryPath);
+      const dirName = path.dirname(resolvedEntryPath);
+      if (baseName.startsWith('index.')) {
+        absoluteBasePath = dirName;
+      } else {
+        absoluteBasePath = resolvedEntryPath.slice(0, -path.extname(resolvedEntryPath).length);
+      }
       logger.trace(
-        `[processComponent] Resolved absolute component path '${componentBasePath}' -> '${absoluteBasePath}'`,
+        `[processComponent] PathResolver 解析 '${componentBasePath}' (ctx: '${currentRoot}') -> entry '${resolvedEntryPath}', base '${absoluteBasePath}'`,
       );
     } else {
-      // Resolve relative to the current JSON file's directory
-      absoluteBasePath = path.resolve(currentRoot, componentBasePath);
+      // Fallback to previous behavior if alias-aware resolution failed
+      if (componentBasePath.startsWith('/')) {
+        absoluteBasePath = path.resolve(this.miniappRoot, componentBasePath.substring(1));
+      } else {
+        absoluteBasePath = path.resolve(currentRoot, componentBasePath);
+      }
       logger.trace(
-        `[processComponent] Resolved relative component path '${componentBasePath}' in '${currentRoot}' -> '${absoluteBasePath}'`,
+        `[processComponent] Fallback 解析 '${componentBasePath}' (ctx: '${currentRoot}') -> '${absoluteBasePath}'`,
       );
     }
 
@@ -277,10 +311,8 @@ export class ProjectStructureBuilder {
     });
     this.addLink(parentId, canonicalComponentId, 'Structure');
 
-    // Process related files using the canonical ID as the owner
-    // Call processRelatedFiles with the *original* basePath and the context it came from (currentRoot)
-    // processRelatedFiles will re-resolve the absolute path correctly based on its context.
-    await this.processRelatedFiles(canonicalComponentId, componentBasePath, currentRoot);
+    // Process related files using the canonical absolute base path to avoid re-resolving aliases
+    await this.processRelatedFiles(canonicalComponentId, canonicalBasePath, currentRoot);
 
     return node;
   }
@@ -294,10 +326,30 @@ export class ProjectStructureBuilder {
     // Resolve absolute path based on the context provided by the caller
     // Needs the same logic as processComponent to handle '/' prefix
     let absoluteBasePath: string;
-    if (basePath.startsWith('/')) {
-      absoluteBasePath = path.resolve(this.miniappRoot, basePath.substring(1));
+    if (path.isAbsolute(basePath)) {
+      absoluteBasePath = basePath;
     } else {
-      absoluteBasePath = path.resolve(currentRoot, basePath);
+      const resolutionContextPath = path.join(currentRoot, 'index.json');
+      const allowedExts = ['.json', '.js', '.ts', '.wxml', '.wxss'];
+      const resolvedEntryPath = this.pathResolver.resolveAnyPath(
+        basePath,
+        resolutionContextPath,
+        allowedExts,
+      );
+
+      if (resolvedEntryPath) {
+        const baseName = path.basename(resolvedEntryPath);
+        const dirName = path.dirname(resolvedEntryPath);
+        if (baseName.startsWith('index.')) {
+          absoluteBasePath = dirName;
+        } else {
+          absoluteBasePath = resolvedEntryPath.slice(0, -path.extname(resolvedEntryPath).length);
+        }
+      } else if (basePath.startsWith('/')) {
+        absoluteBasePath = path.resolve(this.miniappRoot, basePath.substring(1));
+      } else {
+        absoluteBasePath = path.resolve(currentRoot, basePath);
+      }
     }
 
     const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss'];

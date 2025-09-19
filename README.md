@@ -206,7 +206,7 @@ module.exports = {
 };
 ```
 
-更多配置项请参考[示例文件](mp-lens.config.js.example)。
+更多配置项请参考[示例文件](mp-lens.config.example.js)。
 
 ## 🤝 与 Knip 集成 (可选)
 

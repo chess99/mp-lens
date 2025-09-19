@@ -11,35 +11,6 @@
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "internalConsoleOptions": "openOnSessionStart",
       "console": "integratedTerminal"
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug Project",
-      "runtimeArgs": ["-r", "ts-node/register"],
-      "args": ["${workspaceFolder}/src/cli.ts"],
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "internalConsoleOptions": "openOnSessionStart",
-      "console": "integratedTerminal",
-      "sourceMaps": true
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug clean command",
-      "args": [
-        "${workspaceFolder}/dist/cli.js",
-        "-p",
-        "/Users/zcs/code/mmbb/mt-address-msc",
-        "clean"
-      ],
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "internalConsoleOptions": "openOnSessionStart",
-      "console": "integratedTerminal",
-      "sourceMaps": true,
-      "preLaunchTask": "tsc: build - tsconfig.json"
     }
   ]
 }

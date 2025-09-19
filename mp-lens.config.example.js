@@ -6,16 +6,14 @@ module.exports = {
   /**
    * [可选] 小程序源代码所在的子目录（相对于此配置文件所在的目录）。
    * 如果省略，则假定项目根目录即为小程序根目录。
-   * 例: "src", "./miniprogram"
    */
   miniappRoot: 'src',
 
   /**
-   * [可选] 指定分析的入口文件（相对于 miniappRoot）。
-   * 默认为 "app.json"。
-   * 例: "app.js", "my-custom-entry.json"
+   * [可选] 指定分析的入口文件。
+   * 默认会在项目里查找 "app.json"，可以手动指定，不要求在 miniappRoot 目录下。
    */
-  appJsonPath: 'app.json',
+  appJsonPath: 'src/app.json',
 
   /**
    * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
@@ -38,8 +36,8 @@ module.exports = {
    * [可选] 要排除的文件/目录的 Glob 模式列表。
    * 这些文件不会被分析，也不会被列为未使用或被清理。
    * 支持使用 minimatch 语法 (https://github.com/isaacs/minimatch)
-   * 例: ["**/node_modules/**", "dist/**", "**/*.mock.js"]
    */
+  // 例: ["**/node_modules/**", "dist/**", "**/*.mock.js"]
   exclude: [
     '**/node_modules/**',
     '**/miniprogram_npm/**',
@@ -57,7 +55,7 @@ module.exports = {
    */
   essentialFiles: [
     'project.config.json', // 项目配置文件通常是必需的
-    'sitemap.json',      // 站点地图文件
+    'sitemap.json', // 站点地图文件
   ],
 
   /**
@@ -81,4 +79,4 @@ module.exports = {
   aliases: {
     // "@": "./src", // 示例，通常会自动从 tsconfig/jsconfig 加载
   },
-}; 
+};

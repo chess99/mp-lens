@@ -178,11 +178,10 @@ export async function analyzeProject(
   }
 
   // --- Initial File Scan --- //
-  // Scan should happen within the miniapp root if specified
-  const allFoundFiles = findAllFiles(miniappRoot, fileTypes, excludePatterns);
+  const allFoundFiles = findAllFiles(projectRoot, fileTypes, excludePatterns);
   if (allFoundFiles.length === 0) {
     // If no files found, analysis will be based solely on appJsonContent
-    logger.warn('在指定的 miniapp 根目录中未找到匹配的文件。');
+    logger.warn('在指定的 projectRoot 目录中未找到匹配的文件。');
   }
 
   // Add app.json path if it exists and wasn't found by glob (e.g., different extension)
