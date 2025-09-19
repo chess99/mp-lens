@@ -16,6 +16,7 @@ export class AliasResolver {
   private projectRoot: string;
   private aliases: PathAliases = {};
   private initialized = false;
+  private providedApplied = false;
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
@@ -48,6 +49,23 @@ export class AliasResolver {
 
     // 如果至少找到一个来源的别名配置，返回true
     return foundTsConfig || foundCustomConfig;
+  }
+
+  /**
+   * 从调用方直接提供的配置中加载别名（优先级最高）。
+   * 该方法可以在 initialize() 之后调用，用于覆盖/补充已加载的别名。
+   */
+  public applyProvidedAliases(provided?: { [key: string]: string | string[] }): boolean {
+    if (!provided || typeof provided !== 'object') {
+      return false;
+    }
+    const before = Object.keys(this.aliases).length;
+    for (const [alias, targets] of Object.entries(provided)) {
+      this.aliases[alias] = Array.isArray(targets) ? targets : [targets as string];
+    }
+    this.providedApplied = true;
+    const after = Object.keys(this.aliases).length;
+    return after > before;
   }
 
   /**

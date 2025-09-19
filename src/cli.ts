@@ -20,13 +20,13 @@ const program = new Command();
 checkForUpdates();
 
 // Helper to setup logger based on global options
-function setupLogger(globalOptions: any) {
+function setupLogger(globalOptions: GlobalCliOptions & { verboseLevel?: number; trace?: boolean }) {
   // Configure logger verbosity
   if (globalOptions.trace) {
     logger.setLevel(LogLevel.TRACE);
-  } else if (globalOptions.verboseLevel > 0) {
+  } else if ((globalOptions.verboseLevel ?? 0) > 0) {
     // Ensure level is within bounds
-    const level = Math.max(0, Math.min(3, globalOptions.verboseLevel));
+    const level = Math.max(0, Math.min(3, globalOptions.verboseLevel as number));
     logger.setLevel(level as LogLevel);
   } else if (globalOptions.verbose) {
     logger.setLevel(LogLevel.NORMAL); // or DEBUG? Let's use NORMAL
@@ -73,8 +73,7 @@ program
   .option(
     '--exclude <pattern>',
     '排除某些文件/目录 (覆盖配置文件)',
-    (value: string, previous: string[]) => previous.concat([value]),
-    [],
+    (value: string, previous: string[]) => (previous ?? []).concat([value]),
   )
   .option('--essential-files <files>', '指定视为必要的文件，用逗号分隔 (覆盖配置文件)')
   .option('--include-assets', '在分析和清理中包含图片等资源文件 (默认不包含)', false)
@@ -98,7 +97,7 @@ function withTelemetryAction<T>(
     setupLogger(cliOptions);
     try {
       await action(cliOptions, ...args);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof HandledError) {
         // 上报用户遇到的预期问题
         telemetry.capture({
@@ -115,12 +114,13 @@ function withTelemetryAction<T>(
           event: 'error',
           command: commandName,
           version,
-          errorMessage: error.message,
-          stack: error.stack,
+          errorMessage: (error as Error).message,
+          stack: (error as Error).stack,
           args: commandArgs,
         } as Omit<import('./telemetry').ErrorEvent, 'userId' | 'timestamp'>);
       }
-      commandErrorHandler(`Command failed: ${error.message}`, error.stack);
+      const err = error as Error;
+      commandErrorHandler(`Command failed: ${err.message}`, err.stack);
     } finally {
       await shutdownTelemetry();
     }

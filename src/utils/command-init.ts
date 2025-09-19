@@ -20,6 +20,9 @@ interface CommandExecutionContext {
   includeAssets: boolean;
   verboseLevel: number;
   verbose: boolean;
+  aliases?: {
+    [key: string]: string | string[];
+  };
 }
 
 // Default file types list (consistent and comprehensive)
@@ -45,10 +48,13 @@ export async function initializeCommandContext(
   logger.debug(`Loaded config file content:`, fileConfig);
 
   // 3. Merge options
+  // Merge with care: CLI should only override when value is explicitly provided
   const mergedConfig = {
-    ...fileConfig, // Spread file config over the base CLI options
-    ...cliOptions,
-  };
+    ...(fileConfig || {}),
+    ...Object.fromEntries(
+      Object.entries(cliOptions).filter(([, v]) => v !== undefined && v !== null),
+    ),
+  } as Partial<GlobalCliOptions & ConfigFileOptions>;
 
   // 3. Path Resolution
   const resolvePathIfNeeded = (p: string | undefined): string | undefined => {
@@ -88,8 +94,16 @@ export async function initializeCommandContext(
   const verboseLevel = mergedConfig.verboseLevel ?? 3;
   const miniappRoot = mergedConfig.miniappRoot ?? projectRoot;
   const appJsonPath = mergedConfig.appJsonPath;
-  const exclude = mergedConfig.exclude ?? [];
-  const essentialFilesList = (mergedConfig.essentialFiles as string[] | undefined) ?? [];
+  // Exclude: only use CLI when provided and non-empty; else fall back to config
+  const exclude =
+    Array.isArray(cliOptions.exclude) && cliOptions.exclude.length > 0
+      ? cliOptions.exclude
+      : Array.isArray(fileConfig?.exclude)
+        ? fileConfig!.exclude!
+        : [];
+
+  // Essential files: use the fully merged result from processEssentialFiles
+  const essentialFilesList = allEssentialFiles;
   const fileTypesString = mergedConfig.types ?? DEFAULT_FILE_TYPES;
   const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
   const includeAssets = mergedConfig.includeAssets ?? false;
@@ -117,6 +131,7 @@ export async function initializeCommandContext(
     includeAssets,
     verboseLevel,
     verbose,
+    aliases: fileConfig?.aliases,
   };
 }
 

@@ -25,6 +25,7 @@ export async function graph(
     essentialFilesList,
     fileTypes,
     includeAssets,
+    aliases,
   } = context;
 
   // === Extract Graph-Specific Options (Now correctly typed) ===
@@ -58,6 +59,7 @@ export async function graph(
       appJsonPath,
       appJsonContent,
       includeAssets,
+      aliases,
     });
 
     logger.info('正在渲染依赖图...');

@@ -59,7 +59,16 @@ export class ProjectStructureBuilder {
 
     // Initialize alias + path resolvers for non-AST path resolutions (e.g., JSON usingComponents)
     const aliasResolver = new AliasResolver(projectRoot);
-    const hasAliasConfig = aliasResolver.initialize();
+    let hasAliasConfig = aliasResolver.initialize();
+    // Apply provided aliases from options with highest priority
+    if (options.aliases) {
+      const providedApplied = aliasResolver.applyProvidedAliases(
+        options.aliases as {
+          [key: string]: string | string[];
+        },
+      );
+      hasAliasConfig = hasAliasConfig || providedApplied;
+    }
     if (hasAliasConfig) {
       logger.debug('已检测到别名配置，已自动启用别名解析');
       logger.debug('别名配置:', aliasResolver.getAliases());
@@ -460,8 +469,9 @@ export class ProjectStructureBuilder {
           }
         }
       }
-    } catch (error: any) {
-      logger.warn(`Error parsing dependencies for ${relativePath}: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.warn(`Error parsing dependencies for ${relativePath}: ${err.message}`);
     }
   }
 
@@ -564,21 +574,21 @@ export class ProjectStructureBuilder {
   private processTabBar(content: MiniProgramAppJson): void {
     if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
       logger.debug('Processing tabBar entries...');
-      content.tabBar.list.forEach((item: any) => {
+      content.tabBar.list.forEach((item) => {
         // pagePath defines a page structure
         if (item.pagePath) {
           // Process page structure (json, js, wxml, wxss)
           // We don't know the parent context here (App or Package), link from App root?
           // This might re-process pages already found via 'pages' or 'subpackages',
           // but processPage/processRelatedFiles handles duplicates.
-          this.processPage(this.rootNodeId!, item.pagePath, this.miniappRoot);
+          this.processPage(this.rootNodeId!, item.pagePath as string, this.miniappRoot);
         }
         // Icons are single file dependencies
         if (item.iconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.iconPath, 'Resource');
+          this.addSingleFileLink(this.rootNodeId!, item.iconPath as string, 'Resource');
         }
         if (item.selectedIconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.selectedIconPath, 'Resource');
+          this.addSingleFileLink(this.rootNodeId!, item.selectedIconPath as string, 'Resource');
         }
       });
     }

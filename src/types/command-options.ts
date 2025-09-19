@@ -80,4 +80,7 @@ export interface AnalyzerOptions {
   appJsonPath: string;
   appJsonContent?: MiniProgramAppJson;
   includeAssets?: boolean;
+  aliases?: {
+    [key: string]: string | string[];
+  };
 }

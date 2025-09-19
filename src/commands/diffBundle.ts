@@ -100,6 +100,7 @@ async function getProjectPackageSizes(
     appJsonPath: context.appJsonPath,
     appJsonContent: context.appJsonContent,
     includeAssets: false, // Key change: analyzeProject will not primarily look for assets
+    aliases: context.aliases,
   });
 
   projectStructure.nodes.forEach((node: GraphNode) => {
