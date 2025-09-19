@@ -8,7 +8,6 @@ import {
   CmdPurgeWxssOptions,
   GlobalCliOptions,
 } from '../../types/command-options';
-import { AliasResolver } from '../../utils/alias-resolver';
 import { initializeCommandContext } from '../../utils/command-init';
 import { logger } from '../../utils/debug-logger';
 import { HandledError } from '../../utils/errors';
@@ -244,9 +243,7 @@ export async function purgewxss(
   const context = await initializeCommandContext(cliOptions);
   const { projectRoot, miniappRoot } = context;
   const scanRoot = miniappRoot || projectRoot;
-  const aliasResolver = new AliasResolver(scanRoot);
-  const hasAliasConfig = aliasResolver.initialize();
-  const pathResolver = new PathResolver(projectRoot, context, aliasResolver, hasAliasConfig);
+  const pathResolver = new PathResolver(projectRoot, context);
 
   const enhancedCmdOptions = {
     ...cmdOptions,

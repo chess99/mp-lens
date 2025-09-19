@@ -3,7 +3,6 @@ import * as path from 'path';
 import { FileParser } from '../parser/file-parser';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
-import { AliasResolver } from '../utils/alias-resolver';
 import { logger } from '../utils/debug-logger';
 import { PathResolver } from '../utils/path-resolver';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
@@ -58,27 +57,7 @@ export class ProjectStructureBuilder {
     });
 
     // Initialize alias + path resolvers for non-AST path resolutions (e.g., JSON usingComponents)
-    const aliasResolver = new AliasResolver(projectRoot);
-    let hasAliasConfig = aliasResolver.initialize();
-    // Apply provided aliases from options with highest priority
-    if (options.aliases) {
-      const providedApplied = aliasResolver.applyProvidedAliases(
-        options.aliases as {
-          [key: string]: string | string[];
-        },
-      );
-      hasAliasConfig = hasAliasConfig || providedApplied;
-    }
-    if (hasAliasConfig) {
-      logger.debug('已检测到别名配置，已自动启用别名解析');
-      logger.debug('别名配置:', aliasResolver.getAliases());
-    }
-    this.pathResolver = new PathResolver(
-      projectRoot,
-      { ...options, miniappRoot },
-      aliasResolver,
-      hasAliasConfig,
-    );
+    this.pathResolver = new PathResolver(projectRoot, { ...options, miniappRoot });
 
     // --- Start: Initialize all nodes first --- //
     logger.debug(`Initializing nodes for ${this.allFiles.length} found files.`);

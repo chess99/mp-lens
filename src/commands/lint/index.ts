@@ -488,8 +488,7 @@ export async function lint(
   logger.info('开始组件使用情况检查流程...');
   const context = await initializeCommandContext(cliOptions);
   const { projectRoot, miniappRoot } = context;
-  const aliasResolver = null;
-  const pathResolver = new PathResolver(projectRoot, context, aliasResolver, false);
+  const pathResolver = new PathResolver(projectRoot, context);
   const globalComponents = await readGlobalComponents(pathResolver, miniappRoot || '');
   const result: LintResult = {
     summary: {

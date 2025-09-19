@@ -1,25 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
-import { AliasResolver } from './alias-resolver';
 import { logger } from './debug-logger';
 
 export class PathResolver {
   private projectRoot: string;
-  private aliasResolver: AliasResolver | null;
-  private hasAliasConfig: boolean;
   private options: AnalyzerOptions;
 
-  constructor(
-    projectRoot: string,
-    options: AnalyzerOptions,
-    aliasResolver: AliasResolver | null,
-    hasAliasConfig: boolean,
-  ) {
+  constructor(projectRoot: string, options: AnalyzerOptions) {
     this.projectRoot = projectRoot;
     this.options = options; // Store options, especially for miniappRoot
-    this.aliasResolver = aliasResolver;
-    this.hasAliasConfig = hasAliasConfig;
   }
 
   /**
@@ -73,15 +63,11 @@ export class PathResolver {
     let potentialBasePath: string | null = null;
     let isAlias = false;
 
-    if (this.isAliasPath(importPath) && this.aliasResolver) {
+    const aliasResolved = this.resolveAlias(importPath);
+    if (aliasResolved) {
       isAlias = true;
-      potentialBasePath = this.aliasResolver.resolve(importPath, sourcePath);
-      if (potentialBasePath) {
-        logger.trace(`Alias resolved to base path: ${potentialBasePath}`);
-      } else {
-        logger.warn(`Alias '${importPath}' detected but could not be resolved by AliasResolver.`);
-        return null;
-      }
+      potentialBasePath = aliasResolved;
+      logger.trace(`Alias resolved to base path: ${potentialBasePath}`);
     }
 
     if (!potentialBasePath) {
@@ -191,25 +177,33 @@ export class PathResolver {
    * Check if the import path looks like an alias based on the loaded configuration.
    */
   private isAliasPath(importPath: string): boolean {
-    if (!this.hasAliasConfig || !this.aliasResolver) {
-      return false;
+    const aliases = this.getAliases();
+    if (!aliases) return false;
+    const keys = Object.keys(aliases);
+    if (keys.length === 0) return false;
+    if (importPath in aliases) return true;
+    for (const alias of keys) {
+      if (importPath === alias || importPath.startsWith(`${alias}/`)) return true;
     }
-    const aliases = this.aliasResolver.getAliases();
-    if (Object.keys(aliases).length === 0) {
-      return false;
-    }
+    return false;
+  }
 
-    if (importPath in aliases) {
-      return true;
-    }
-
-    for (const alias of Object.keys(aliases)) {
-      if (importPath === alias || importPath.startsWith(`${alias}/`)) {
-        return true;
+  private resolveAlias(importPath: string): string | null {
+    const aliases = this.getAliases();
+    if (!aliases) return null;
+    for (const [alias, targets] of Object.entries(aliases)) {
+      const aliasPrefix = `${alias}/`;
+      if (importPath === alias || importPath.startsWith(aliasPrefix)) {
+        const remaining = importPath === alias ? '' : importPath.substring(aliasPrefix.length);
+        const targetList = Array.isArray(targets) ? targets : [targets as string];
+        if (targetList.length === 0) return null;
+        // Use first target
+        const base = targetList[0];
+        const baseDir = path.isAbsolute(base) ? base : path.resolve(this.projectRoot, base);
+        return path.join(baseDir, remaining);
       }
     }
-
-    return false;
+    return null;
   }
 
   /**
@@ -224,14 +218,13 @@ export class PathResolver {
 
     if (importPath.startsWith('@')) {
       const scope = importPath.split('/')[0];
-      if (this.hasAliasConfig && this.aliasResolver) {
-        const aliases = this.aliasResolver.getAliases();
-        if (
-          scope in aliases ||
-          Object.keys(aliases).some((alias) => alias === scope || alias.startsWith(`${scope}/`))
-        ) {
-          return false; // It's a configured alias, not necessarily an npm package
-        }
+      const aliases = this.getAliases();
+      if (
+        aliases &&
+        (scope in aliases ||
+          Object.keys(aliases).some((alias) => alias === scope || alias.startsWith(`${scope}/`)))
+      ) {
+        return false; // configured alias scope
       }
       return true; // Starts with @ and doesn't match a configured alias scope
     }
@@ -249,5 +242,9 @@ export class PathResolver {
     }
 
     return false; // Default to false if none of the above conditions met (e.g. relative paths)
+  }
+
+  private getAliases(): { [key: string]: string | string[] } | null {
+    return this.options.aliases || null;
   }
 }

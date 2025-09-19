@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../../src/types/command-options';
-import { AliasResolver } from '../../src/utils/alias-resolver';
 import { PathResolver } from '../../src/utils/path-resolver';
 
 // Get actual path module *before* mocking
@@ -21,14 +20,9 @@ jest.mock('path', () => ({
   isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
 }));
 
-// Mock AliasResolver
-jest.mock('../../src/utils/alias-resolver');
-const MockedAliasResolver = AliasResolver as jest.MockedClass<typeof AliasResolver>;
-
 describe('PathResolver', () => {
   const projectRoot = '/workspace/test-project';
   let pathResolver: PathResolver;
-  let aliasResolver: jest.Mocked<AliasResolver>;
 
   // Use Sets to store mocked FS state persistently across helper calls within a test
   let mockedExistingPaths: Set<string>;
@@ -68,7 +62,6 @@ describe('PathResolver', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    MockedAliasResolver.mockClear();
 
     // Initialize persistent mock stores for each test
     mockedExistingPaths = new Set<string>();
@@ -152,11 +145,6 @@ describe('PathResolver', () => {
     (path.extname as jest.Mock).mockImplementation((p) => actualPath.extname(p));
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
 
-    // Setup AliasResolver mocks
-    aliasResolver = new MockedAliasResolver(projectRoot) as jest.Mocked<AliasResolver>;
-    (aliasResolver.resolve as jest.Mock).mockReturnValue(null);
-    (aliasResolver.getAliases as jest.Mock).mockReturnValue({});
-
     const options: AnalyzerOptions = {
       fileTypes: [],
       verbose: false,
@@ -165,7 +153,7 @@ describe('PathResolver', () => {
     };
 
     // Create pathResolver instance
-    pathResolver = new PathResolver(projectRoot, options, aliasResolver, false);
+    pathResolver = new PathResolver(projectRoot, options);
   });
 
   describe('resolveAnyPath', () => {
@@ -219,36 +207,28 @@ describe('PathResolver', () => {
       expect(resolved).toBe(indexFile);
     });
 
-    it('should resolve alias paths through AliasResolver', () => {
+    it('should resolve alias paths through provided aliases', () => {
       const sourcePath = actualPath.resolve(projectRoot, 'src/index.js');
       const aliasPath = '@/utils/helper';
       const resolvedAliasPath = actualPath.resolve(projectRoot, 'src/utils/helper.js');
 
-      // Mock the AliasResolver behavior
-      (aliasResolver.resolve as jest.Mock).mockImplementation((path, _source) => {
-        if (path === aliasPath) {
-          return actualPath.resolve(projectRoot, 'src/utils/helper');
-        }
-        return null;
-      });
-      (aliasResolver.getAliases as jest.Mock).mockReturnValue({ '@': 'src' });
-
-      // Mock the file existence
-      mockPathExists(resolvedAliasPath);
-
-      // Create a new instance with hasAliasConfig=true
-      const options: AnalyzerOptions = {
+      // Recreate pathResolver with aliases in options
+      const optionsWithAliases: AnalyzerOptions = {
         fileTypes: [],
         verbose: false,
         miniappRoot: projectRoot,
         appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+        aliases: { '@': 'src' },
       };
-      const resolverWithAliases = new PathResolver(projectRoot, options, aliasResolver, true);
+      const resolverWithAliases = new PathResolver(projectRoot, optionsWithAliases);
+
+      // Mock the file existence
+      mockPathExists(resolvedAliasPath);
 
       const resolved = resolverWithAliases.resolveAnyPath(aliasPath, sourcePath, ['.js', '.ts']);
 
       expect(resolved).toBe(resolvedAliasPath);
-      expect(aliasResolver.resolve).toHaveBeenCalledWith(aliasPath, sourcePath);
+      // No AliasResolver used anymore
     });
 
     it('should return null for non-existent files', () => {

@@ -89,6 +89,18 @@ export async function initializeCommandContext(
   const allEssentialFiles = processEssentialFiles(cliOptions, fileConfig, projectRoot);
   logger.debug(`Final essential files list (CLI/Config + tsconfig):`, allEssentialFiles);
 
+  // Load and merge aliases from multiple sources
+  const aliasesFromTsConfig = loadAliasesFromTsConfig(projectRoot);
+  // Priority (low -> high): tsconfig < mp-lens.config.* (通过 ConfigLoader 加载)
+  const mergedAliases: { [key: string]: string | string[] } = {
+    ...aliasesFromTsConfig,
+    ...(fileConfig?.aliases || {}),
+  };
+  const hasMergedAliases = Object.keys(mergedAliases).length > 0;
+  if (hasMergedAliases) {
+    logger.debug(`Loaded aliases from sources (merged):`, mergedAliases);
+  }
+
   // 4. Extract common options
   const verbose = mergedConfig.verbose ?? false;
   const verboseLevel = mergedConfig.verboseLevel ?? 3;
@@ -131,7 +143,7 @@ export async function initializeCommandContext(
     includeAssets,
     verboseLevel,
     verbose,
-    aliases: fileConfig?.aliases,
+    aliases: mergedAliases,
   };
 }
 
@@ -256,4 +268,34 @@ function resolveAppJson(
   }
 
   return { appJsonPath, appJsonContent: effectiveAppJsonContent };
+}
+
+// === Alias loading helpers (pure functions) ===
+
+function loadAliasesFromTsConfig(projectRoot: string): { [key: string]: string[] } {
+  try {
+    const fsPath = path.join(projectRoot, 'tsconfig.json');
+    if (!fs.existsSync(fsPath)) return {};
+    const tsconfig = JSON.parse(fs.readFileSync(fsPath, 'utf-8')) as {
+      compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> };
+    };
+    if (!tsconfig.compilerOptions || !tsconfig.compilerOptions.paths) return {};
+
+    const tsconfigDir = path.dirname(fsPath);
+    const baseUrl = tsconfig.compilerOptions.baseUrl || '.';
+    const baseDir = path.resolve(tsconfigDir, baseUrl);
+
+    const result: { [key: string]: string[] } = {};
+    for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
+      const normalizedAlias = alias.replace(/\/\*$/, '');
+      result[normalizedAlias] = (targets as string[]).map((t) => {
+        const targetPath = (t as string).replace(/\/\*$/, '');
+        return path.resolve(baseDir, targetPath);
+      });
+    }
+    return result;
+  } catch (e) {
+    logger.warn(`无法解析 tsconfig.json 以加载别名: ${(e as Error).message}`);
+    return {};
+  }
 }

@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
-import { AliasResolver } from '../utils/alias-resolver';
 import { logger } from '../utils/debug-logger';
 import { PathResolver } from '../utils/path-resolver';
 
@@ -25,22 +24,12 @@ export class FileParser {
   private jsonParser: JSONParser;
 
   constructor(projectRoot: string, options: AnalyzerOptions) {
-    const actualRoot = options.miniappRoot || projectRoot;
-
     if (options.miniappRoot) {
       logger.debug(`FileParser using custom miniapp root: ${options.miniappRoot}`);
     }
 
-    const aliasResolver = new AliasResolver(actualRoot);
-    const hasAliasConfig = aliasResolver.initialize();
-
-    if (hasAliasConfig) {
-      logger.debug('Alias configuration detected, automatically enabling alias resolution');
-      logger.debug('Alias configuration:', aliasResolver.getAliases());
-    }
-
-    // Instantiate PathResolver
-    this.pathResolver = new PathResolver(projectRoot, options, aliasResolver, hasAliasConfig);
+    // Instantiate PathResolver with pre-merged aliases
+    this.pathResolver = new PathResolver(projectRoot, options);
 
     // Instantiate specialized parsers - they now only handle text analysis
     this.javaScriptParser = new JavaScriptParser();
@@ -99,9 +88,10 @@ export class FileParser {
       }
 
       return resolvedDependencies;
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as Error;
       // Centralized error handling for file reading or parsing issues
-      logger.warn(`Error parsing file ${filePath}: ${e.message}`);
+      logger.warn(`Error parsing file ${filePath}: ${err.message}`);
       return []; // Return empty array on error
     }
   }
