@@ -13,7 +13,7 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
   // 1. 初始化上下文，获取 miniappRoot、exclude
   const context = await initializeCommandContext(cliOptions);
   const miniappRoot = context.miniappRoot;
-  const exclude = context.exclude;
+  const excludePatterns = context.excludePatterns;
 
   // 2. 组装 jscpd 参数
   const formats = ['markup', 'css', 'javascript', 'typescript'];
@@ -24,8 +24,8 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
     typescript: ['ts', 'tsx'],
   };
   const ignore =
-    exclude.length > 0
-      ? exclude
+    excludePatterns.length > 0
+      ? excludePatterns
       : [
           '**/node_modules/**',
           '**/dist/**',

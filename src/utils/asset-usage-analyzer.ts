@@ -31,10 +31,10 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
   const {
     miniappRoot,
     fileTypes,
-    exclude,
+    excludePatterns,
     appJsonPath,
     appJsonContent,
-    essentialFilesList,
+    essentialFiles,
     includeAssets,
   } = context;
 
@@ -43,10 +43,10 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
   const options = {
     miniappRoot,
     fileTypes: Array.isArray(fileTypes) && fileTypes.length > 0 ? fileTypes : defaultFileTypes,
-    excludePatterns: exclude,
+    excludePatterns,
     appJsonPath,
     appJsonContent,
-    essentialFiles: essentialFilesList,
+    essentialFiles,
     includeAssets,
   };
 

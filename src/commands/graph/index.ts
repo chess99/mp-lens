@@ -14,19 +14,7 @@ export async function graph(
   cmdOptions: CmdGraphOptions,
 ): Promise<void> {
   const context = await initializeCommandContext(cliOptions);
-  const {
-    projectRoot,
-    verbose,
-    verboseLevel,
-    miniappRoot,
-    appJsonPath,
-    appJsonContent,
-    exclude,
-    essentialFilesList,
-    fileTypes,
-    includeAssets,
-    aliases,
-  } = context;
+  const { projectRoot } = context;
 
   // === Extract Graph-Specific Options (Now correctly typed) ===
   const format = cmdOptions.format ?? 'html';
@@ -49,18 +37,10 @@ export async function graph(
     // No need to recalculate fileTypes
 
     // Call analyzeProject with options from context
-    const { projectStructure, reachableNodeIds, unusedFiles } = await analyzeProject(projectRoot, {
-      fileTypes,
-      excludePatterns: exclude,
-      essentialFiles: essentialFilesList,
-      verbose,
-      verboseLevel,
-      miniappRoot,
-      appJsonPath,
-      appJsonContent,
-      includeAssets,
-      aliases,
-    });
+    const { projectStructure, reachableNodeIds, unusedFiles } = await analyzeProject(
+      projectRoot,
+      context,
+    );
 
     logger.info('正在渲染依赖图...');
 

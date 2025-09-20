@@ -90,18 +90,7 @@ async function getProjectPackageSizes(
   }
 
   // 2. Analyze project structure (non-assets and non-globbed assets)
-  const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
-    fileTypes: context.fileTypes,
-    excludePatterns: context.exclude,
-    essentialFiles: context.essentialFilesList,
-    verbose: context.verbose,
-    verboseLevel: context.verboseLevel,
-    miniappRoot: context.miniappRoot,
-    appJsonPath: context.appJsonPath,
-    appJsonContent: context.appJsonContent,
-    includeAssets: false, // Key change: analyzeProject will not primarily look for assets
-    aliases: context.aliases,
-  });
+  const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, context);
 
   projectStructure.nodes.forEach((node: GraphNode) => {
     if (

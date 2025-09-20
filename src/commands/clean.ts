@@ -14,18 +14,8 @@ export async function clean(
   cliOptions: GlobalCliOptions,
   cmdOptions: CmdCleanOptions,
 ): Promise<void> {
-  const {
-    projectRoot,
-    verbose,
-    verboseLevel,
-    miniappRoot,
-    appJsonPath,
-    appJsonContent,
-    exclude,
-    essentialFilesList,
-    fileTypes,
-    includeAssets,
-  } = await initializeCommandContext(cliOptions);
+  const context = await initializeCommandContext(cliOptions);
+  const { projectRoot } = context;
 
   const writeDirectly = cmdOptions.write ?? false;
 
@@ -34,17 +24,7 @@ export async function clean(
 
   try {
     logger.info('正在分析项目以查找未使用文件...');
-    const { unusedFiles } = await analyzeProject(projectRoot, {
-      fileTypes,
-      excludePatterns: exclude,
-      essentialFiles: essentialFilesList,
-      verbose,
-      verboseLevel,
-      miniappRoot,
-      appJsonPath,
-      appJsonContent,
-      includeAssets,
-    });
+    const { unusedFiles } = await analyzeProject(projectRoot, context);
 
     if (unusedFiles.length === 0) {
       logger.info('✨ 未找到未使用文件。');

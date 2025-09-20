@@ -15,8 +15,8 @@ interface CommandExecutionContext {
   appJsonPath: string;
   appJsonContent: MiniProgramAppJson;
   fileTypes: string[];
-  exclude: string[];
-  essentialFilesList: string[];
+  excludePatterns: string[];
+  essentialFiles: string[];
   includeAssets: boolean;
   verboseLevel: number;
   verbose: boolean;
@@ -107,10 +107,14 @@ export async function initializeCommandContext(
   const miniappRoot = mergedConfig.miniappRoot ?? projectRoot;
   const appJsonPath = mergedConfig.appJsonPath;
   // Exclude: centralized initialization (defaults + .gitignore + config + CLI)
-  const exclude = buildExcludePatterns(projectRoot, fileConfig?.exclude, cliOptions.exclude);
+  const excludePatterns = buildExcludePatterns(
+    projectRoot,
+    fileConfig?.exclude,
+    cliOptions.exclude,
+  );
 
   // Essential files: use the fully merged result from processEssentialFiles
-  const essentialFilesList = allEssentialFiles;
+  const essentialFiles = allEssentialFiles;
   const fileTypesString = mergedConfig.types ?? DEFAULT_FILE_TYPES;
   const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
   const includeAssets = mergedConfig.includeAssets ?? false;
@@ -133,8 +137,8 @@ export async function initializeCommandContext(
     appJsonPath: resolvedAppJsonPath,
     appJsonContent,
     fileTypes,
-    exclude,
-    essentialFilesList,
+    excludePatterns,
+    essentialFiles,
     includeAssets,
     verboseLevel,
     verbose,
