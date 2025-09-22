@@ -1,9 +1,7 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
-import { AnalyzerOptions } from '../types/command-options';
-import { MiniProgramAppJson } from '../types/miniprogram';
-import { loadMergedAliases } from '../utils/alias-loader';
+import { GlobalCliOptions } from '../types/command-options';
+import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
 
 /**
@@ -22,33 +20,20 @@ export async function findMiniProgramEntryPoints(
   logger.debug(`[EntryFinder] Project Root: ${projectRoot}`);
   logger.debug(`[EntryFinder] MiniApp Root: ${miniappRoot}`);
 
-  const appJsonPath = path.resolve(miniappRoot, 'app.json');
-  if (!fs.existsSync(appJsonPath)) {
-    logger.warn('[EntryFinder] 未找到 app.json，返回空入口列表。');
+  // 通过统一的初始化流程获取 appJson、别名、排除规则等上下文
+  const cliOptions: GlobalCliOptions = { project: projectRoot, miniappRoot };
+  const context = await initializeCommandContext(cliOptions);
+
+  if (!context.appJsonContent || Object.keys(context.appJsonContent).length === 0) {
+    logger.warn('[EntryFinder] 未找到有效的 app.json 内容，返回空入口列表。');
     return [];
   }
 
-  let appJsonContent: MiniProgramAppJson;
   try {
-    appJsonContent = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8')) as MiniProgramAppJson;
-  } catch (e) {
-    logger.error(`[EntryFinder] 读取或解析 app.json 失败: ${(e as Error).message}`);
-    return [];
-  }
-
-  const aliases = await loadMergedAliases(projectRoot);
-  const options: AnalyzerOptions = {
-    miniappRoot,
-    appJsonPath,
-    appJsonContent,
-    aliases,
-    fileTypes: ['js', 'ts', 'wxml', 'wxss', 'json'],
-    excludePatterns: [],
-    includeAssets: false,
-  };
-
-  try {
-    const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, options);
+    const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
+      ...context,
+      includeAssets: false,
+    });
     const nodeMap = new Map(projectStructure.nodes.map((n) => [n.id, n]));
     const entries = new Set<string>();
     for (const id of reachableNodeIds) {
