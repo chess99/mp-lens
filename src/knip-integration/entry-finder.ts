@@ -1,7 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
+import { loadMergedAliases } from '../utils/alias-loader';
 import { logger } from '../utils/debug-logger';
+import { PathResolver } from '../utils/path-resolver';
 
 /**
  * Interface to track page information including path and containing root directory
@@ -32,6 +35,17 @@ export async function findMiniProgramEntryPoints(
   const entryPoints = new Set<string>();
   const processedComponentJsonPaths = new Set<string>(); // Initialize cycle tracker
 
+  // Initialize alias-aware path resolver (align with analyzer logic)
+  const aliases = await loadMergedAliases(projectRoot);
+  const appJsonAbsPath = path.resolve(miniappRoot, 'app.json');
+  const resolverOptions: AnalyzerOptions = {
+    miniappRoot,
+    appJsonPath: appJsonAbsPath,
+    aliases,
+  };
+  const resolver = new PathResolver(projectRoot, resolverOptions);
+  logger.debug('[EntryFinder] PathResolver 已初始化(含别名)。');
+
   // 1. Find and add global app files
   addImplicitGlobalFiles(projectRoot, miniappRoot, entryPoints);
 
@@ -40,6 +54,7 @@ export async function findMiniProgramEntryPoints(
     projectRoot,
     miniappRoot,
     entryPoints,
+    resolver,
     processedComponentJsonPaths,
   );
 
@@ -60,6 +75,7 @@ export async function findMiniProgramEntryPoints(
       miniappRoot,
       pagesFound,
       entryPoints,
+      resolver,
       processedComponentJsonPaths,
     );
   } else {
@@ -115,6 +131,7 @@ function processAppJsonGlobals(
   projectRoot: string,
   miniappRoot: string,
   entryPoints: Set<string>,
+  resolver: PathResolver,
   processedComponentJsonPaths: Set<string>,
 ): MiniProgramAppJson | null {
   let appJsonContent: MiniProgramAppJson | null = null;
@@ -143,6 +160,7 @@ function processAppJsonGlobals(
               miniappRoot,
               miniappRoot,
               entryPoints,
+              resolver,
               processedComponentJsonPaths,
             );
           }
@@ -240,6 +258,7 @@ function processPageSpecificComponents(
   miniappRoot: string,
   pagesFound: PageInfo[],
   entryPoints: Set<string>,
+  resolver: PathResolver,
   processedComponentJsonPaths: Set<string>,
 ): void {
   logger.debug(`[EntryFinder] Processing components for ${pagesFound.length} found pages...`);
@@ -264,6 +283,7 @@ function processPageSpecificComponents(
                 pageDir,
                 miniappRoot,
                 entryPoints,
+                resolver,
                 processedComponentJsonPaths,
               );
             }
@@ -296,6 +316,7 @@ function findComponentEntriesRecursively(
   definingJsonDir: string,
   miniappRoot: string,
   entryPoints: Set<string>,
+  resolver: PathResolver,
   processedComponentJsonPaths: Set<string>,
 ): void {
   // Ignore plugin protocols or npm packages for now
@@ -310,13 +331,35 @@ function findComponentEntriesRecursively(
     return;
   }
 
+  // 使用 PathResolver 解析组件入口 JSON（支持 alias、相对/绝对与 index.json）
+  const resolutionContext = path.join(definingJsonDir, 'index.json');
+  const resolvedEntryJson = resolver.resolveAnyPath(componentPathValue, resolutionContext, [
+    '.json',
+  ]);
+
+  // 计算组件基准路径（无扩展名），供后续关联文件检查
   let componentBasePath: string;
-  if (componentPathValue.startsWith('/')) {
-    // Absolute path within miniapp root
-    componentBasePath = path.resolve(miniappRoot, componentPathValue.substring(1));
+  if (resolvedEntryJson) {
+    const baseName = path.basename(resolvedEntryJson);
+    const dirName = path.dirname(resolvedEntryJson);
+    if (baseName.startsWith('index.')) {
+      componentBasePath = dirName;
+    } else {
+      componentBasePath = resolvedEntryJson.slice(0, -path.extname(resolvedEntryJson).length);
+    }
+    logger.trace(
+      `[EntryFinder] PathResolver 解析 '${componentPathValue}' (ctx: '${definingJsonDir}') -> entry '${resolvedEntryJson}', base '${componentBasePath}'`,
+    );
   } else {
-    // Relative path from the defining JSON's directory
-    componentBasePath = path.resolve(definingJsonDir, componentPathValue);
+    // 回退：保持旧行为
+    if (componentPathValue.startsWith('/')) {
+      componentBasePath = path.resolve(miniappRoot, componentPathValue.substring(1));
+    } else {
+      componentBasePath = path.resolve(definingJsonDir, componentPathValue);
+    }
+    logger.trace(
+      `[EntryFinder] Fallback 解析 '${componentPathValue}' (ctx: '${definingJsonDir}') -> '${componentBasePath}'`,
+    );
   }
 
   // Always try to add .js and .ts files, considering both direct file and index file patterns
@@ -347,17 +390,19 @@ function findComponentEntriesRecursively(
 
   // --- Recursive part: Process the component's JSON file --- //
   // Check both direct json and index.json patterns
-  const potentialJsonPaths = [
-    `${componentBasePath}.json`,
-    path.join(componentBasePath, 'index.json'),
-  ];
-
-  let actualComponentJsonPath: string | null = null;
-  for (const p of potentialJsonPaths) {
-    if (fs.existsSync(p)) {
-      actualComponentJsonPath = p;
-      logger.debug(`[EntryFinder] Found component JSON config at: ${actualComponentJsonPath}`);
-      break; // Found the primary JSON config
+  // 优先使用 resolver 的结果；如无，则尝试传统两种 JSON 位置
+  let actualComponentJsonPath: string | null = resolvedEntryJson || null;
+  if (!actualComponentJsonPath) {
+    const potentialJsonPaths = [
+      `${componentBasePath}.json`,
+      path.join(componentBasePath, 'index.json'),
+    ];
+    for (const p of potentialJsonPaths) {
+      if (fs.existsSync(p)) {
+        actualComponentJsonPath = p;
+        logger.debug(`[EntryFinder] Found component JSON config at: ${actualComponentJsonPath}`);
+        break; // Found the primary JSON config
+      }
     }
   }
 
@@ -408,6 +453,7 @@ function findComponentEntriesRecursively(
             componentDir, // Resolve nested components relative to *this* component's dir
             miniappRoot,
             entryPoints,
+            resolver,
             processedComponentJsonPaths, // Pass the tracker down
           );
         }
