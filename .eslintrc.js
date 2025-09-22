@@ -11,7 +11,13 @@ module.exports = {
   },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
-  ignorePatterns: ['dist/**', 'node_modules/**', 'tests/fixtures/**', 'scripts/**'],
+  ignorePatterns: [
+    'dist/**',
+    'node_modules/**',
+    'tests/fixtures/**',
+    'scripts/**',
+    'mp-lens.config.example.js',
+  ],
   rules: {
     '@typescript-eslint/explicit-module-boundary-types': 'warn',
     '@typescript-eslint/no-explicit-any': 'warn',

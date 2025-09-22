@@ -4,21 +4,35 @@
  */
 module.exports = {
   /**
-   * [可选] 小程序源代码所在的子目录（相对于此配置文件所在的目录）。
-   * 如果省略，则假定项目根目录即为小程序根目录。
+   * [可选] 小程序源代码根目录。
+   * miniappRoot 的作用：
+   * - 作为 app.json 的默认查找位置（resolveAppJson）。
+   * - 作为页面/组件解析的根：基于此解析 pages、subpackages、usingComponents 以及相关文件
+   *   （ProjectStructureBuilder.processAppJsonContent / processRelatedFiles / processComponent）。
+   * - 自动纳入隐式全局文件（processImplicitGlobalFiles）：app.js、app.ts、app.wxss、project.config.json、sitemap.json。
+   * - 作为导入解析基准：'/' 开头或非相对导入按该目录解析；别名解析回落也以此为基准（PathResolver）。
+   * - 资源扫描与差异分析：在该目录下进行图片等资源的 glob 扫描（diffBundle、asset-usage-analyzer）。
+   * - 组件使用检查与重复代码检测：以该目录作为主要工作目录（lint、cpd）。
+   * - 必需文件集合中的小程序级文件（如 app.json、theme.json 等）按该目录解析（resolveEssentialFiles）。
+   * 未设置时等同于项目根目录；当小程序位于 monorepo 子目录时应显式设置。
    */
   miniappRoot: 'src',
 
   /**
-   * [可选] 指定分析的入口文件。
-   * 默认会在项目里查找 "app.json"，可以手动指定，不要求在 miniappRoot 目录下。
+   * [可选] 入口文件路径（app.json）。
+   * 解析规则：
+   * - 绝对路径：直接使用。
+   * - 相对路径：相对于 projectRoot 解析（初始化阶段会标准化为绝对路径）。
+   * 默认行为：
+   * - 若未提供 appJsonPath 与 appJsonContent：从 projectRoot 自动探测 app.json，并据此推断 miniappRoot 与 appJsonPath。
+   * - 若已提供 miniappRoot 且未提供 appJsonPath：默认使用 miniappRoot/app.json。
    */
   appJsonPath: 'src/app.json',
 
   /**
-   * [可选] 高级选项：直接提供入口文件的内容（通常是 app.json 的内容）。
-   * 这在入口文件由构建工具动态生成时可能有用。
-   * 如果提供此项，将忽略 appJsonPath 选项。
+   * [可选] 高级选项：直接提供入口文件内容（app.json 的内容）。
+   * 适用于入口文件由构建工具动态生成的场景。
+   * 提供此项时，会忽略 appJsonPath。
    * 例: {
    *   "pages": ["pages/index/index"],
    *   "subPackages": []
@@ -38,7 +52,7 @@ module.exports = {
    * 支持使用 minimatch 语法 (https://github.com/isaacs/minimatch)
    */
   // eg: 排除根目录的 script / bin 目录，以及根目录下以点开头的文件
-  // 说明：' .* ' 仅匹配项目根目录的隐藏文件/目录；.git/** 等已在默认排除中覆盖
+  // 说明: '.*' 仅匹配项目根目录的隐藏文件/目录；.git/** 等已在默认排除中覆盖
   exclude: [
     '.*',
     '.*/**',
@@ -52,9 +66,9 @@ module.exports = {
   ],
 
   /**
-   * [可选] 应始终被视为必需的文件路径列表（相对于项目根目录）。
-   * 这些文件永远不会被报告为未使用或被清理，即使没有找到引用。
-   * 对于某些通过特殊方式引用或全局使用的文件很有用。
+   * [可选] 需要强制保留的文件路径列表（相对于项目根目录）。
+   * 这些文件即使未被静态引用，也不会被标记为未使用或被清理。
+   * 用于声明通过特殊方式引用或以全局方式使用的文件。
    * 例: ["utils/init.js", "config/theme.json"]
    */
   essentialFiles: [
@@ -63,24 +77,24 @@ module.exports = {
   ],
 
   /**
-   * [可选] 是否在清理和报告中包含图片等资源文件(.png, .jpg, .jpeg, .gif, .svg)。
-   * 默认值: false - 资源文件不会被报告为未使用或被清理。
-   * 设置为 true 表示显式包含这些资源文件在分析和清理范围内。
+   * [可选] 是否在清理与报告中包含图片等资源文件（.png, .jpg, .jpeg, .gif, .svg）。
+   * 默认值：false。为 true 时将资源文件纳入分析与清理范围。
    */
   includeAssets: false,
 
   /**
    * [可选] 路径别名配置，用于解析模块导入。
-   * 如果项目中有 tsconfig.json 或 jsconfig.json 包含 paths 配置，
-   * 通常会自动加载，无需在此手动配置。
-   * 如果需要覆盖或补充自动加载的配置，可以在此定义。
+   * 如检测到 tsconfig.json 或 jsconfig.json 的 paths 配置，将自动加载。
+   * 此处与自动加载的配置进行合并；如发生同名键冲突，以本配置覆盖 tsconfig/jsconfig。
+   * 建议避免将单个 "@" 作为别名，以免与 npm 作用域包（@scope/pkg）混淆。
    * 例: {
-   *   "@": "./src",
-   *   "@components": "./src/components",
+   *   "@app/*": ["./src/*"],
+   *   "@components/*": ["./src/components/*"],
    *   "@utils/*": ["./src/utils/*"]
    * }
    */
   aliases: {
-    // "@": "./src", // 示例，通常会自动从 tsconfig/jsconfig 加载
+    // "@app/*": ["./src/*"],
+    // "@components/*": ["./src/components/*"]
   },
 };
