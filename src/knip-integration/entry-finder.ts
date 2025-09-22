@@ -9,19 +9,14 @@ import { logger } from '../utils/debug-logger';
  * Includes app, pages, subPackages, and components found via usingComponents.
  *
  * @param projectRoot The absolute path to the root of the entire project.
- * @param miniappRoot The absolute path to the root of the miniapp source code (where app.json resides).
  * @returns A promise resolving to an array of entry file paths relative to the projectRoot.
  */
-export async function findMiniProgramEntryPoints(
-  projectRoot: string,
-  miniappRoot: string,
-): Promise<string[]> {
+export async function findMiniProgramEntryPoints(projectRoot: string): Promise<string[]> {
   logger.debug('[EntryFinder] 使用 analyzeProject 结果生成入口点（递归）。');
   logger.debug(`[EntryFinder] Project Root: ${projectRoot}`);
-  logger.debug(`[EntryFinder] MiniApp Root: ${miniappRoot}`);
 
   // 通过统一的初始化流程获取 appJson、别名、排除规则等上下文
-  const cliOptions: GlobalCliOptions = { project: projectRoot, miniappRoot };
+  const cliOptions: GlobalCliOptions = { project: projectRoot };
   const context = await initializeCommandContext(cliOptions);
 
   if (!context.appJsonContent || Object.keys(context.appJsonContent).length === 0) {

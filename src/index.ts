@@ -5,6 +5,7 @@ import { HtmlGeneratorPreact } from './commands/graph/html-renderer';
 import { findMiniProgramEntryPoints } from './knip-integration/entry-finder';
 import { parseJson, parseWxml, parseWxs, parseWxss } from './knip-integration/parsers';
 import { findUnusedAssets } from './utils/asset-usage-analyzer';
+import { initializeCommandContext } from './utils/command-init';
 
 export {
   analyzeProject,
@@ -12,6 +13,7 @@ export {
   findMiniProgramEntryPoints,
   findUnusedAssets,
   HtmlGeneratorPreact,
+  initializeCommandContext,
   // Export Mini Program file parsers for knip custom compilers
   parseJson,
   parseWxml,

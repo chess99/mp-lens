@@ -5,8 +5,7 @@
  *
  * 使用方法:
  * 1. 将此文件复制到你的项目根目录，命名为 knip.js
- * 2. 根据你的项目结构修改 miniappRootRelative 变量
- * 3. 运行 npx knip 或设置 npm script
+ * 2. 运行 npx knip 或设置 npm script
  *
  * 更多信息请参考:
  * - Knip 文档: https://knip.dev
@@ -15,6 +14,7 @@
 
 const {
   findMiniProgramEntryPoints,
+  initializeCommandContext,
   parseWxml,
   parseWxs,
   parseWxss,
@@ -24,13 +24,15 @@ const path = require('path');
 
 // 配置小程序源码目录路径
 const projectRoot = process.cwd();
-const miniappRootRelative = 'src'; // 修改为你的小程序源码所在目录
-const miniappRootAbsolute = path.resolve(projectRoot, miniappRootRelative);
+const SRC = path.resolve(projectRoot, 'src');
 
 /** @type {() => Promise<import('knip').KnipConfig>} */
 const config = async () => {
+  // 通过 mp-lens 的初始化流程加载上下文（含 miniappRoot、exclude、aliases 等）
+  const context = await initializeCommandContext({ project: projectRoot });
+
   // 调用 mp-lens 函数获取动态入口点
-  const mpEntryPoints = await findMiniProgramEntryPoints(projectRoot, miniappRootAbsolute);
+  const mpEntryPoints = await findMiniProgramEntryPoints(projectRoot);
   console.log(`[Knip Config] 找到 ${mpEntryPoints.length} 个小程序相关文件.`);
 
   // 自定义静态入口点（例如构建脚本、其他配置）
@@ -44,10 +46,7 @@ const config = async () => {
     entry: [...staticEntries, ...mpEntryPoints],
 
     // 定义 knip 应分析的项目文件
-    project: [
-      `src/**/*.{js,ts,wxml,wxss,json}`, // 根据需要调整扩展名
-      // 如果需要，添加其他源代码位置
-    ],
+    project: [`${SRC}/**/*.{js,ts,wxml,wxss,json}`],
 
     // 自定义编译器支持小程序特有文件类型
     compilers: {
@@ -58,10 +57,14 @@ const config = async () => {
     },
 
     // 添加项目特有的忽略项, node_modules 等 .gitignore 包含的文件不需要单独配置 ignore
-    // eg: 'src/custom-tab-bar/**'
-    // 如果需要，忽略特定导出
-    // eg: 'src/someFile.js#someExport'
-    ignore: [],
+    ignore: [
+      // 使用 mp-lens 上下文生成的排除规则（已合并 .gitignore 与配置项）
+      ...context.excludePatterns,
+      // 如需另外忽略特定导出/依赖，可继续在下方追加
+      // eg: 'src/custom-tab-bar/**'
+      // 如果需要，忽略特定导出
+      // eg: 'src/someFile.js#someExport'
+    ],
 
     // 忽略项目中已知的误报依赖
     ignoreDependencies: [],

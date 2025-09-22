@@ -8,7 +8,7 @@ import * as path from 'path';
  * @param absolutePath The absolute file path.
  * @returns The canonical absolute base path.
  */
-export function getCanonicalBasePath(absolutePath: string): string {
+function getCanonicalBasePath(absolutePath: string): string {
   // Regex to remove common miniprogram extensions
   let basePath = absolutePath.replace(/\.(wxml|wxss|js|ts|json)$/, '');
 
