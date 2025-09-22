@@ -108,8 +108,7 @@ export class ProjectStructureBuilder {
     // This uses appJsonContent which is guaranteed to be an object (even if empty)
     await this.processAppJsonContent(appJsonContent);
 
-    // 4. Process implicit global files (app.js/ts/wxss)
-    this.processImplicitGlobalFiles();
+    // 4. (moved) Implicit global files are now handled as essential files in analyzer
 
     // --- Start: Final pass to parse all remaining files --- //
     logger.debug(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);

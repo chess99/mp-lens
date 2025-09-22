@@ -179,6 +179,15 @@ export async function analyzeProject(
     allFoundFiles.push(appJsonPath);
   }
 
+  // --- Merge essential files into initial scan to ensure nodes exist --- //
+  const essentialFilePaths = resolveEssentialFiles(projectRoot, miniappRoot, essentialFiles);
+  essentialFilePaths.forEach((filePath) => {
+    if (fs.existsSync(filePath) && !allFoundFiles.includes(filePath)) {
+      allFoundFiles.push(filePath);
+      logger.trace(`Added essential file to initial scan: ${filePath}`);
+    }
+  });
+
   // --- Build Project Structure ---
   const builder = new ProjectStructureBuilder(
     projectRoot,
@@ -200,7 +209,6 @@ export async function analyzeProject(
     logger.warn('Project structure has no root node ID defined.');
   }
   // Add essential files as entry points
-  const essentialFilePaths = resolveEssentialFiles(projectRoot, miniappRoot, essentialFiles);
   essentialFilePaths.forEach((filePath) => {
     if (nodeMap.has(filePath)) {
       entryNodeIdsSet.add(filePath);
@@ -314,6 +322,9 @@ function resolveEssentialFiles(
 
   const miniappLevelFiles = [
     'app.json', // Often the source of truth for entries, essential itself
+    'app.js',
+    'app.ts',
+    'app.wxss',
     'project.config.json',
     'project.private.config.json',
     'sitemap.json',
