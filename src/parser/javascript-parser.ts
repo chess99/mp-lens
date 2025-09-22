@@ -20,14 +20,15 @@ export class JavaScriptParser {
       this.traverseAST(ast, dependencies);
 
       return Array.from(dependencies);
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Log the error but re-throw it so the central handler in FileParser catches it
-      logger.warn(`Error parsing JavaScript file ${filePath}: ${e.message}`);
+      const message = e instanceof Error ? e.message : String(e);
+      logger.warn(`Error parsing JavaScript file ${filePath}: ${message}`);
       throw e; // Re-throw the error
     }
   }
 
-  private parseToAST(content: string, filePath: string) {
+  private parseToAST(content: string, filePath: string): t.File {
     const isTypeScript = path.extname(filePath) === '.ts';
 
     const basePlugins: ParserPlugin[] = [
@@ -59,7 +60,7 @@ export class JavaScriptParser {
         allowImportExportEverywhere: true,
         allowReturnOutsideFunction: true,
         plugins,
-      });
+      }) as unknown as t.File;
     } catch (parseError) {
       // If parsing as module fails, check if it contains import/export
       const hasImportExport = /\b(import|export)\b/.test(content);
@@ -74,11 +75,11 @@ export class JavaScriptParser {
         sourceType: 'script',
         allowReturnOutsideFunction: true,
         plugins,
-      });
+      }) as unknown as t.File;
     }
   }
 
-  private traverseAST(ast: any, dependencies: Set<string>): void {
+  private traverseAST(ast: t.File, dependencies: Set<string>): void {
     traverse(ast, {
       // Handle ES6 import statements
       ImportDeclaration: (path) => {
@@ -86,6 +87,22 @@ export class JavaScriptParser {
         if (t.isStringLiteral(source)) {
           const importPath = source.value;
           dependencies.add(importPath);
+        }
+      },
+
+      // Handle re-exports: export * from '...'
+      ExportAllDeclaration: (path) => {
+        const source = path.node.source;
+        if (t.isStringLiteral(source)) {
+          dependencies.add(source.value);
+        }
+      },
+
+      // Handle re-exports: export { ... } from '...'
+      ExportNamedDeclaration: (path) => {
+        const source = path.node.source;
+        if (source && t.isStringLiteral(source)) {
+          dependencies.add(source.value);
         }
       },
 
@@ -103,6 +120,20 @@ export class JavaScriptParser {
           const requirePath = node.arguments[0].value;
           dependencies.add(requirePath);
         }
+
+        // Handle require.resolve('...')
+        if (
+          t.isMemberExpression(node.callee) &&
+          t.isIdentifier(node.callee.object) &&
+          node.callee.object.name === 'require' &&
+          t.isIdentifier(node.callee.property) &&
+          node.callee.property.name === 'resolve' &&
+          node.arguments.length >= 1 &&
+          t.isStringLiteral(node.arguments[0])
+        ) {
+          const resolvedPath = node.arguments[0].value;
+          dependencies.add(resolvedPath);
+        }
       },
 
       // Handle dynamic imports
@@ -115,6 +146,17 @@ export class JavaScriptParser {
         ) {
           const importPath = parent.arguments[0].value;
           dependencies.add(importPath);
+        }
+      },
+
+      // Handle TypeScript import equals: import x = require('...')
+      TSImportEqualsDeclaration: (path) => {
+        const moduleRef = path.node.moduleReference;
+        if (t.isTSExternalModuleReference(moduleRef)) {
+          const expr = moduleRef.expression;
+          if (t.isStringLiteral(expr)) {
+            dependencies.add(expr.value);
+          }
         }
       },
     });

@@ -255,5 +255,44 @@ describe('JavaScriptParser', () => {
 
       expect(dependencies).toEqual([]);
     });
+
+    it('should parse re-export statements', async () => {
+      const filePath = actualPath.resolve('/project', 'src/reexport.js');
+      const content = `
+        export * from './requestStrategyManager';
+        export { foo, bar as baz } from './types';
+      `;
+
+      const dependencies = await parser.parse(content, filePath);
+
+      expect(dependencies).toEqual(['./requestStrategyManager', './types']);
+    });
+
+    it('should parse TS import equals declarations', async () => {
+      const filePath = actualPath.resolve('/project', 'src/ts-import-equals.ts');
+      const content = `
+        import x = require('lodash');
+        import y = require('./local');
+        const z = require('./common');
+      `;
+
+      const dependencies = await parser.parse(content, filePath);
+
+      expect(dependencies).toEqual(['lodash', './local', './common']);
+    });
+
+    it('should parse require.resolve calls', async () => {
+      const filePath = actualPath.resolve('/project', 'src/require-resolve.js');
+      const content = `
+        const p1 = require.resolve('./path');
+        const p2 = require.resolve('../config/app.json');
+        const name = './dynamic';
+        const p3 = require.resolve(name);
+      `;
+
+      const dependencies = await parser.parse(content, filePath);
+
+      expect(dependencies).toEqual(['./path', '../config/app.json']);
+    });
   });
 });
