@@ -110,7 +110,7 @@ export class FileParser {
     switch (sourceExt) {
       case '.js':
       case '.ts':
-        allowedExtensions = ['.js', '.ts', '.json'];
+        allowedExtensions = ['.js', '.ts', '.d.ts', '.json'];
         break;
       case '.wxs':
         allowedExtensions = ['.wxs']; // WXS files can only import other WXS files
