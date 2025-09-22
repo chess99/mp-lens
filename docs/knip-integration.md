@@ -45,7 +45,13 @@ yarn add --dev mp-lens knip
 
 ```javascript
 // 参考示例位于 docs/examples/knip.js
-const { findMiniProgramEntryPoints, parseWxml, parseWxs, parseWxss, parseJson } = require('mp-lens');
+const {
+  findMiniProgramEntryPoints,
+  parseWxml,
+  parseWxs,
+  parseWxss,
+  parseJson,
+} = require('mp-lens');
 const path = require('path');
 
 // 配置小程序源码目录
@@ -69,9 +75,7 @@ const config = async () => {
       `${miniappRootRelative}/project.config.json`,
     ],
     // 定义项目文件
-    project: [
-      `${miniappRootRelative}/**/*.{js,ts,wxml,wxss,json}`,
-    ],
+    project: [`${miniappRootRelative}/**/*.{js,ts,wxml,wxss,json}`],
     // 自定义编译器支持小程序特有文件
     compilers: {
       wxml: parseWxml,
@@ -80,10 +84,7 @@ const config = async () => {
       json: parseJson,
     },
     // 忽略输出和依赖目录
-    ignore: [
-      'dist/**',
-      'node_modules/**',
-    ],
+    ignore: ['dist/**', 'node_modules/**'],
   };
 };
 
@@ -113,13 +114,19 @@ npm run find-unused
 
 ### 动态入口点发现
 
-`findMiniProgramEntryPoints` 函数会自动发现你的小程序项目中的所有入口点，包括：
+`findMiniProgramEntryPoints` 现已直接复用 `analyzeProject` 的分析结果，依据“可达节点”生成入口文件列表：
+
+- 返回的入口文件均为相对 `projectRoot` 的模块文件路径（节点类型为 `Module`）
+- 默认不包含静态资源文件（如图片等），以降低噪音；如需纳入，可在后续版本开放配置
+- 支持通过别名（alias）解析的组件与模块路径，行为与核心分析一致
+
+它会自动覆盖你的小程序项目中的关键入口点，包括：
 
 - 全局应用文件 (app.js/ts, app.wxss, app.json)
 - 主包页面及其关联文件
 - 分包页面及其关联文件
 - 全局和页面级别注册的组件
-- 递归发现所有组件依赖
+- 递归发现所有组件依赖（通过 `analyzeProject` 的图构建与可达性分析实现）
 
 ### 自定义编译器
 
@@ -183,7 +190,7 @@ module.exports = {
     'eslint:recommended',
     '@typescript-eslint/recommended',
     'plugin:import/recommended',
-    'plugin:import/typescript'
+    'plugin:import/typescript',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -203,19 +210,19 @@ module.exports = {
   rules: {
     // 🔥 关键规则：检查命名导入是否真实存在
     'import/named': 'error',
-    
+
     // 🔥 关键规则：检查导出声明的有效性
     'import/export': 'error',
-    
+
     // 🔥 关键规则：检查模块是否能解析
     'import/no-unresolved': 'error',
-    
+
     // 辅助规则：避免其他导入问题
     'import/no-duplicates': 'error',
     'import/no-self-import': 'error',
     'import/no-cycle': ['error', { maxDepth: 10 }],
     'import/no-absolute-path': 'error',
-    
+
     // TypeScript 相关
     '@typescript-eslint/no-unused-vars': [
       'error',
