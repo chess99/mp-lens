@@ -25,19 +25,40 @@ export async function findMiniProgramEntryPoints(projectRoot: string): Promise<s
   }
 
   try {
-    const { projectStructure, reachableNodeIds } = await analyzeProject(projectRoot, {
+    const { projectStructure } = await analyzeProject(projectRoot, {
       ...context,
       includeAssets: false,
     });
     const nodeMap = new Map(projectStructure.nodes.map((n) => [n.id, n]));
+    const allowedExts = new Set(['.js', '.ts', '.wxml', '.wxss', '.json']);
     const entries = new Set<string>();
-    for (const id of reachableNodeIds) {
-      const node = nodeMap.get(id);
-      if (node && node.type === 'Module' && node.properties?.absolutePath) {
-        entries.add(path.relative(projectRoot, node.properties.absolutePath as string));
+
+    // 1) 从非 Module（App/Package/Page/Component）到 Module 的直接结构链接
+    for (const link of projectStructure.links) {
+      if (link.type !== 'Structure') continue;
+      const source = nodeMap.get(link.source);
+      const target = nodeMap.get(link.target);
+      if (!source || !target) continue;
+      if (source.type !== 'Module' && target.type === 'Module' && target.properties?.absolutePath) {
+        const abs = target.properties.absolutePath as string;
+        const ext = path.extname(abs).toLowerCase();
+        if (allowedExts.has(ext)) {
+          entries.add(path.relative(projectRoot, abs));
+        }
       }
     }
-    logger.info(`[EntryFinder] 依据可达节点生成入口文件数: ${entries.size}`);
+
+    // 2) essentialFiles 直接加入（来自初始化上下文）
+    if (Array.isArray(context.essentialFiles)) {
+      for (const abs of context.essentialFiles) {
+        const ext = path.extname(abs).toLowerCase();
+        if (allowedExts.has(ext)) {
+          entries.add(path.relative(projectRoot, abs));
+        }
+      }
+    }
+
+    logger.info(`[EntryFinder] 基于第一层结构关联与必要文件生成入口文件数: ${entries.size}`);
     return Array.from(entries);
   } catch (e) {
     logger.error(`[EntryFinder] analyzeProject 执行失败: ${(e as Error).message}`);

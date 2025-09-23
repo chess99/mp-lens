@@ -33,7 +33,6 @@ const config = async () => {
 
   // 调用 mp-lens 函数获取动态入口点
   const mpEntryPoints = await findMiniProgramEntryPoints(projectRoot);
-  console.log(`[Knip Config] 找到 ${mpEntryPoints.length} 个小程序相关文件.`);
 
   // 自定义静态入口点（例如构建脚本、其他配置）
   const staticEntries = [
