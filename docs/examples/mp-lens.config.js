@@ -1,7 +1,3 @@
-/**
- * mp-lens 配置文件示例 (JavaScript 格式)
- * 使用 JavaScript 格式允许添加注释并进行更灵活的配置。
- */
 module.exports = {
   /**
    * [可选] 小程序源代码根目录。
@@ -9,7 +5,7 @@ module.exports = {
    * - 作为 app.json 的默认查找位置（resolveAppJson）。
    * - 作为页面/组件解析的根：基于此解析 pages、subpackages、usingComponents 以及相关文件
    *   （ProjectStructureBuilder.processAppJsonContent / processRelatedFiles / processComponent）。
-   * - 自动纳入隐式全局文件（processImplicitGlobalFiles）：app.js、app.ts、app.wxss、project.config.json、sitemap.json。
+   * - 自动纳入隐式全局文件：app.js、app.ts、app.wxss、project.config.json、sitemap.json。
    * - 作为导入解析基准：'/' 开头或非相对导入按该目录解析；别名解析回落也以此为基准（PathResolver）。
    * - 资源扫描与差异分析：在该目录下进行图片等资源的 glob 扫描（diffBundle、asset-usage-analyzer）。
    * - 组件使用检查与重复代码检测：以该目录作为主要工作目录（lint、cpd）。

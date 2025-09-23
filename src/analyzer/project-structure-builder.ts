@@ -14,7 +14,6 @@ export class ProjectStructureBuilder {
   private projectRoot: string;
   private fileParser: FileParser;
   private pathResolver: PathResolver;
-  private options: AnalyzerOptions;
   private rootNodeId: string | null = null;
   private processedJsonFiles: Set<string> = new Set(); // Avoid infinite loops
 
@@ -43,7 +42,6 @@ export class ProjectStructureBuilder {
   ) {
     this.projectRoot = projectRoot;
     this.miniappRoot = miniappRoot;
-    this.options = options;
     this.appJsonPath = appJsonPath;
     this.appJsonContent = appJsonContent;
     // --- Start: Store allFiles ---
@@ -71,22 +69,10 @@ export class ProjectStructureBuilder {
   async build(): Promise<ProjectStructure> {
     logger.info('开始项目结构分析...');
 
-    // 1. Find and parse app.json - REMOVED (using constructor values)
-    // const appJsonInfo = this.findAndParseAppJson();
-    // if (!appJsonInfo) {
-    //   // Error logged in findAndParseAppJson
-    //   throw new Error(
-    //     'Failed to initialize structure: Could not find or parse app.json/entry content.',
-    //   );
-    // }
-    // // Destructure potentially null path and guaranteed content (or {})
-    // const { appJsonPath, appJsonContent } = appJsonInfo;
-
-    // Use values passed to constructor
     const appJsonPath = this.appJsonPath;
     const appJsonContent = this.appJsonContent;
 
-    // 2. Create App node
+    // Create App node
     this.rootNodeId = 'app';
     this.addNode({
       id: this.rootNodeId,
@@ -104,11 +90,9 @@ export class ProjectStructureBuilder {
       }
     }
 
-    // 3. Process app.json content (pages, subpackages, etc.)
+    // Process app.json content (pages, subpackages, etc.)
     // This uses appJsonContent which is guaranteed to be an object (even if empty)
     await this.processAppJsonContent(appJsonContent);
-
-    // 4. (moved) Implicit global files are now handled as essential files in analyzer
 
     // --- Start: Final pass to parse all remaining files --- //
     logger.debug(`Starting final pass to parse dependencies for all ${this.nodes.size} nodes...`);
@@ -450,21 +434,6 @@ export class ProjectStructureBuilder {
     } catch (error: unknown) {
       const err = error as Error;
       logger.warn(`Error parsing dependencies for ${relativePath}: ${err.message}`);
-    }
-  }
-
-  private processImplicitGlobalFiles(): void {
-    const implicitFiles = ['app.js', 'app.ts', 'app.wxss', 'project.config.json', 'sitemap.json'];
-    for (const fileName of implicitFiles) {
-      const filePath = path.resolve(this.miniappRoot, fileName);
-      if (fs.existsSync(filePath)) {
-        const node = this.addNodeForFile(filePath, 'Module');
-        if (node && this.rootNodeId) {
-          this.addLink(this.rootNodeId, node.id, 'Structure');
-          // Need to parse these too, in case app.js requires other modules
-          this.parseModuleDependencies(node);
-        }
-      }
     }
   }
 

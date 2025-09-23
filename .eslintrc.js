@@ -16,7 +16,7 @@ module.exports = {
     'node_modules/**',
     'tests/fixtures/**',
     'scripts/**',
-    'mp-lens.config.example.js',
+    'docs/examples/**',
   ],
   rules: {
     '@typescript-eslint/explicit-module-boundary-types': 'warn',
