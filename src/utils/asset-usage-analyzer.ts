@@ -39,7 +39,7 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
   } = context;
 
   // 2. 组装 AnalyzerOptions，确保 fileTypes 有默认值
-  const defaultFileTypes = ['js', 'ts', 'wxml', 'wxss', 'json'];
+  const defaultFileTypes = ['js', 'ts', 'wxml', 'wxss', 'less', 'json'];
   const options = {
     miniappRoot,
     fileTypes: Array.isArray(fileTypes) && fileTypes.length > 0 ? fileTypes : defaultFileTypes,

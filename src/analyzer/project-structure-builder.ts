@@ -105,7 +105,7 @@ export class ProjectStructureBuilder {
         node.type === 'Module' &&
         filePath &&
         !this.parsedModules.has(filePath) &&
-        ['.js', '.ts', '.wxml', '.wxss'].includes(fileExt) // Check file extension
+        ['.js', '.ts', '.wxml', '.wxss', '.less'].includes(fileExt) // Check file extension
       ) {
         // Use node.properties.absolutePath which is the ID and the key for parsedModules
         await this.parseModuleDependencies(node);
@@ -301,7 +301,7 @@ export class ProjectStructureBuilder {
       absoluteBasePath = basePath;
     } else {
       const resolutionContextPath = path.join(currentRoot, 'index.json');
-      const allowedExts = ['.json', '.js', '.ts', '.wxml', '.wxss'];
+      const allowedExts = ['.json', '.js', '.ts', '.wxml', '.wxss', '.less'];
       const resolvedEntryPath = this.pathResolver.resolveAnyPath(
         basePath,
         resolutionContextPath,
@@ -323,7 +323,7 @@ export class ProjectStructureBuilder {
       }
     }
 
-    const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss'];
+    const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss', '.less'];
 
     for (const ext of extensions) {
       // Check both patterns: basePath.ext and basePath/index.ext
@@ -355,7 +355,7 @@ export class ProjectStructureBuilder {
             await this.parseComponentJson(ownerId, foundFilePath);
           }
           // If it's a script or template, parse dependencies
-          else if ('.js,.ts,.wxml,.wxss'.includes(ext)) {
+          else if ('.js,.ts,.wxml,.wxss,.less'.includes(ext)) {
             await this.parseModuleDependencies(moduleNode);
           }
         }

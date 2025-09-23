@@ -7,6 +7,7 @@ import { PathResolver } from '../utils/path-resolver';
 // Import specialized parsers with corrected paths relative to src/analyzer/
 import { JavaScriptParser } from './javascript-parser';
 import { JSONParser } from './json-parser';
+import { LessParser } from './less-parser';
 import { WXMLParser } from './wxml-parser';
 import { WXSSParser } from './wxss-parser';
 
@@ -21,6 +22,7 @@ export class FileParser {
   private javaScriptParser: JavaScriptParser;
   private wxmlParser: WXMLParser;
   private wxssParser: WXSSParser;
+  private lessParser: LessParser;
   private jsonParser: JSONParser;
 
   constructor(projectRoot: string, options: AnalyzerOptions) {
@@ -35,6 +37,7 @@ export class FileParser {
     this.javaScriptParser = new JavaScriptParser();
     this.wxmlParser = new WXMLParser();
     this.wxssParser = new WXSSParser();
+    this.lessParser = new LessParser();
     this.jsonParser = new JSONParser();
   }
 
@@ -63,6 +66,9 @@ export class FileParser {
           break;
         case '.wxss':
           rawDependencies = await this.wxssParser.parse(content, filePath);
+          break;
+        case '.less':
+          rawDependencies = await this.lessParser.parse(content, filePath);
           break;
         case '.json':
           rawDependencies = await this.jsonParser.parse(content, filePath);
@@ -133,6 +139,14 @@ export class FileParser {
           allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
         } else {
           allowedExtensions = ['.wxss'];
+        }
+        break;
+      case '.less':
+        // Less can import other Less files, WXSS files, or reference image files
+        if (this.isImagePath(rawPath)) {
+          allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+        } else {
+          allowedExtensions = ['.less', '.wxss'];
         }
         break;
       case '.json':
