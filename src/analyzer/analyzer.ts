@@ -139,7 +139,7 @@ export async function analyzeProject(
   options: AnalyzerOptions,
 ): Promise<AnalysisResult> {
   const {
-    fileTypes = ['js', 'ts', 'wxml', 'wxss', 'json'],
+    fileTypes = ['js', 'ts', 'wxml', 'wxss', 'less', 'json'],
     excludePatterns = [],
     miniappRoot,
     appJsonPath,
