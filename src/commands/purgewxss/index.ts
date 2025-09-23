@@ -27,6 +27,7 @@ async function performPurge(
   let totalPotentialSavings = 0;
 
   let wxssFilesToProcess: string[] = [];
+  let lessFilesToProcess: string[] = [];
 
   if (wxssFilePathInput) {
     const absolutePath = path.isAbsolute(wxssFilePathInput)
@@ -35,21 +36,26 @@ async function performPurge(
     try {
       const statResult = await fs.stat(absolutePath);
       if (!statResult.isFile()) {
-        throw new HandledError(`指定的 WXSS 输入不是一个文件: ${absolutePath}`);
+        throw new HandledError(`指定的样式输入不是一个文件: ${absolutePath}`);
       }
     } catch (e: any) {
       if (e.code === 'ENOENT') {
-        throw new HandledError(`WXSS 文件未找到: ${absolutePath}`);
+        throw new HandledError(`样式文件未找到: ${absolutePath}`);
       }
-      throw new HandledError(`无法访问 WXSS 文件: ${absolutePath} (${e.message})`);
+      throw new HandledError(`无法访问样式文件: ${absolutePath} (${e.message})`);
     }
 
-    if (path.extname(absolutePath) !== '.wxss') {
-      throw new HandledError(`输入文件不是 .wxss 文件: ${absolutePath}`);
+    const ext = path.extname(absolutePath);
+    if (ext === '.wxss') {
+      wxssFilesToProcess.push(absolutePath);
+    } else if (ext === '.less') {
+      lessFilesToProcess.push(absolutePath);
+    } else {
+      throw new HandledError(`输入文件不是 .wxss 或 .less 文件: ${absolutePath}`);
     }
-    wxssFilesToProcess.push(absolutePath);
   } else {
-    const pattern = path.join(scanRoot, '**/*.wxss').replace(/\\/g, '/');
+    const patternWxss = path.join(scanRoot, '**/*.wxss').replace(/\\/g, '/');
+    const patternLess = path.join(scanRoot, '**/*.less').replace(/\\/g, '/');
 
     const excludePatterns = context.excludePatterns || [];
     const ignorePatterns = [
@@ -61,25 +67,34 @@ async function performPurge(
     ];
 
     try {
-      wxssFilesToProcess = await glob(pattern, {
+      wxssFilesToProcess = await glob(patternWxss, {
+        ignore: ignorePatterns,
+        nodir: true,
+        absolute: true,
+        cwd: scanRoot,
+      });
+      lessFilesToProcess = await glob(patternLess, {
         ignore: ignorePatterns,
         nodir: true,
         absolute: true,
         cwd: scanRoot,
       });
     } catch (err: any) {
-      throw new Error(`扫描 WXSS 文件时出错: ${err.message}`);
+      throw new Error(`扫描样式文件时出错: ${err.message}`);
     }
 
-    if (wxssFilesToProcess.length === 0) {
-      logger.info(chalk.yellow('在指定目录未找到 WXSS 文件 (或所有文件都被忽略)。'));
+    if (wxssFilesToProcess.length === 0 && lessFilesToProcess.length === 0) {
+      logger.info(chalk.yellow('在指定目录未找到 WXSS/LESS 文件 (或所有文件都被忽略)。'));
       return;
     }
   }
 
-  if (wxssFilesToProcess.length > 0 && !wxssFilePathInput) {
+  if ((wxssFilesToProcess.length > 0 || lessFilesToProcess.length > 0) && !wxssFilePathInput) {
     const rootForDisplay = path.relative(projectRoot, scanRoot) || '.';
-    logger.info(`将在 ${rootForDisplay} 目录中分析 ${wxssFilesToProcess.length} 个 WXSS 文件...`);
+    const total = wxssFilesToProcess.length + lessFilesToProcess.length;
+    logger.info(
+      `将在 ${rootForDisplay} 目录中分析 ${total} 个样式文件 (WXSS: ${wxssFilesToProcess.length}, LESS: ${lessFilesToProcess.length})...`,
+    );
   }
 
   for (const wxssFilePath of wxssFilesToProcess) {
@@ -215,6 +230,126 @@ async function performPurge(
     }
   }
 
+  // Process LESS files (analysis only; no write-back)
+  for (const lessFilePath of lessFilesToProcess) {
+    const relativeLessPath = path.relative(projectRoot, lessFilePath);
+    let statusMessage = '';
+
+    const wxmlFilePath = lessFilePath.replace(/\.less$/, '.wxml');
+    try {
+      await fs.access(wxmlFilePath);
+    } catch {
+      statusMessage = chalk.yellow('跳过 (WXML 未找到)');
+      logger.info(`${relativeLessPath} ${statusMessage}`);
+      continue;
+    }
+
+    // Try to load optional 'less' compiler
+    let lessCompiler: any = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      lessCompiler = require('less');
+    } catch (_e) {
+      logger.warn(
+        `跳过 ${relativeLessPath}: 未安装 \`less\` 依赖，无法编译 .less 进行 Purge。请运行: npm i -D less`,
+      );
+      continue;
+    }
+
+    try {
+      const lessSource = await fs.readFile(lessFilePath, 'utf-8');
+      if (!lessSource.trim()) {
+        statusMessage = chalk.gray('跳过 (LESS 文件为空)');
+        logger.info(`${relativeLessPath} ${statusMessage}`);
+        continue;
+      }
+
+      // Compile LESS to CSS (in-memory)
+      const renderResult = await lessCompiler.render(lessSource, {
+        filename: lessFilePath,
+        paths: [path.dirname(lessFilePath)],
+        javascriptEnabled: true,
+      });
+      const compiledCss: string = renderResult.css || '';
+
+      const wxmlAnalysisResult: WxmlPurgeAnalysisResult = await analyzeWxmlForPurge(
+        wxmlFilePath,
+        pathResolver,
+        new Set(),
+      );
+
+      if (wxmlAnalysisResult.wxmlFilePaths.size === 0) {
+        statusMessage = chalk.yellow('跳过 (WXML 分析失败或为空)');
+        logger.info(`${relativeLessPath} ${statusMessage}`);
+        continue;
+      }
+
+      const safelistStandard: (string | RegExp)[] = [
+        ...wxmlAnalysisResult.tagNames,
+        ...wxmlAnalysisResult.staticClassNames,
+      ];
+      wxmlAnalysisResult.dynamicClassValues.forEach((dynValue) => {
+        const innerContent = dynValue.substring(2, dynValue.length - 2);
+        const words = innerContent.match(/[a-zA-Z0-9_-]+/g) || [];
+        words.forEach((word) => {
+          if (word.length > 1 && !safelistStandard.includes(word)) {
+            safelistStandard.push(word);
+          }
+        });
+      });
+      const commonTagsToExclude = new Set(['block', 'template', 'slot']);
+      const finalSafeList = safelistStandard.filter((s) =>
+        typeof s === 'string' ? !commonTagsToExclude.has(s) : true,
+      );
+
+      const purger = new PurgeCSS();
+      const purgeResults = await purger.purge({
+        content: await Promise.all(
+          Array.from(wxmlAnalysisResult.wxmlFilePaths).map(
+            async (fp) =>
+              ({
+                raw: await fs.readFile(fp, 'utf-8'),
+                extension: 'wxml',
+              }) as { raw: string; extension: string },
+          ),
+        ),
+        css: [{ raw: compiledCss, name: path.basename(lessFilePath).replace(/\.less$/, '.css') }],
+        safelist: { standard: finalSafeList },
+      });
+
+      const originalSize = Buffer.byteLength(compiledCss, 'utf-8');
+
+      if (purgeResults.length > 0 && purgeResults[0].css) {
+        const purgedCss = purgeResults[0].css;
+        const newSize = Buffer.byteLength(purgedCss, 'utf-8');
+        const diff = originalSize - newSize;
+
+        if (diff > 0) {
+          statusMessage = chalk.green(
+            `潜在节省 ${diff}B (分析自编译后的 CSS)。暂不支持对 .less 写回。`,
+          );
+        } else if (diff === 0) {
+          statusMessage = chalk.gray('无变化 (编译后的 CSS)。');
+        } else {
+          statusMessage = chalk.yellow(`可能增大 ${-diff}B (检查 safelist)。`);
+        }
+      } else if (purgeResults.length > 0 && purgeResults[0].css === '') {
+        if (compiledCss.trim().length > 0) {
+          statusMessage = chalk.yellow('可清空 (针对编译后的 CSS)。暂不支持对 .less 写回。');
+        } else {
+          statusMessage = chalk.gray('无变化 (编译后的 CSS 已为空)。');
+        }
+      } else {
+        statusMessage = chalk.red('PurgeCSS 处理失败 (LESS)。');
+      }
+
+      logger.info(`${relativeLessPath} ${statusMessage}`);
+    } catch (error: any) {
+      logger.error(chalk.red(`  处理文件 ${relativeLessPath} 时出错: ${error.message}`));
+      commandHadErrors = true;
+    }
+  }
+
   if (!write && writeableChangesCount > 0) {
     const savingsInKb = (totalPotentialSavings / 1024).toFixed(1);
     logger.info(
@@ -228,7 +363,7 @@ async function performPurge(
     logger.error(chalk.red('PurgeWXSS 命令执行完毕，但出现错误。'));
     if (!process.exitCode) process.exitCode = 1;
   } else {
-    if (wxssFilesToProcess.length > 0 && !commandHadErrors) {
+    if ((wxssFilesToProcess.length > 0 || lessFilesToProcess.length > 0) && !commandHadErrors) {
       // Consider if this final message is needed if all files were skipped or had individual statuses
     }
     logger.info(chalk.green('PurgeWXSS 分析完成。'));
