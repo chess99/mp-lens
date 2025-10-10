@@ -1,61 +1,22 @@
-# mp-lens (小程序分析工具)
-
 [![npm](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 [![License](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](https://github.com/chess99/mp-lens/blob/master/LICENSE)
 [![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 
-**`mp-lens` 是一款专为微信小程序开发者设计的命令行工具，旨在通过依赖分析，帮助您轻松、安全地理解和优化项目。**
+**`mp-lens` 是一款专为微信小程序开发者设计的命令行工具，基于依赖分析，一键发现并清理未使用的文件与代码，帮助您安全瘦身并优化项目。**
 
-它能解决项目维护中的常见痛点：快速理解项目结构、精准优化包体积、提升代码质量。
+它聚焦清理相关场景：快速清理冗余、精准优化包体积，并辅助理解项目结构与提升代码质量。
 
-## 🚀 快速开始
-
-### 1. 安装
-
-在您的项目本地安装 `mp-lens`：
+通过一条命令立即体验清理（默认仅预览，实际删除前会有确认提示，可放心试用）：
 
 ```bash
-npm install --save-dev mp-lens
-# 或者
-yarn add --dev mp-lens
-```
-
-### 2. 核心命令
-
-通过 `npx` 直接运行命令：
-
-#### **分析并清理未使用的文件**
-
-这是最常用的功能。它会找出项目中未被引用的孤立文件（组件、页面、脚本、图片等）。
-
-```bash
-# 1. 预览将要删除的文件 (推荐首先运行)
 npx mp-lens clean
-
-# 2. 确认无误后，实际执行删除操作
-npx mp-lens clean --write
 ```
-
-**⚠️ 强烈建议：** 在执行 `--write` 操作前，确保您的代码已通过 Git 等版本控制工具保存。
-
-#### **可视化项目依赖图**
-
-生成一个交互式的 HTML 文件，帮助您快速理解项目的全貌。
-
-```bash
-# 生成依赖图，默认保存为 mp-lens-graph.html
-npx mp-lens graph
-```
-
-![依赖关系图示例](docs/images/dependency-graph-example.png)
 
 ---
 
-对更多功能感兴趣？请继续阅读下文的详细介绍。
-
 ## ✨ 功能特性
 
-- **全面的依赖分析:** 扫描多种文件类型（`.js`, `.ts`, `.wxml`, `.wxss`, `.json`, `.wxs`, 及常见图片格式），构建项目依赖图。
+- **全面的依赖分析:** 为安全清理提供可靠依据；扫描多种文件类型（`.js`, `.ts`, `.wxml`, `.wxss`, `.json`, `.wxs`, 及常见图片格式），构建项目依赖图。
 - **依赖图可视化:** 生成交互式 HTML 或 JSON 格式的依赖图，清晰展现页面、组件、脚本间的相互联系。
 - **精准的未使用文件检测:** 基于依赖分析，准确识别项目中未被任何地方引用的孤立文件。
 - **灵活的路径别名支持:** 智能解析 TypeScript 路径别名 (Path Aliases) 和自定义别名配置。
@@ -63,18 +24,34 @@ npx mp-lens graph
 - **安全至上的清理机制:**
   - 默认在删除文件前进行**交互式确认**。
   - 支持 Glob 模式，可在分析和清理时**排除**特定文件或目录。
-- **代码质量检查:**
+- **代码质量检查（辅助清理）:**
   - 检查组件声明与使用的一致性 (`lint` 命令)。
   - 清理 WXSS 文件中未使用的 CSS 规则 (`purgewxss` 命令)。
   - 检测重复代码 (`cpd` 命令)。
-- **包体差异分析:** 对比两个 Git 提交（分支或标签）之间的包体构成和大小差异 (`diff` 命令)。
+- **包体差异分析（清理前后对比）:** 对比两个 Git 提交（分支或标签）之间的包体构成和大小差异 (`diff` 命令)。
+
+## 安装（可选）
+
+如需本地安装以获得更快的执行体验：
+
+```bash
+npm install --save-dev mp-lens
+# 或者
+yarn add --dev mp-lens
+```
 
 ## 📖 命令详解
 
-基本命令结构：
+基本命令结构与示例：
 
 ```bash
 mp-lens [全局选项] <命令> [命令特定选项]
+```
+
+将 `<命令>` 替换为以下之一：`clean`, `graph`, `lint`, `purgewxss`, `diff`, `cpd`。
+
+```bash
+mp-lens clean --write
 ```
 
 ### 全局选项
@@ -132,6 +109,8 @@ mp-lens graph -f json -o dependency-data.json
 
 - `-f, --format <format>`: 输出格式 (html|json)。默认为 `html`。
 - `-o, --output <file>`: 保存图文件的路径。
+
+![依赖关系图示例](docs/images/dependency-graph-example.png)
 
 ### `lint` - 检查组件声明与使用的一致性
 
