@@ -33,91 +33,51 @@ mp-lens 提供了专门的解析器和分析工具，使 Knip 能够正确理解
 
 ```bash
 # 使用npm
-npm install --save-dev mp-lens knip
+npm install --save-dev mp-lens 
 
 # 或使用yarn
-yarn add --dev mp-lens knip
+yarn add --dev mp-lens 
 ```
 
-### 2. 创建 Knip 配置文件
+### 2. 使用示例配置
 
-在你的项目根目录创建`knip.js`文件（也可以选择使用`knip.ts`或JSON格式）:
-
-```javascript
-// 参考示例位于 docs/examples/knip.js
-const {
-  findMiniProgramEntryPoints,
-  parseWxml,
-  parseWxs,
-  parseWxss,
-  parseJson,
-} = require('mp-lens');
-const path = require('path');
-
-// 配置小程序源码目录
-const projectRoot = process.cwd();
-const miniappRootRelative = 'src'; // 修改为你的小程序源码目录
-const miniappRootAbsolute = path.resolve(projectRoot, miniappRootRelative);
-
-/** @type {() => Promise<import('knip').KnipConfig>} */
-const config = async () => {
-  console.log(`[Knip Config] 动态分析 ${miniappRootRelative} 结构...`);
-
-  // 使用mp-lens函数动态发现入口点
-  const mpEntryPoints = await findMiniProgramEntryPoints(projectRoot, miniappRootAbsolute);
-  console.log(`[Knip Config] 找到 ${mpEntryPoints.length} 个潜在的小程序入口点.`);
-
-  return {
-    // 组合入口点
-    entry: [
-      ...mpEntryPoints,
-      `${miniappRootRelative}/app.json`,
-      `${miniappRootRelative}/project.config.json`,
-    ],
-    // 定义项目文件
-    project: [`${miniappRootRelative}/**/*.{js,ts,wxml,wxss,json}`],
-    // 自定义编译器支持小程序特有文件
-    compilers: {
-      wxml: parseWxml,
-      wxss: parseWxss,
-      wxs: parseWxs,
-      json: parseJson,
-    },
-    // 忽略输出和依赖目录
-    ignore: ['dist/**', 'node_modules/**'],
-  };
-};
-
-module.exports = config;
-```
+- 将 `docs/examples/knip.js` 复制到项目根目录并命名为 `knip.js`。
+- 按需调整源码目录、忽略规则等；该示例已集成 mp-lens 的动态入口发现与小程序文件解析器。
 
 ### 3. 添加 npm script
 
-在你的`package.json`中添加 Knip 命令：
+在你的`package.json`中添加 Knip 命令（支持自动修复并允许移除未使用文件）：
 
 ```json
 "scripts": {
-  "knip": "knip",
-  "find-unused": "knip"
+  "knip:fix": "npx --yes knip --fix --allow-remove-files"
+}
+```
+
+如需固定 Knip 版本，可使用：
+
+```json
+"scripts": {
+  "knip:fix": "npx --yes knip@5.40.0 --fix --allow-remove-files"
 }
 ```
 
 ### 4. 运行分析
 
-现在你可以运行以下命令来分析你的小程序项目：
+现在你可以运行以下命令来分析并尝试自动修复：
 
 ```bash
-npm run find-unused
+npm run knip:fix
 ```
 
 ## 配置详解
 
 ### 动态入口点发现
 
-`findMiniProgramEntryPoints` 现已直接复用 `analyzeProject` 的分析结果，依据“可达节点”生成入口文件列表：
+`findMiniProgramEntryPoints` 基于 mp-lens 的依赖图可达性生成入口文件列表：
 
 - 返回的入口文件均为相对 `projectRoot` 的模块文件路径（节点类型为 `Module`）
-- 默认不包含静态资源文件（如图片等），以降低噪音；如需纳入，可在后续版本开放配置
+- 默认不包含静态资源文件（如图片等），以降低噪音
 - 支持通过别名（alias）解析的组件与模块路径，行为与核心分析一致
 
 它会自动覆盖你的小程序项目中的关键入口点，包括：
@@ -139,27 +99,10 @@ mp-lens 提供了以下主要的小程序文件解析器：
 
 这些解析器帮助 Knip 正确理解小程序特有的文件类型并跟踪它们的依赖关系。
 
-## 高级技巧
+### 上下文与忽略规则
 
-### 忽略特定文件
-
-如果有些组件是按需动态加载的，你可能希望排除它们：
-
-```javascript
-ignoreDependencies: [
-  // 添加 Knip 误报为未使用的依赖
-],
-ignoreExportsUsedInFile: true, // 忽略在同一文件中使用的导出
-```
-
-### 调整日志详细程度
-
-如果你想查看更详细的分析过程：
-
-```bash
-# 使用环境变量控制mp-lens的日志级别
-MP_LENS_LOG_LEVEL=debug npm run find-unused
-```
+- 通过 `initializeCommandContext` 加载项目上下文（包含 `miniappRoot`、`aliases`、`exclude` 等）
+- 可复用 `context.excludePatterns` 作为 Knip 的 `ignore` 列表（已合并 `.gitignore` 与配置项）
 
 ## 安全删除导出：配置 ESLint 校验机制
 
@@ -245,7 +188,7 @@ module.exports = {
 #### 1. 运行 Knip 分析
 
 ```bash
-npm run find-unused
+npm run knip:fix
 ```
 
 #### 2. 删除 Knip 标识的未使用导出
