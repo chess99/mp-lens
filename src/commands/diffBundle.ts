@@ -174,25 +174,7 @@ export async function diffBundle(
     gitManager.restore();
   }
 
-  // --- Compare and Display Results ---
-  console.log(chalk.bold('\n📊 包大小差异对比结果:'));
-  console.log(chalk.dim(`  基准 (Base): ${baseRef}`));
-  console.log(chalk.dim(`  目标 (Target): ${targetRef}\n`));
-
-  const sizeDiff = targetSizes.totalSize - baseSizes.totalSize;
-  const filesDiff = targetSizes.totalFiles - baseSizes.totalFiles;
-
-  console.log(
-    `  总包大小: ${formatBytes(baseSizes.totalSize)} -> ${formatBytes(
-      targetSizes.totalSize,
-    )} (${formatBytes(sizeDiff, true)})`,
-  );
-  console.log(
-    `  总文件数: ${baseSizes.totalFiles} -> ${targetSizes.totalFiles} (${
-      filesDiff > 0 ? '+' : ''
-    }${filesDiff})`,
-  );
-
+  // --- Display file-level details first ---
   console.log(chalk.bold('\n📄 文件级别变化明细:'));
 
   interface FileChange {
@@ -261,4 +243,21 @@ export async function diffBundle(
       }
     });
   }
+
+  // --- Finally, print the summary at the end ---
+  const sizeDiff = targetSizes.totalSize - baseSizes.totalSize;
+  const filesDiff = targetSizes.totalFiles - baseSizes.totalFiles;
+
+  console.log(chalk.bold('\n📊 包大小差异对比结果:'));
+  console.log(chalk.dim(`  基准 (Base): ${baseRef}`));
+  console.log(chalk.dim(`  目标 (Target): ${targetRef}\n`));
+
+  console.log(
+    `  总包大小: ${formatBytes(baseSizes.totalSize)} -> ${formatBytes(
+      targetSizes.totalSize,
+    )} (${formatBytes(sizeDiff, true)})`,
+  );
+  console.log(
+    `  总文件数: ${baseSizes.totalFiles} -> ${targetSizes.totalFiles} (${filesDiff > 0 ? '+' : ''}${filesDiff})`,
+  );
 }
