@@ -6,12 +6,13 @@ import type {
 } from '../../analyzer/project-structure';
 import type { TreeNodeData } from '../types';
 
-interface ExtendedNodeProperties extends Record<string, any> {
+interface ExtendedNodeProperties extends Record<string, unknown> {
   fileCount?: number;
   totalSize?: number;
   fileTypes?: Record<string, number>;
   sizeByType?: Record<string, number>;
   reachableModuleIds?: Set<string>; // Added to store the IDs
+  selfSize?: number; // For Module nodes: its own file size
 }
 
 interface FileStats {
@@ -274,23 +275,23 @@ function processNodeRecursive(
   });
 
   // 3. Calculate stats for the current node based on all aggregated module IDs
-  let finalProperties: ExtendedNodeProperties;
+  // Unify behavior for both Module and non-Module: use aggregated reachable modules for stats.
+  // For Module nodes, also expose selfSize to keep its own file size explicitly.
+  const currentStats = calculateStatsFromModuleIds(aggregatedModuleIds, nodeMap);
+  const baseProperties: ExtendedNodeProperties =
+    nodeData.type === 'Module' ? ensureModuleProperties(nodeData) : nodeData.properties || {};
 
-  if (nodeData.type === 'Module') {
-    // For Module nodes, ensure they have their own properties with at least basic values
-    finalProperties = ensureModuleProperties(nodeData);
-  } else {
-    // For non-Module nodes, calculate stats from all aggregated modules
-    const currentStats = calculateStatsFromModuleIds(aggregatedModuleIds, nodeMap);
-    finalProperties = {
-      ...nodeData.properties, // Preserve original properties
-      fileCount: currentStats.fileCount,
-      totalSize: currentStats.totalSize,
-      fileTypes: currentStats.fileTypes,
-      sizeByType: currentStats.sizeByType,
-      reachableModuleIds: aggregatedModuleIds, // Store the set of module IDs
-    };
-  }
+  const finalProperties: ExtendedNodeProperties = {
+    ...baseProperties,
+    fileCount: currentStats.fileCount,
+    totalSize: currentStats.totalSize,
+    fileTypes: currentStats.fileTypes,
+    sizeByType: currentStats.sizeByType,
+    reachableModuleIds: aggregatedModuleIds, // Store the set of module IDs for FileListView and others
+    ...(nodeData.type === 'Module'
+      ? { selfSize: (baseProperties && (baseProperties as { fileSize?: number }).fileSize) || 0 }
+      : {}),
+  };
 
   const treeNode: TreeNodeData = {
     id: nodeData.id,
@@ -379,4 +380,62 @@ export function buildTreeWithStats(projectStructure: ProjectStructure): TreeNode
   );
 
   return result ? result.treeNode : null;
+}
+
+/**
+ * Compute aggregated stats (fileCount, totalSize, sizeByType, etc.) for a node by traversing
+ * the full graph. If reachableModuleIds is provided, it will be used directly.
+ * Returns both stats and the set of reachable module IDs for reuse in views.
+ */
+export function computeAggregatedStatsForNode(
+  projectStructure: ProjectStructure,
+  nodeId: string,
+  nodeType: string,
+  reachableModuleIds?: Set<string>,
+): {
+  moduleIds: Set<string>;
+  fileCount: number;
+  totalSize: number;
+  fileTypes: Record<string, number>;
+  sizeByType: Record<string, number>;
+  selfSize?: number;
+} {
+  const { nodes, links } = projectStructure;
+
+  const nodeMap = new Map<string, GraphNode>();
+  nodes.forEach((n) => nodeMap.set(n.id, n));
+
+  const linksFromMap = new Map<string, GraphLink[]>();
+  links.forEach((link) => {
+    if (!linksFromMap.has(link.source)) {
+      linksFromMap.set(link.source, []);
+    }
+    linksFromMap.get(link.source)!.push(link);
+  });
+
+  let moduleIds: Set<string>;
+  if (reachableModuleIds && reachableModuleIds.size > 0) {
+    moduleIds = reachableModuleIds;
+  } else {
+    moduleIds = collectAllReachableModulesFrom(nodeId, nodeMap, linksFromMap);
+    if (nodeType === 'Module') {
+      moduleIds.add(nodeId);
+    }
+  }
+
+  const stats = calculateStatsFromModuleIds(moduleIds, nodeMap);
+  const selfNode = nodeMap.get(nodeId);
+  const selfSize =
+    nodeType === 'Module' && selfNode?.properties?.fileSize
+      ? (selfNode.properties.fileSize as number)
+      : undefined;
+
+  return {
+    moduleIds,
+    fileCount: stats.fileCount,
+    totalSize: stats.totalSize,
+    fileTypes: stats.fileTypes,
+    sizeByType: stats.sizeByType,
+    ...(selfSize !== undefined ? { selfSize } : {}),
+  };
 }

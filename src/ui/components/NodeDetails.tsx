@@ -1,7 +1,8 @@
+import type { VNode } from 'preact';
 import { useMemo } from 'preact/hooks';
 import type { ProjectStructure } from '../../analyzer/project-structure'; // Import necessary types
 import { NodeDetailsProps } from '../types';
-import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
+import { computeAggregatedStatsForNode, formatBytes } from '../utils/dependency-tree-processor'; // UPDATED
 import styles from './NodeDetails.module.css'; // Import CSS Module
 
 // Update NodeDetailsProps to include fullGraphData and the callback
@@ -59,11 +60,58 @@ function getFileTypeColor(fileType: string): string {
   return fileTypeColorMap[fileType] || '#4285F4'; // Default to blue
 }
 
-export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: ExtendedNodeDetailsProps) {
-  const fileCount = node.properties?.fileCount || 0;
-  const totalSize = node.properties?.totalSize || 0;
-  const fileTypes = node.properties?.fileTypes || {};
-  const sizeByType = node.properties?.sizeByType || {};
+export function NodeDetails({
+  node,
+  fullGraphData,
+  onChildNodeSelect,
+}: ExtendedNodeDetailsProps): VNode {
+  // Prefer aggregated stats on node; otherwise compute from full graph
+  const agg = useMemo(() => {
+    // For Module: always compute aggregated stats to avoid relying on default placeholders
+    if (node.type === 'Module') {
+      const result = computeAggregatedStatsForNode(
+        fullGraphData,
+        node.id,
+        node.type,
+        node.properties?.reachableModuleIds,
+      );
+      return result;
+    }
+    // For non-Module: prefer precomputed aggregated values on properties; else compute
+    const preCount = node.properties?.fileCount;
+    const preTotal = node.properties?.totalSize;
+    const preSelf = node.properties?.selfSize;
+    if (typeof preCount === 'number' && typeof preTotal === 'number') {
+      return {
+        moduleIds: (node.properties?.reachableModuleIds as Set<string>) || new Set<string>(),
+        fileCount: preCount,
+        totalSize: preTotal,
+        fileTypes: node.properties?.fileTypes || {},
+        sizeByType: node.properties?.sizeByType || {},
+        selfSize: preSelf,
+      };
+    }
+    const result = computeAggregatedStatsForNode(
+      fullGraphData,
+      node.id,
+      node.type,
+      node.properties?.reachableModuleIds,
+    );
+    return result;
+  }, [
+    node.id,
+    node.type,
+    node.properties?.fileCount,
+    node.properties?.totalSize,
+    node.properties?.selfSize,
+    node.properties?.reachableModuleIds,
+    fullGraphData,
+  ]);
+  const fileCount = agg.fileCount;
+  const totalSize = agg.totalSize;
+  const selfSize = agg.selfSize;
+  const fileTypes = agg.fileTypes || {};
+  const sizeByType = agg.sizeByType || {};
   const childrenIds = node.children?.map((c) => c.id) || [];
   const displayPath = node.properties?.basePath || node.properties?.path;
 
@@ -121,6 +169,12 @@ export function NodeDetails({ node, fullGraphData, onChildNodeSelect }: Extended
             <div className={styles.nodeStatItem}>
               <span className={styles.statValue}>{formatBytes(totalSize)}</span>
               <span className={styles.statLabel}>总大小</span>
+            </div>
+          )}
+          {node.type === 'Module' && (selfSize || 0) > 0 && (
+            <div className={styles.nodeStatItem}>
+              <span className={styles.statValue}>{formatBytes(selfSize as number)}</span>
+              <span className={styles.statLabel}>自身大小</span>
             </div>
           )}
         </div>

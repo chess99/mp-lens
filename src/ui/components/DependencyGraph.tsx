@@ -2,6 +2,7 @@ import G6, { Graph } from '@antv/g6';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { ProjectStructure } from '../../analyzer/project-structure';
 import { TreeNodeData } from '../types';
+import { computeAggregatedStatsForNode } from '../utils/dependency-tree-processor';
 import styles from './DependencyGraph.module.css';
 
 interface DependencyGraphProps {
@@ -61,15 +62,16 @@ function getBorderColorByType(type: string, isCenter = false): string {
 }
 
 // Helper to ensure node always has valid property information
-function ensureNodeProperties(properties: any = {}) {
+function ensureNodeProperties(properties: Record<string, unknown> = {}): Record<string, unknown> {
+  const p = properties as { fileCount?: number; totalSize?: number; fileSize?: number };
   return {
     ...properties,
-    fileCount: properties.fileCount !== undefined ? properties.fileCount : 1,
+    fileCount: typeof p.fileCount === 'number' ? p.fileCount : 1,
     totalSize:
-      properties.totalSize !== undefined
-        ? properties.totalSize
-        : properties.fileSize !== undefined
-          ? properties.fileSize
+      typeof p.totalSize === 'number'
+        ? p.totalSize
+        : typeof p.fileSize === 'number'
+          ? p.fileSize
           : 0,
   };
 }
@@ -84,17 +86,43 @@ export function DependencyGraph({
   const graphRef = useRef<Graph | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // (Removed aggregated calculation here; center节点的聚合在 App.tsx fallback 中处理)
+
   // Function to create a subgraph focused on the selected node
   const createSubgraphForNode = (node: TreeNodeData | null) => {
     const nodes: any[] = [];
     const edges: any[] = [];
     const nodeMap = new Map<string, boolean>();
 
+    // Build maps for full graph traversal (for tooltip aggregation on Module nodes)
+    const fullNodeMap = new Map<
+      string,
+      { id: string; type: string; label: string; properties?: Record<string, unknown> }
+    >(
+      (fullGraphData?.nodes || []).map((n) => [
+        n.id,
+        n as unknown as {
+          id: string;
+          type: string;
+          label: string;
+          properties?: Record<string, unknown>;
+        },
+      ]),
+    );
+    const linksFromMap = new Map<string, string[]>();
+    for (const link of fullGraphData?.links || []) {
+      if (!linksFromMap.has(link.source)) linksFromMap.set(link.source, []);
+      linksFromMap.get(link.source)!.push(link.target);
+    }
+
+    const aggregateModuleStats = (startId: string) =>
+      computeAggregatedStatsForNode(fullGraphData, startId, 'Module');
+
     if (!node || !fullGraphData) {
       return { nodes, edges };
     }
 
-    // Add the selected node as the center node (already has full properties)
+    // Add the selected node as the center node (use provided properties)
     nodes.push({
       id: node.id,
       label: node.label || node.id,
@@ -117,7 +145,7 @@ export function DependencyGraph({
         },
       },
       nodeType: node.type,
-      properties: ensureNodeProperties(node.properties), // Ensure center node has valid properties
+      properties: ensureNodeProperties(node.properties),
     });
     nodeMap.set(node.id, true);
 
@@ -133,7 +161,7 @@ export function DependencyGraph({
 
           // Get properties, ensure they're valid
           let targetProperties = processedTargetNode?.properties || rawTargetNode.properties || {};
-          targetProperties = ensureNodeProperties(targetProperties);
+          targetProperties = ensureNodeProperties(targetProperties as Record<string, unknown>);
 
           nodes.push({
             id: targetNodeData.id,
@@ -172,7 +200,7 @@ export function DependencyGraph({
 
           // Get properties, ensure they're valid
           let sourceProperties = processedSourceNode?.properties || rawSourceNode.properties || {};
-          sourceProperties = ensureNodeProperties(sourceProperties);
+          sourceProperties = ensureNodeProperties(sourceProperties as Record<string, unknown>);
 
           nodes.push({
             id: sourceNodeData.id,
@@ -203,22 +231,29 @@ export function DependencyGraph({
 
     // Create tooltips for all nodes
     nodes.forEach((n) => {
-      let tooltip = `<div style="padding: 5px; font-size: 12px;"><strong>${n.label}</strong><br/>Type: ${n.nodeType}`;
+      let tooltip = `<div style="padding: 5px; font-size: 12px;"><strong>${n.label}</strong><br/>类型: ${n.nodeType}`;
       if (n.properties) {
-        // Always use fileCount from properties (now guaranteed to exist)
-        tooltip += `<br/>Files: ${n.properties.fileCount}`;
+        // Prefer aggregated values; if missing and nodeType === Module, compute on the fly
+        let files: number | undefined = (n.properties as any).fileCount as number | undefined;
+        let totalSizeBytes: number | undefined = (n.properties as any).totalSize as
+          | number
+          | undefined;
+        let selfBytes: number | undefined = (n.properties as any).selfSize as number | undefined;
 
-        // Get size information, preferring totalSize, then fileSize, defaulting to 0
-        const sizeInBytes =
-          n.properties.totalSize !== undefined
-            ? n.properties.totalSize
-            : n.properties.fileSize !== undefined
-              ? n.properties.fileSize
-              : 0;
+        if (n.nodeType === 'Module') {
+          const agg = aggregateModuleStats(n.id);
+          files = agg.fileCount;
+          totalSizeBytes = agg.totalSize;
+          selfBytes = agg.selfSize;
+        }
 
-        // Convert bytes to KB for display
-        const sizeToDisplay = (sizeInBytes / 1024).toFixed(2) + ' KB';
-        tooltip += `<br/>Size: ${sizeToDisplay}`;
+        tooltip += `<br/>文件数: ${files ?? 0}`;
+        const totalSizeDisplay = ((totalSizeBytes ?? 0) / 1024).toFixed(2) + ' KB';
+        tooltip += `<br/>总大小: ${totalSizeDisplay}`;
+        if (n.nodeType === 'Module') {
+          const selfDisplay = ((selfBytes ?? 0) / 1024).toFixed(2) + ' KB';
+          tooltip += `<br/>自身大小: ${selfDisplay}`;
+        }
       }
       tooltip += `</div>`;
       n.tooltip = tooltip; // Assign tooltip directly to node data

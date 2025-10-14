@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
-import type { GraphNode } from '../../analyzer/project-structure'; // Import graph types
+import type { GraphNode, ProjectStructure } from '../../analyzer/project-structure'; // Import graph types
 import { NodeDetailsProps } from '../types';
-import { formatBytes } from '../utils/dependency-tree-processor'; // UPDATED import path
+import { computeAggregatedStatsForNode, formatBytes } from '../utils/dependency-tree-processor'; // UPDATED import path
 import styles from './FileListView.module.css'; // Import CSS Module
 
 // ADDED: Define props for FileListView, including the new callback
@@ -48,7 +48,11 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
   const [filterType, setFilterType] = useState<string>(''); // '' means show all
 
   // Use full graph data if available
-  const fullGraphData = window.__MP_LENS_GRAPH_DATA__ || { nodes: [], links: [], miniappRoot: '' };
+  const fullGraphData = (window.__MP_LENS_GRAPH_DATA__ || {
+    nodes: [],
+    links: [],
+    miniappRoot: '',
+  }) as ProjectStructure;
   const miniappRoot = fullGraphData.miniappRoot || '';
 
   // Pre-calculate dependency counts for all nodes
@@ -60,12 +64,24 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
     return counts;
   }, [fullGraphData.links]);
 
+  // Build node and adjacency maps for fallback traversal
+  const nodeMap = useMemo(() => {
+    return new Map<string, GraphNode>(fullGraphData.nodes.map((n: GraphNode) => [n.id, n]));
+  }, [fullGraphData.nodes]);
+
+  // Compute reachable modules via shared helper (prefer precomputed reachableModuleIds)
+  const moduleIds = useMemo(() => {
+    const agg = computeAggregatedStatsForNode(
+      fullGraphData,
+      node.id,
+      node.type,
+      node.properties?.reachableModuleIds as Set<string> | undefined,
+    );
+    return agg.moduleIds;
+  }, [fullGraphData, node.id, node.type, node.properties?.reachableModuleIds]);
+
   // Collect all reachable module files first
   const allFiles = useMemo(() => {
-    const moduleIds = node.properties?.reachableModuleIds || new Set<string>();
-    const nodeMap = new Map<string, GraphNode>(
-      fullGraphData.nodes.map((n: GraphNode) => [n.id, n]),
-    ); // Use GraphNode type
     const files: FileDetail[] = []; // Use FileDetail type
     let counter = 0;
     moduleIds.forEach((mid: string) => {
@@ -86,13 +102,7 @@ export function FileListView({ node, onFileSelect }: FileListViewProps) {
       });
     });
     return files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  }, [
-    node.id,
-    node.properties?.reachableModuleIds,
-    fullGraphData.nodes,
-    miniappRoot,
-    dependencyCounts,
-  ]); // Added dependencies
+  }, [node.id, moduleIds, nodeMap, miniappRoot, dependencyCounts]); // Added dependencies
 
   // Get unique file types for filtering options
   const uniqueFileTypes = useMemo(() => {
