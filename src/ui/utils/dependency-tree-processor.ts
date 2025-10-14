@@ -112,11 +112,11 @@ function collectAllReachableModulesFrom(
   nodeMap: Map<string, GraphNode>,
   linksFromMap: Map<string, GraphLink[]>, // Links grouped by source ID
   // Optional: Cache for this collection to optimize if called with same startNodeId multiple times
-  // collectionCache: Map<string, Set<string>> = new Map()
+  collectionCache?: Map<string, Set<string>>,
 ): Set<string> {
-  // if (collectionCache.has(startGraphNodeId)) {
-  //   return new Set(collectionCache.get(startGraphNodeId)!);
-  // }
+  if (collectionCache && collectionCache.has(startGraphNodeId)) {
+    return new Set(collectionCache.get(startGraphNodeId)!);
+  }
 
   const reachableModuleIds = new Set<string>();
   const queue: string[] = [startGraphNodeId];
@@ -143,7 +143,9 @@ function collectAllReachableModulesFrom(
       }
     }
   }
-  // collectionCache.set(startGraphNodeId, new Set(reachableModuleIds));
+  if (collectionCache) {
+    collectionCache.set(startGraphNodeId, new Set(reachableModuleIds));
+  }
   return reachableModuleIds;
 }
 
@@ -190,7 +192,7 @@ function processNodeRecursive(
   // Map defining tree structure: parentId -> Set<childId (non-Module)>
   treeChildrenMap: Map<string, Set<string>>,
   visitedForTreeCycles: Set<string>,
-  // collectionCache: Map<string, Set<string>> // Pass down for collectAllReachableModulesFrom
+  collectionCache: Map<string, Set<string>>, // Cache for collectAllReachableModulesFrom
 ): ProcessNodeResult | null {
   const nodeData = nodeMap.get(currentGraphNodeId);
   if (!nodeData) {
@@ -223,7 +225,8 @@ function processNodeRecursive(
       const modulesReachableFromThisFile = collectAllReachableModulesFrom(
         moduleNode.id,
         nodeMap,
-        linksFromMap /* collectionCache */,
+        linksFromMap,
+        collectionCache,
       );
       modulesReachableFromThisFile.forEach((id) => aggregatedModuleIds.add(id));
     }
@@ -233,13 +236,10 @@ function processNodeRecursive(
     const modulesReachableFromThisFile = collectAllReachableModulesFrom(
       currentGraphNodeId,
       nodeMap,
-      linksFromMap /* collectionCache */,
+      linksFromMap,
+      collectionCache,
     );
     modulesReachableFromThisFile.forEach((id) => aggregatedModuleIds.add(id));
-
-    // For Module nodes, always include itself in the reachable set
-    // This ensures it has its own stats even if it has no dependencies
-    aggregatedModuleIds.add(currentGraphNodeId);
   }
 
   // 2. Process children (non-Module, 'Structure' links that define the tree hierarchy)
@@ -256,7 +256,8 @@ function processNodeRecursive(
         allLinks,
         linksFromMap,
         treeChildrenMap,
-        new Set(visitedForTreeCycles) /* collectionCache */,
+        new Set(visitedForTreeCycles),
+        collectionCache,
       );
       if (childResult) {
         childrenTreeNodes.push(childResult.treeNode);
@@ -278,8 +279,9 @@ function processNodeRecursive(
   // Unify behavior for both Module and non-Module: use aggregated reachable modules for stats.
   // For Module nodes, also expose selfSize to keep its own file size explicitly.
   const currentStats = calculateStatsFromModuleIds(aggregatedModuleIds, nodeMap);
+  // For Module nodes, prefer raw properties (we'll compute aggregated stats anyway)
   const baseProperties: ExtendedNodeProperties =
-    nodeData.type === 'Module' ? ensureModuleProperties(nodeData) : nodeData.properties || {};
+    nodeData.type === 'Module' ? nodeData.properties || {} : nodeData.properties || {};
 
   const finalProperties: ExtendedNodeProperties = {
     ...baseProperties,
@@ -289,7 +291,7 @@ function processNodeRecursive(
     sizeByType: currentStats.sizeByType,
     reachableModuleIds: aggregatedModuleIds, // Store the set of module IDs for FileListView and others
     ...(nodeData.type === 'Module'
-      ? { selfSize: (baseProperties && (baseProperties as { fileSize?: number }).fileSize) || 0 }
+      ? { selfSize: (baseProperties as { fileSize?: number }).fileSize || 0 }
       : {}),
   };
 
@@ -368,7 +370,7 @@ export function buildTreeWithStats(projectStructure: ProjectStructure): TreeNode
     return { id: 'error_root', label: 'Could not build tree: No valid root', type: 'Unknown' };
   }
 
-  // const collectionCache = new Map<string, Set<string>>(); // Instantiate cache for collectAllReachableModulesFrom
+  const collectionCache = new Map<string, Set<string>>(); // Cache for collectAllReachableModulesFrom
 
   const result = processNodeRecursive(
     rootId,
@@ -376,7 +378,8 @@ export function buildTreeWithStats(projectStructure: ProjectStructure): TreeNode
     links,
     linksFromMap,
     treeChildrenMap,
-    new Set<string>() /* collectionCache */,
+    new Set<string>(),
+    collectionCache,
   );
 
   return result ? result.treeNode : null;
@@ -417,7 +420,9 @@ export function computeAggregatedStatsForNode(
   if (reachableModuleIds && reachableModuleIds.size > 0) {
     moduleIds = reachableModuleIds;
   } else {
-    moduleIds = collectAllReachableModulesFrom(nodeId, nodeMap, linksFromMap);
+    // local cache during this call to prevent repeated traversals if compute is extended
+    const localCache = new Map<string, Set<string>>();
+    moduleIds = collectAllReachableModulesFrom(nodeId, nodeMap, linksFromMap, localCache);
     if (nodeType === 'Module') {
       moduleIds.add(nodeId);
     }

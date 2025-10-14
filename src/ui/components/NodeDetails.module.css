@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   border-left: 4px solid #4285f4;
   grid-column: 1 / -1;
 }
@@ -33,6 +33,8 @@
 .detailTitleArea {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0; /* allow text to shrink and wrap gracefully */
 }
 
 .nodeTitle {
@@ -55,13 +57,17 @@
 
 .nodeStats {
   display: flex;
-  gap: 20px;
+  gap: 12px;
+  flex-wrap: wrap; /* allow more stats like 自身大小 to wrap */
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .nodeStatItem {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 90px;
 }
 
 .statValue {
