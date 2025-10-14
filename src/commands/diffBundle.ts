@@ -10,6 +10,7 @@ import { logger } from '../utils/debug-logger';
 import { HandledError } from '../utils/errors';
 import {
   branchOrCommitExists,
+  getDefaultBranch,
   GitSwitchManager,
   isGitRepository,
   isWorkingDirectoryClean,
@@ -130,7 +131,7 @@ export async function diffBundle(
     throw new HandledError('当前目录不是一个 Git 仓库。请在 Git 仓库内运行此命令。');
   }
 
-  const baseRef = cmdOptions.base || 'master';
+  const baseRef = cmdOptions.base || getDefaultBranch(projectRoot);
   const targetRef = cmdOptions.target || 'HEAD';
 
   logger.info(`对比基准 (Base): ${baseRef}`);

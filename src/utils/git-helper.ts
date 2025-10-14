@@ -15,6 +15,59 @@ export function isGitRepository(projectRoot: string): boolean {
 }
 
 /**
+ * 获取默认分支名。
+ * 优先解析远程 origin 的 HEAD 指向；若不可用，则在远程分支中优先选择 main、其次 master；
+ * 若仍不可用，回退到当前分支名。
+ */
+export function getDefaultBranch(projectRoot: string): string {
+  // 1) 尝试解析 origin/HEAD -> origin/<branch>
+  try {
+    const symRef = execSync('git symbolic-ref refs/remotes/origin/HEAD', {
+      cwd: projectRoot,
+      encoding: 'utf8',
+    }).trim();
+    // 形如: refs/remotes/origin/main
+    const match = symRef.match(/refs\/remotes\/origin\/(.+)$/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  } catch (error) {
+    // 忽略，继续下一种策略
+    logger.debug(
+      `解析 origin/HEAD 失败，尝试从远程分支列表推断默认分支: ${(error as Error).message}`,
+    );
+  }
+
+  // 2) 从远程分支列表中选择常见默认分支
+  try {
+    const remoteBranchesRaw = execSync('git branch -r', {
+      cwd: projectRoot,
+      encoding: 'utf8',
+    });
+    const remoteBranches = remoteBranchesRaw
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const hasOriginMain = remoteBranches.some((b) => /origin\/main$/.test(b));
+    if (hasOriginMain) return 'main';
+    const hasOriginMaster = remoteBranches.some((b) => /origin\/master$/.test(b));
+    if (hasOriginMaster) return 'master';
+  } catch (error) {
+    logger.debug(`获取远程分支失败: ${(error as Error).message}`);
+  }
+
+  // 3) 退化为当前分支（本地环境下依然可用）
+  try {
+    return getCurrentBranch(projectRoot);
+  } catch (error) {
+    // 极端情况下再回退到常见默认值
+    logger.warn(`无法获取当前分支，回退到默认 'master': ${(error as Error).message}`);
+    return 'master';
+  }
+}
+
+/**
  * 检查工作区是否干净（没有未提交的更改）
  */
 export function isWorkingDirectoryClean(projectRoot: string): boolean {
