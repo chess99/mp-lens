@@ -8,6 +8,11 @@
   position: relative;
 }
 
+/* Allow node labels to wrap (G6 renders text in <text> but we can enable breaks via CSS for HTML tooltips if any) */
+.graphContainer :global(g.node text) {
+  white-space: normal;
+}
+
 /* Style for interactive graph nodes */
 .graphContainer :global(g.node) {
   cursor: pointer; /* Ensure nodes have pointer cursor */

@@ -61,6 +61,54 @@ function getBorderColorByType(type: string, isCenter = false): string {
   return isCenter ? '#1890ff' : colors[type] || colors.Default;
 }
 
+// Helper: if over maxLength, keep at least the last two path segments intact.
+// Then, from right to left, keep adding whole segments until reaching maxLength.
+// If the retained part is still longer than maxLength (e.g., very long filename), we still keep it intact.
+function truncateKeepLastTwoSegments(text: string, maxLength = 60): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 1) return text.slice(-1);
+
+  const lastSlash = Math.max(text.lastIndexOf('/'), text.lastIndexOf('\\'));
+  if (lastSlash < 0) {
+    // Not a path, fallback to simple middle truncation
+    const keep = maxLength - 1; // room for ellipsis
+    const head = Math.ceil(keep / 2);
+    const tail = Math.floor(keep / 2);
+    return text.slice(0, head) + '…' + text.slice(text.length - tail);
+  }
+
+  const delimiter = text[lastSlash];
+  const parts = text.split(/[/\\]/);
+  const n = parts.length;
+  let start = Math.max(0, n - 2); // ensure at least last two segments
+
+  // Try to include more segments from the left while respecting maxLength
+  // We account for leading ellipsis + delimiter when truncated
+  const joinWithDelim = (arr: string[]) => arr.join(delimiter);
+  let retained = parts.slice(start);
+  while (start > 0) {
+    const candidate = parts.slice(start - 1);
+    const candidateStr = candidate.join(delimiter);
+    const lengthWithEllipsis = candidateStr.length + 2; // '…' + delimiter
+    if (lengthWithEllipsis <= maxLength) {
+      start -= 1;
+      retained = candidate;
+    } else {
+      break;
+    }
+  }
+
+  // If no truncation actually needed (we managed to include all parts), return original
+  if (start === 0 && joinWithDelim(parts).length <= maxLength) {
+    return text;
+  }
+
+  const retainedStr = joinWithDelim(retained);
+  // If retained part plus prefix still exceeds maxLength (very long filename), keep it intact anyway
+  return '…' + delimiter + retainedStr;
+}
+
 // Helper to ensure node always has valid property information
 function ensureNodeProperties(properties: Record<string, unknown> = {}): Record<string, unknown> {
   const p = properties as { fileCount?: number; totalSize?: number; fileSize?: number };
@@ -94,21 +142,6 @@ export function DependencyGraph({
     const edges: any[] = [];
     const nodeMap = new Map<string, boolean>();
 
-    // Build maps for full graph traversal (for tooltip aggregation on Module nodes)
-    const fullNodeMap = new Map<
-      string,
-      { id: string; type: string; label: string; properties?: Record<string, unknown> }
-    >(
-      (fullGraphData?.nodes || []).map((n) => [
-        n.id,
-        n as unknown as {
-          id: string;
-          type: string;
-          label: string;
-          properties?: Record<string, unknown>;
-        },
-      ]),
-    );
     const linksFromMap = new Map<string, string[]>();
     for (const link of fullGraphData?.links || []) {
       if (!linksFromMap.has(link.source)) linksFromMap.set(link.source, []);
@@ -125,7 +158,9 @@ export function DependencyGraph({
     // Add the selected node as the center node (use provided properties)
     nodes.push({
       id: node.id,
-      label: node.label || node.id,
+      label: truncateKeepLastTwoSegments(node.label || node.id),
+      // Preserve full label for tooltip
+      fullLabel: node.label || node.id,
       style: {
         fill: getNodeColorByType(node.type, true),
         stroke: getBorderColorByType(node.type, true),
@@ -165,7 +200,8 @@ export function DependencyGraph({
 
           nodes.push({
             id: targetNodeData.id,
-            label: targetNodeData.label || targetNodeData.id,
+            label: truncateKeepLastTwoSegments(targetNodeData.label || targetNodeData.id),
+            fullLabel: targetNodeData.label || targetNodeData.id,
             style: {
               fill: getNodeColorByType(targetNodeData.type),
               stroke: getBorderColorByType(targetNodeData.type),
@@ -204,7 +240,8 @@ export function DependencyGraph({
 
           nodes.push({
             id: sourceNodeData.id,
-            label: sourceNodeData.label || sourceNodeData.id,
+            label: truncateKeepLastTwoSegments(sourceNodeData.label || sourceNodeData.id),
+            fullLabel: sourceNodeData.label || sourceNodeData.id,
             style: {
               fill: getNodeColorByType(sourceNodeData.type),
               stroke: getBorderColorByType(sourceNodeData.type),
@@ -231,14 +268,13 @@ export function DependencyGraph({
 
     // Create tooltips for all nodes
     nodes.forEach((n) => {
-      let tooltip = `<div style="padding: 5px; font-size: 12px;"><strong>${n.label}</strong><br/>类型: ${n.nodeType}`;
+      const title = n.fullLabel || n.label;
+      let tooltip = `<div style="padding: 5px; font-size: 12px;"><strong>${title}</strong><br/>类型: ${n.nodeType}`;
       if (n.properties) {
         // Prefer aggregated values; if missing and nodeType === Module, compute on the fly
-        let files: number | undefined = (n.properties as any).fileCount as number | undefined;
-        let totalSizeBytes: number | undefined = (n.properties as any).totalSize as
-          | number
-          | undefined;
-        let selfBytes: number | undefined = (n.properties as any).selfSize as number | undefined;
+        let files: number | undefined = n.properties.fileCount;
+        let totalSizeBytes: number | undefined = n.properties.totalSize;
+        let selfBytes: number | undefined = n.properties.selfSize;
 
         if (n.nodeType === 'Module') {
           const agg = aggregateModuleStats(n.id);
@@ -302,7 +338,7 @@ export function DependencyGraph({
         // *** Use default rect node ***
         defaultNode: {
           type: 'rect',
-          size: [140, 30],
+          size: [340, 48],
           // Basic default style, will be overridden by node data
           style: {
             radius: 4,
@@ -316,6 +352,7 @@ export function DependencyGraph({
             style: {
               fill: '#333',
               fontSize: 11,
+              lineHeight: 14,
               cursor: 'pointer',
             },
           },
