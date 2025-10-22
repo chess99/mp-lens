@@ -109,7 +109,7 @@ export class ProjectStructureBuilder {
         node.type === 'Module' &&
         filePath &&
         !this.parsedModules.has(filePath) &&
-        COMPONENT_IMPLEMENTATION_FILE_TYPES.includes(fileExt.slice(1)) // Check file extension
+        (COMPONENT_IMPLEMENTATION_FILE_TYPES as readonly string[]).includes(fileExt.slice(1)) // Check file extension
       ) {
         // Use node.properties.absolutePath which is the ID and the key for parsedModules
         await this.parseModuleDependencies(node);
@@ -356,7 +356,7 @@ export class ProjectStructureBuilder {
             await this.parseComponentJson(ownerId, foundFilePath);
           }
           // If it's a script or template, parse dependencies
-          else if (COMPONENT_IMPLEMENTATION_FILE_TYPES.includes(ext)) {
+          else if ((COMPONENT_IMPLEMENTATION_FILE_TYPES as readonly string[]).includes(ext)) {
             await this.parseModuleDependencies(moduleNode);
           }
         }

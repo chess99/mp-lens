@@ -2,7 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
-import { COMPONENT_DEFINITION_FILE_TYPES, IMAGE_FILE_TYPES } from '../utils/filetypes';
+import {
+  COMPONENT_DEFINITION_FILE_TYPES,
+  IMAGE_FILE_TYPES,
+  SupportedFileType,
+} from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
@@ -107,7 +111,7 @@ export class FileParser {
     sourceExt: string,
   ): string | null {
     // Determine allowed extensions based on source file type and dependency context
-    let allowedExtensions: string[];
+    let allowedExtensions: readonly SupportedFileType[];
 
     switch (sourceExt) {
       case '.js':
@@ -164,6 +168,6 @@ export class FileParser {
       return false;
     }
     // Strictly check if the file extension is an image extension
-    return IMAGE_FILE_TYPES.includes(ext.slice(1));
+    return (IMAGE_FILE_TYPES as readonly string[]).includes(ext.slice(1));
   }
 }

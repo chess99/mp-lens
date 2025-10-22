@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from './debug-logger';
+import { SupportedFileType } from './filetypes';
 
 export class PathResolver {
   private projectRoot: string;
@@ -24,7 +25,7 @@ export class PathResolver {
   public resolveAnyPath(
     importPath: string,
     sourcePath: string,
-    allowedExtensions: string[],
+    allowedExtensions: readonly SupportedFileType[],
   ): string | null {
     logger.trace(
       `Resolving import '${importPath}' from '${sourcePath}' with allowed extensions: [${allowedExtensions.join(
@@ -112,7 +113,10 @@ export class PathResolver {
    * @param allowedExtensions Ordered list of extensions to check (e.g., ['js', 'ts'])
    * @returns The existing absolute file path, or null.
    */
-  private findExistingPath(potentialPath: string, allowedExtensions: string[]): string | null {
+  private findExistingPath(
+    potentialPath: string,
+    allowedExtensions: readonly SupportedFileType[],
+  ): string | null {
     logger.trace(
       `Looking for existing path: ${potentialPath} with extensions: ${allowedExtensions}`,
     );

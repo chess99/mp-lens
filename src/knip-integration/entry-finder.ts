@@ -31,7 +31,7 @@ export async function findMiniProgramEntryPoints(projectRoot: string): Promise<s
       includeAssets: false,
     });
     const nodeMap = new Map(projectStructure.nodes.map((n) => [n.id, n]));
-    const allowedExts = new Set(COMPONENT_DEFINITION_FILE_TYPES);
+    const allowedExts = new Set(COMPONENT_DEFINITION_FILE_TYPES as readonly string[]);
     const entries = new Set<string>();
 
     // 1) 从非 Module（App/Package/Page/Component）到 Module 的直接结构链接

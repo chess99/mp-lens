@@ -273,7 +273,7 @@ function findUnusedFiles(
 
     unusedFiles = unusedFiles.filter((absolutePath) => {
       const fileExt = path.extname(absolutePath).toLowerCase();
-      const isAsset = IMAGE_FILE_TYPES.includes(fileExt.slice(1));
+      const isAsset = (IMAGE_FILE_TYPES as readonly string[]).includes(fileExt.slice(1));
 
       if (isAsset) {
         const relativePath = path.relative(projectRoot, absolutePath);
