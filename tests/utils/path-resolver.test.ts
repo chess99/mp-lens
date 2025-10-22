@@ -163,7 +163,7 @@ describe('PathResolver', () => {
       // Mock the file existence
       mockPathExists(targetFile);
 
-      const resolved = pathResolver.resolveAnyPath('./utils/helper.js', sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath('./utils/helper.js', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(targetFile);
     });
@@ -175,7 +175,7 @@ describe('PathResolver', () => {
       // Mock the file existence
       mockPathExists(targetFile);
 
-      const resolved = pathResolver.resolveAnyPath('/utils/helper.js', sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath('/utils/helper.js', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(targetFile);
     });
@@ -187,7 +187,7 @@ describe('PathResolver', () => {
       // Mock the file existence
       mockPathExists(targetFile);
 
-      const resolved = pathResolver.resolveAnyPath('./utils/helper', sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath('./utils/helper', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(targetFile);
     });
@@ -201,7 +201,7 @@ describe('PathResolver', () => {
       mockPathExists(directory, 'dir');
       mockPathExists(indexFile);
 
-      const resolved = pathResolver.resolveAnyPath('./components', sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath('./components', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(indexFile);
     });
@@ -223,7 +223,7 @@ describe('PathResolver', () => {
       // Mock the file existence
       mockPathExists(resolvedAliasPath);
 
-      const resolved = resolverWithAliases.resolveAnyPath(aliasPath, sourcePath, ['.js', '.ts']);
+      const resolved = resolverWithAliases.resolveAnyPath(aliasPath, sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(resolvedAliasPath);
       // No AliasResolver used anymore
@@ -234,10 +234,7 @@ describe('PathResolver', () => {
 
       // No mocked files means the file doesn't exist
 
-      const resolved = pathResolver.resolveAnyPath('./utils/nonexistent', sourcePath, [
-        '.js',
-        '.ts',
-      ]);
+      const resolved = pathResolver.resolveAnyPath('./utils/nonexistent', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBeNull();
     });
@@ -245,7 +242,7 @@ describe('PathResolver', () => {
     it('should skip npm package imports', () => {
       const sourcePath = actualPath.resolve(projectRoot, 'src/index.js');
 
-      const resolved = pathResolver.resolveAnyPath('react', sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath('react', sourcePath, ['js', 'ts']);
 
       expect(resolved).toBeNull();
     });
@@ -257,7 +254,7 @@ describe('PathResolver', () => {
       // Mock the file existence at the absolute path
       mockPathExists(absolutePath);
 
-      const resolved = pathResolver.resolveAnyPath(absolutePath, sourcePath, ['.js', '.ts']);
+      const resolved = pathResolver.resolveAnyPath(absolutePath, sourcePath, ['js', 'ts']);
 
       expect(resolved).toBe(absolutePath);
     });

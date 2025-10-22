@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
-import { COMPONENT_DEFINITION_EXTENSIONS, IMAGE_EXTENSIONS } from '../utils/filetypes';
+import { COMPONENT_DEFINITION_FILE_TYPES, IMAGE_FILE_TYPES } from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
@@ -112,40 +112,40 @@ export class FileParser {
     switch (sourceExt) {
       case '.js':
       case '.ts':
-        allowedExtensions = ['.js', '.ts', '.d.ts', '.json'];
+        allowedExtensions = ['js', 'ts', 'd.ts', 'json'];
         break;
       case '.wxs':
-        allowedExtensions = ['.wxs']; // WXS files can only import other WXS files
+        allowedExtensions = ['wxs']; // WXS files can only import other WXS files
         break;
       case '.wxml':
         // WXML can reference .wxml (import/include), .wxs, and image files
         // Determine type based on path characteristics
         if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_EXTENSIONS;
+          allowedExtensions = IMAGE_FILE_TYPES;
         } else if (rawPath.includes('.wxs') || rawPath.endsWith('.wxs')) {
-          allowedExtensions = ['.wxs'];
+          allowedExtensions = ['wxs'];
         } else {
           // Default to WXML for import/include
-          allowedExtensions = ['.wxml'];
+          allowedExtensions = ['wxml'];
         }
         break;
       case '.wxss':
       case '.less':
         // WXSS can import other WXSS files or reference image files
         if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_EXTENSIONS;
+          allowedExtensions = IMAGE_FILE_TYPES;
         } else {
-          allowedExtensions = ['.wxss', '.less'];
+          allowedExtensions = ['wxss', 'less'];
         }
         break;
       case '.json':
         // JSON files can reference various file types depending on context
         // For pages and components, we need to find all related files
         if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_EXTENSIONS;
+          allowedExtensions = IMAGE_FILE_TYPES;
         } else {
           // For pages/components, try to find the main file first
-          allowedExtensions = COMPONENT_DEFINITION_EXTENSIONS;
+          allowedExtensions = COMPONENT_DEFINITION_FILE_TYPES;
         }
         break;
       default:
@@ -159,10 +159,11 @@ export class FileParser {
    * Determines if a path refers to an image file based on its extension
    */
   private isImagePath(filePath: string): boolean {
-    const imageExtensions = IMAGE_EXTENSIONS;
     const ext = path.extname(filePath).toLowerCase();
-
+    if (!ext) {
+      return false;
+    }
     // Strictly check if the file extension is an image extension
-    return imageExtensions.includes(ext);
+    return IMAGE_FILE_TYPES.includes(ext.slice(1));
   }
 }

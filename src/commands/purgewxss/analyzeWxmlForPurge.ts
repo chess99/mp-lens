@@ -62,9 +62,7 @@ async function _analyzeWxmlRecursiveForPurge(
     const importPaths = extractImportPaths(ast); // Reuse existing import path extraction
     for (const importPath of importPaths) {
       try {
-        const resolvedPath = pathResolver.resolveAnyPath(importPath, currentWxmlFilePath, [
-          '.wxml',
-        ]);
+        const resolvedPath = pathResolver.resolveAnyPath(importPath, currentWxmlFilePath, ['wxml']);
         if (resolvedPath) {
           await _analyzeWxmlRecursiveForPurge(
             resolvedPath,

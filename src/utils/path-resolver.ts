@@ -18,7 +18,7 @@ export class PathResolver {
    *
    * @param importPath The original import string (e.g., './utils', '/pages/index', '@/comp', 'image.png').
    * @param sourcePath The absolute path of the file containing the import.
-   * @param allowedExtensions An ordered array of extensions to check (e.g., ['.js', '.ts'] or ['.wxml']).
+   * @param allowedExtensions An ordered array of extensions to check (e.g., ['js', 'ts'] or ['wxml']).
    * @returns The absolute path of the resolved existing file, or null if not found.
    */
   public resolveAnyPath(
@@ -109,7 +109,7 @@ export class PathResolver {
    * extensions, or checking for directory index files with allowed extensions.
    *
    * @param potentialPath Absolute path, possibly without extension (e.g., '/path/to/file' or '/path/to/dir')
-   * @param allowedExtensions Ordered list of extensions to check (e.g., ['.js', '.ts'])
+   * @param allowedExtensions Ordered list of extensions to check (e.g., ['js', 'ts'])
    * @returns The existing absolute file path, or null.
    */
   private findExistingPath(potentialPath: string, allowedExtensions: string[]): string | null {
@@ -127,7 +127,7 @@ export class PathResolver {
         logger.trace(`Check 1: Exact path exists and is a directory: ${potentialPath}`);
         potentialPathIsDir = true; // It's a directory, continue to check index files
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.trace(`Check 1: Exact path does not exist: ${potentialPath}`);
     }
 
@@ -135,7 +135,7 @@ export class PathResolver {
     if (!potentialPathIsDir) {
       logger.trace(`Check 2: Trying extensions for base path: ${potentialPath}`);
       for (const ext of allowedExtensions) {
-        const pathWithExt = potentialPath + ext;
+        const pathWithExt = potentialPath + '.' + ext;
         logger.trace(`Check 2a: Checking path with extension: ${pathWithExt}`);
         try {
           const stats = fs.statSync(pathWithExt);
@@ -145,8 +145,8 @@ export class PathResolver {
           } else {
             logger.trace(`Check 2b: Path with extension not found or not a file: ${pathWithExt}`);
           }
-        } catch (e: any) {
-          logger.trace(`Check 2b: Error stating path ${pathWithExt}: ${e.message}`);
+        } catch (e: unknown) {
+          logger.trace(`Check 2b: Error stating path ${pathWithExt}: ${(e as Error).message}`);
         }
       }
     }
@@ -154,7 +154,7 @@ export class PathResolver {
     // Check 3: If the original path was a directory OR it wasn't found with extensions, check for index files
     logger.trace(`Check 3: Checking for index files in directory: ${potentialPath}`);
     for (const ext of allowedExtensions) {
-      const indexFilePath = path.join(potentialPath, 'index' + ext);
+      const indexFilePath = path.join(potentialPath, 'index.' + ext);
       logger.trace(`Check 3a: Checking index file: ${indexFilePath}`);
       try {
         const stats = fs.statSync(indexFilePath);
@@ -164,8 +164,10 @@ export class PathResolver {
         } else {
           logger.trace(`Check 3b: Index file not found or not a file: ${indexFilePath}`);
         }
-      } catch (e: any) {
-        logger.trace(`Check 3b: Error stating index file ${indexFilePath}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.trace(
+          `Check 3b: Error stating index file ${indexFilePath}: ${(e as Error).message}`,
+        );
       }
     }
 

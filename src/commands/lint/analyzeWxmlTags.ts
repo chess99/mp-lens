@@ -39,7 +39,7 @@ export async function analyzeWxmlTags(
     const importPaths = extractImportPaths(ast);
     for (const importPath of importPaths) {
       try {
-        const resolvedPath = pathResolver.resolveAnyPath(importPath, wxmlFilePath, ['.wxml']);
+        const resolvedPath = pathResolver.resolveAnyPath(importPath, wxmlFilePath, ['wxml']);
         if (resolvedPath) {
           const importedTagToFiles = await analyzeWxmlTags(resolvedPath, pathResolver, visited);
           // Merge importedTagToFiles into tagToFiles

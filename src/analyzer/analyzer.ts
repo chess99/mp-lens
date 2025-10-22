@@ -4,11 +4,7 @@ import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
 import { HandledError } from '../utils/errors';
-import {
-  ALL_MINI_PROGRAM_SOURCE_TYPES,
-  IMAGE_EXTENSIONS,
-  IMAGE_FILE_TYPES,
-} from '../utils/filetypes';
+import { IMAGE_FILE_TYPES, MINI_PROGRAM_FILE_TYPES } from '../utils/filetypes';
 import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
 import { GraphLink, ProjectStructure } from './project-structure';
 import { ProjectStructureBuilder } from './project-structure-builder';
@@ -171,7 +167,7 @@ export async function analyzeProject(
   }
 
   // --- Initial File Scan --- //
-  const fileTypes = [...ALL_MINI_PROGRAM_SOURCE_TYPES, ...IMAGE_FILE_TYPES];
+  const fileTypes = [...MINI_PROGRAM_FILE_TYPES, ...IMAGE_FILE_TYPES];
   const allFoundFiles = findAllFiles(projectRoot, fileTypes, excludePatterns);
   if (allFoundFiles.length === 0) {
     // If no files found, analysis will be based solely on appJsonContent
@@ -273,11 +269,11 @@ function findUnusedFiles(
 
   // --- Step 2: Filter out asset files unless includeAssets is true --- //
   if (!includeAssets) {
-    logger.debug(`Filtering out asset files with extensions: ${IMAGE_EXTENSIONS.join(', ')}`);
+    logger.debug(`Filtering out asset files with extensions: ${IMAGE_FILE_TYPES.join(', ')}`);
 
     unusedFiles = unusedFiles.filter((absolutePath) => {
       const fileExt = path.extname(absolutePath).toLowerCase();
-      const isAsset = IMAGE_EXTENSIONS.includes(fileExt);
+      const isAsset = IMAGE_FILE_TYPES.includes(fileExt.slice(1));
 
       if (isAsset) {
         const relativePath = path.relative(projectRoot, absolutePath);

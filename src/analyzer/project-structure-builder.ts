@@ -5,8 +5,8 @@ import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
 import {
-  COMPONENT_DEFINITION_EXTENSIONS,
-  COMPONENT_IMPLEMENTATION_EXTENSIONS,
+  COMPONENT_DEFINITION_FILE_TYPES,
+  COMPONENT_IMPLEMENTATION_FILE_TYPES,
 } from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
@@ -109,7 +109,7 @@ export class ProjectStructureBuilder {
         node.type === 'Module' &&
         filePath &&
         !this.parsedModules.has(filePath) &&
-        COMPONENT_IMPLEMENTATION_EXTENSIONS.includes(fileExt) // Check file extension
+        COMPONENT_IMPLEMENTATION_FILE_TYPES.includes(fileExt.slice(1)) // Check file extension
       ) {
         // Use node.properties.absolutePath which is the ID and the key for parsedModules
         await this.parseModuleDependencies(node);
@@ -213,7 +213,7 @@ export class ProjectStructureBuilder {
     const resolvedEntryPath = this.pathResolver.resolveAnyPath(
       componentBasePath,
       resolutionContextPath,
-      ['.json'],
+      ['json'],
     );
 
     if (resolvedEntryPath) {
@@ -308,7 +308,7 @@ export class ProjectStructureBuilder {
       const resolvedEntryPath = this.pathResolver.resolveAnyPath(
         basePath,
         resolutionContextPath,
-        COMPONENT_DEFINITION_EXTENSIONS,
+        COMPONENT_DEFINITION_FILE_TYPES,
       );
 
       if (resolvedEntryPath) {
@@ -326,10 +326,10 @@ export class ProjectStructureBuilder {
       }
     }
 
-    for (const ext of COMPONENT_DEFINITION_EXTENSIONS) {
+    for (const ext of COMPONENT_DEFINITION_FILE_TYPES) {
       // Check both patterns: basePath.ext and basePath/index.ext
-      const filePathDirect = absoluteBasePath + ext;
-      const filePathIndex = path.join(absoluteBasePath, 'index' + ext);
+      const filePathDirect = absoluteBasePath + '.' + ext;
+      const filePathIndex = path.join(absoluteBasePath, 'index.' + ext);
 
       let foundFilePath: string | null = null;
 
@@ -351,12 +351,12 @@ export class ProjectStructureBuilder {
           this.addLink(ownerId, moduleNode.id, 'Structure');
 
           // If it's a JSON file, parse it for components
-          if (ext === '.json') {
+          if (ext === 'json') {
             // Pass the canonical ownerId and the absolute path to the JSON
             await this.parseComponentJson(ownerId, foundFilePath);
           }
           // If it's a script or template, parse dependencies
-          else if (COMPONENT_IMPLEMENTATION_EXTENSIONS.includes(ext)) {
+          else if (COMPONENT_IMPLEMENTATION_FILE_TYPES.includes(ext)) {
             await this.parseModuleDependencies(moduleNode);
           }
         }
