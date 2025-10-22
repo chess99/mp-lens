@@ -28,7 +28,6 @@ module.exports = function () {
     appJsonPath: 'app.json', // 入口文件
 
     // 文件分析配置
-    types: 'js,ts,wxml,wxss,json', // 要分析的文件类型
     exclude: ['**/dist/**', '**/node_modules/**'], // 要排除的文件夹
 
     // 传入动态生成的app.json内容

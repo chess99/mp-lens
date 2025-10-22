@@ -14,7 +14,6 @@ describe('FileParser', () => {
 
   beforeEach(() => {
     const options: AnalyzerOptions = {
-      fileTypes: ['js', 'json', 'wxml', 'wxss'],
       miniappRoot: '/test/project',
       appJsonPath: '/test/project/app.json',
     };

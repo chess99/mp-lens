@@ -5,7 +5,6 @@ export interface GlobalCliOptions {
   project: string;
   miniappRoot?: string;
   appJsonPath?: string;
-  types?: string;
   exclude?: string[];
   essentialFiles?: string;
   includeAssets?: boolean; // 分析项目结构的时候是否包含资源文件
@@ -58,7 +57,6 @@ export interface ConfigFileOptions {
   appJsonContent?: MiniProgramAppJson; // 或者直接提供入口文件内容
 
   // 文件分析相关
-  types?: string; // 要检查的文件类型
   exclude?: string[]; // 要排除的文件/目录
   essentialFiles?: string[]; // 必要文件列表
   includeAssets?: boolean; // 是否包含资源文件(png,jpg等)在清理范围
@@ -72,7 +70,6 @@ export interface ConfigFileOptions {
 
 export interface AnalyzerOptions {
   miniappRoot: string;
-  fileTypes?: string[];
   excludePatterns?: string[];
   verbose?: boolean;
   verboseLevel?: number;

@@ -69,7 +69,6 @@ program
   .option('--config <path>', '指定配置文件的路径')
   .option('--miniapp-root <path>', '指定小程序代码所在的子目录（相对于项目根目录）')
   .option('--entry-file <path>', '指定入口文件路径（相对于小程序根目录，默认为app.json）')
-  .option('--types <types>', '指定要分析的文件类型 (覆盖配置文件)')
   .option(
     '--exclude <pattern>',
     '排除某些文件/目录 (覆盖配置文件)',

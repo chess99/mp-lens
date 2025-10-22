@@ -14,7 +14,6 @@ interface CommandExecutionContext {
   miniappRoot: string;
   appJsonPath: string;
   appJsonContent: MiniProgramAppJson;
-  fileTypes: string[];
   excludePatterns: string[];
   essentialFiles: string[];
   includeAssets: boolean;
@@ -24,9 +23,6 @@ interface CommandExecutionContext {
     [key: string]: string | string[];
   };
 }
-
-// Default file types list (consistent and comprehensive)
-const DEFAULT_FILE_TYPES = 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs';
 
 /**
  * Performs common initialization steps for CLI commands.
@@ -115,8 +111,6 @@ export async function initializeCommandContext(
 
   // Essential files: use the fully merged result from processEssentialFiles
   const essentialFiles = allEssentialFiles;
-  const fileTypesString = mergedConfig.types ?? DEFAULT_FILE_TYPES;
-  const fileTypes = fileTypesString.split(',').map((t: string) => t.trim());
   const includeAssets = mergedConfig.includeAssets ?? false;
 
   // Basic logging (can be expanded)
@@ -136,7 +130,6 @@ export async function initializeCommandContext(
     miniappRoot,
     appJsonPath: resolvedAppJsonPath,
     appJsonContent,
-    fileTypes,
     excludePatterns,
     essentialFiles,
     includeAssets,

@@ -4,6 +4,7 @@ import AhoCorasick from 'modern-ahocorasick';
 import * as path from 'path';
 import { analyzeProject } from '../analyzer/analyzer';
 import { initializeCommandContext } from './command-init';
+import { IMAGE_FILE_TYPES } from './filetypes';
 
 /**
  * 检测项目中未被使用的资源文件（如图片）。
@@ -30,7 +31,6 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
   const context = await initializeCommandContext({ project: projectRoot });
   const {
     miniappRoot,
-    fileTypes,
     excludePatterns,
     appJsonPath,
     appJsonContent,
@@ -38,11 +38,9 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
     includeAssets,
   } = context;
 
-  // 2. 组装 AnalyzerOptions，确保 fileTypes 有默认值
-  const defaultFileTypes = ['js', 'ts', 'wxml', 'wxss', 'json'];
+  // 2. 组装 AnalyzerOptions
   const options = {
     miniappRoot,
-    fileTypes: Array.isArray(fileTypes) && fileTypes.length > 0 ? fileTypes : defaultFileTypes,
     excludePatterns,
     appJsonPath,
     appJsonContent,
@@ -58,8 +56,8 @@ export async function findUnusedAssets(projectRoot: string): Promise<string[]> {
     .filter(fs.existsSync);
 
   // 4. 获取所有资源文件
-  const assetGlobPattern = '**/*.{png,jpg,jpeg,gif,svg,webp}';
-  const assetFiles = glob.sync(assetGlobPattern, { cwd: miniappRoot, absolute: true });
+  const imagePattern = `**/*.{${IMAGE_FILE_TYPES.join(',')}}`;
+  const assetFiles = glob.sync(imagePattern, { cwd: miniappRoot, absolute: true });
   if (assetFiles.length === 0) return [];
   const assetNames = assetFiles.map((f) => path.basename(f));
 

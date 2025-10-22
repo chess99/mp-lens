@@ -146,7 +146,6 @@ describe('PathResolver', () => {
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
 
     const options: AnalyzerOptions = {
-      fileTypes: [],
       verbose: false,
       miniappRoot: projectRoot,
       appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
@@ -214,7 +213,6 @@ describe('PathResolver', () => {
 
       // Recreate pathResolver with aliases in options
       const optionsWithAliases: AnalyzerOptions = {
-        fileTypes: [],
         verbose: false,
         miniappRoot: projectRoot,
         appJsonPath: actualPath.resolve(projectRoot, 'app.json'),

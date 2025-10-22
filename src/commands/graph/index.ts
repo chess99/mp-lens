@@ -34,8 +34,6 @@ export async function graph(
 
   try {
     logger.info('正在分析项目依赖...');
-    // No need to recalculate fileTypes
-
     // Call analyzeProject with options from context
     const { projectStructure, reachableNodeIds, unusedFiles } = await analyzeProject(
       projectRoot,

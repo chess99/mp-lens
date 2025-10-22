@@ -8,6 +8,7 @@ import { CmdDiffOptions, GlobalCliOptions } from '../types/command-options';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
 import { HandledError } from '../utils/errors';
+import { IMAGE_FILE_TYPES } from '../utils/filetypes';
 import {
   branchOrCommitExists,
   getDefaultBranch,
@@ -15,8 +16,6 @@ import {
   isGitRepository,
   isWorkingDirectoryClean,
 } from '../utils/git-helper';
-
-const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
 
 interface PackageAnalysisResult {
   totalSize: number;
@@ -58,7 +57,7 @@ async function getProjectPackageSizes(
 
   // 1. Analyze assets (images) using glob
   if (context.miniappRoot) {
-    const imagePattern = `**/*.{${imageExtensions.join(',')}}`;
+    const imagePattern = `**/*.{${IMAGE_FILE_TYPES.join(',')}}`;
     logger.debug(`开始使用glob模式扫描图片资源: ${imagePattern} 于目录: ${context.miniappRoot}`);
     try {
       const assetFiles = globSync(imagePattern, {

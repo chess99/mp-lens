@@ -11,8 +11,6 @@ describe('analyzeProject Integration Tests', () => {
 
   // Default options for the analyzer
   const defaultOptions: AnalyzerOptions = {
-    fileTypes: ['js', 'json', 'wxml', 'wxss'], // Analyzer expects types without leading dots
-    // excludePatterns: ['**/node_modules/**'], // Default exclusion often needed
     miniappRoot: fixtureProjectRoot,
     appJsonPath: actualPath.resolve(fixtureProjectRoot, 'app.json'),
   };
@@ -121,7 +119,6 @@ describe('analyzeProject Integration Tests', () => {
     const tsFixtureRoot = actualPath.resolve(__dirname, '../fixtures/basic-ts');
     const options: AnalyzerOptions = {
       ...defaultOptions,
-      fileTypes: [...defaultOptions.fileTypes!, 'ts'], // Add ts
       appJsonContent: { pages: ['pages/page'] }, // Provide content to guide it
       miniappRoot: tsFixtureRoot,
       appJsonPath: '',

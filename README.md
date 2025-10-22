@@ -62,7 +62,6 @@ mp-lens clean --write
 - `--miniapp-root <路径>`: 指定小程序代码所在的子目录（相对于项目根目录）。如果未指定，工具会尝试自动检测（如 `src`, `miniprogram`）。
 - `--entry-file <路径>`: 指定入口文件路径（相对于 `miniappRoot`，默认为 `app.json`）。
 - `--config <路径>`: 指定配置文件的路径。
-- `--types <类型1,...>`: 指定要分析的文件类型扩展名，用逗号分隔 (默认: `js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs`)。
 - `--exclude <Glob模式>`: 用于排除文件/目录的 Glob 模式。可多次使用此选项。
 - `--essential-files <文件1,...>`: 指定应被视为"必要"的文件路径（相对于 `miniappRoot`），这些文件不会被报告为未使用。
 - `--include-assets`: 在分析和清理中包含图片等资源文件 (默认不包含)。
@@ -81,9 +80,6 @@ mp-lens clean
 
 # 写入模式: 实际删除文件
 mp-lens clean --write
-
-# 清理特定类型的未使用文件 (例如仅图片)
-mp-lens --types png,jpg,gif clean
 
 # 清理时排除特定目录
 mp-lens --exclude "**/legacy/**" clean

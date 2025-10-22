@@ -37,12 +37,6 @@ module.exports = {
   appJsonContent: undefined,
 
   /**
-   * [可选] 要分析的文件类型扩展名列表，用逗号分隔。
-   * 默认值: 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs'
-   */
-  types: 'js,ts,wxml,wxss,json,png,jpg,jpeg,gif,svg,wxs',
-
-  /**
    * [可选] 要排除的文件/目录的 Glob 模式列表。
    * 这些文件不会被分析，也不会被列为未使用或被清理。
    * 支持使用 minimatch 语法 (https://github.com/isaacs/minimatch)
