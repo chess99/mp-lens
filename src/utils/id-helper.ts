@@ -10,7 +10,7 @@ import * as path from 'path';
  */
 function getCanonicalBasePath(absolutePath: string): string {
   // Regex to remove common miniprogram extensions
-  let basePath = absolutePath.replace(/\.(wxml|wxss|js|ts|json)$/, '');
+  let basePath = absolutePath.replace(/\.(wxml|wxss|less|js|ts|json)$/, '');
 
   const indexSuffix = path.sep + 'index';
   if (basePath.endsWith(indexSuffix)) {

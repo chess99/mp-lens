@@ -19,7 +19,7 @@ export async function cpd(cliOptions: GlobalCliOptions, cmdOptions: CmdCpdOption
   const formats = ['markup', 'css', 'javascript', 'typescript'];
   const formatsExts = {
     markup: ['wxml', 'html'],
-    css: ['wxss', 'css'],
+    css: ['wxss', 'less', 'css'],
     javascript: ['js', 'jsx', 'mjs', 'cjs', 'wxs'],
     typescript: ['ts', 'tsx'],
   };

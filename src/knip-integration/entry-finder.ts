@@ -3,6 +3,7 @@ import { analyzeProject } from '../analyzer/analyzer';
 import { GlobalCliOptions } from '../types/command-options';
 import { initializeCommandContext } from '../utils/command-init';
 import { logger } from '../utils/debug-logger';
+import { COMPONENT_DEFINITION_EXTENSIONS } from '../utils/filetypes';
 
 /**
  * Finds potential entry points for a Mini Program project.
@@ -30,7 +31,7 @@ export async function findMiniProgramEntryPoints(projectRoot: string): Promise<s
       includeAssets: false,
     });
     const nodeMap = new Map(projectStructure.nodes.map((n) => [n.id, n]));
-    const allowedExts = new Set(['.js', '.ts', '.wxml', '.wxss', '.json']);
+    const allowedExts = new Set(COMPONENT_DEFINITION_EXTENSIONS);
     const entries = new Set<string>();
 
     // 1) 从非 Module（App/Package/Page/Component）到 Module 的直接结构链接

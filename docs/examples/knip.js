@@ -45,12 +45,13 @@ const config = async () => {
     entry: [...staticEntries, ...mpEntryPoints],
 
     // 定义 knip 应分析的项目文件
-    project: [`${SRC}/**/*.{js,ts,wxml,wxss,json}`],
+    project: [`${SRC}/**/*.{js,ts,wxml,wxss,less,json}`],
 
     // 自定义编译器支持小程序特有文件类型
     compilers: {
       wxml: parseWxml, // 解析WXML文件中的依赖关系
       wxss: parseWxss, // 解析WXSS文件中的样式导入
+      less: parseWxss, // 解析LESS文件中的样式导入
       wxs: parseWxs, // 解析WXS文件中的模块导入
       json: parseJson, // 将JSON文件纳入Knip分析范围，mp-lens在项目整体分析时处理其内部依赖。
     },

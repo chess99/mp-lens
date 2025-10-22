@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
-import { IMAGE_EXTENSIONS } from '../utils/filetypes';
+import { COMPONENT_DEFINITION_EXTENSIONS, IMAGE_EXTENSIONS } from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
@@ -63,6 +63,7 @@ export class FileParser {
           rawDependencies = await this.wxmlParser.parse(content, filePath);
           break;
         case '.wxss':
+        case '.less':
           rawDependencies = await this.wxssParser.parse(content, filePath);
           break;
         case '.json':
@@ -129,11 +130,12 @@ export class FileParser {
         }
         break;
       case '.wxss':
+      case '.less':
         // WXSS can import other WXSS files or reference image files
         if (this.isImagePath(rawPath)) {
           allowedExtensions = IMAGE_EXTENSIONS;
         } else {
-          allowedExtensions = ['.wxss'];
+          allowedExtensions = ['.wxss', '.less'];
         }
         break;
       case '.json':
@@ -143,7 +145,7 @@ export class FileParser {
           allowedExtensions = IMAGE_EXTENSIONS;
         } else {
           // For pages/components, try to find the main file first
-          allowedExtensions = ['.js', '.ts', '.wxml', '.wxss', '.json'];
+          allowedExtensions = COMPONENT_DEFINITION_EXTENSIONS;
         }
         break;
       default:

@@ -4,7 +4,11 @@ import * as path from 'path';
 import { AnalyzerOptions } from '../types/command-options';
 import { logger } from '../utils/debug-logger';
 import { HandledError } from '../utils/errors';
-import { IMAGE_EXTENSIONS, IMAGE_FILE_TYPES, MINI_PROGRAM_FILE_TYPES } from '../utils/filetypes';
+import {
+  ALL_MINI_PROGRAM_SOURCE_TYPES,
+  IMAGE_EXTENSIONS,
+  IMAGE_FILE_TYPES,
+} from '../utils/filetypes';
 import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
 import { GraphLink, ProjectStructure } from './project-structure';
 import { ProjectStructureBuilder } from './project-structure-builder';
@@ -167,7 +171,7 @@ export async function analyzeProject(
   }
 
   // --- Initial File Scan --- //
-  const fileTypes = [...MINI_PROGRAM_FILE_TYPES, ...IMAGE_FILE_TYPES];
+  const fileTypes = [...ALL_MINI_PROGRAM_SOURCE_TYPES, ...IMAGE_FILE_TYPES];
   const allFoundFiles = findAllFiles(projectRoot, fileTypes, excludePatterns);
   if (allFoundFiles.length === 0) {
     // If no files found, analysis will be based solely on appJsonContent
@@ -325,6 +329,7 @@ function resolveEssentialFiles(
     'app.js',
     'app.ts',
     'app.wxss',
+    'app.less',
     'project.config.json',
     'project.private.config.json',
     'sitemap.json',

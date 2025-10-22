@@ -4,6 +4,10 @@ import { FileParser } from '../parser/file-parser';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
+import {
+  COMPONENT_DEFINITION_EXTENSIONS,
+  COMPONENT_IMPLEMENTATION_EXTENSIONS,
+} from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
 
@@ -105,7 +109,7 @@ export class ProjectStructureBuilder {
         node.type === 'Module' &&
         filePath &&
         !this.parsedModules.has(filePath) &&
-        ['.js', '.ts', '.wxml', '.wxss'].includes(fileExt) // Check file extension
+        COMPONENT_IMPLEMENTATION_EXTENSIONS.includes(fileExt) // Check file extension
       ) {
         // Use node.properties.absolutePath which is the ID and the key for parsedModules
         await this.parseModuleDependencies(node);
@@ -301,11 +305,10 @@ export class ProjectStructureBuilder {
       absoluteBasePath = basePath;
     } else {
       const resolutionContextPath = path.join(currentRoot, 'index.json');
-      const allowedExts = ['.json', '.js', '.ts', '.wxml', '.wxss'];
       const resolvedEntryPath = this.pathResolver.resolveAnyPath(
         basePath,
         resolutionContextPath,
-        allowedExts,
+        COMPONENT_DEFINITION_EXTENSIONS,
       );
 
       if (resolvedEntryPath) {
@@ -323,9 +326,7 @@ export class ProjectStructureBuilder {
       }
     }
 
-    const extensions = ['.json', '.js', '.ts', '.wxml', '.wxss'];
-
-    for (const ext of extensions) {
+    for (const ext of COMPONENT_DEFINITION_EXTENSIONS) {
       // Check both patterns: basePath.ext and basePath/index.ext
       const filePathDirect = absoluteBasePath + ext;
       const filePathIndex = path.join(absoluteBasePath, 'index' + ext);
@@ -355,7 +356,7 @@ export class ProjectStructureBuilder {
             await this.parseComponentJson(ownerId, foundFilePath);
           }
           // If it's a script or template, parse dependencies
-          else if ('.js,.ts,.wxml,.wxss'.includes(ext)) {
+          else if (COMPONENT_IMPLEMENTATION_EXTENSIONS.includes(ext)) {
             await this.parseModuleDependencies(moduleNode);
           }
         }
