@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileParser } from '../parser/file-parser';
+import { JSONParser, JsonDependency } from '../parser/json-parser';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
@@ -18,6 +19,7 @@ export class ProjectStructureBuilder {
   private projectRoot: string;
   private fileParser: FileParser;
   private pathResolver: PathResolver;
+  private jsonParser: JSONParser;
   private rootNodeId: string | null = null;
   private processedJsonFiles: Set<string> = new Set(); // Avoid infinite loops
 
@@ -60,6 +62,7 @@ export class ProjectStructureBuilder {
 
     // Initialize alias + path resolvers for non-AST path resolutions (e.g., JSON usingComponents)
     this.pathResolver = new PathResolver(projectRoot, { ...options, miniappRoot });
+    this.jsonParser = new JSONParser();
 
     // --- Start: Initialize all nodes first --- //
     logger.debug(`Initializing nodes for ${this.allFiles.length} found files.`);
@@ -137,18 +140,12 @@ export class ProjectStructureBuilder {
   }
 
   private async processAppJsonContent(content: MiniProgramAppJson): Promise<void> {
-    // Process Pages
-    if (content.pages && Array.isArray(content.pages)) {
-      for (const pagePath of content.pages) {
-        await this.processPage(this.rootNodeId!, pagePath, this.miniappRoot);
-      }
-    }
-
-    // Process Subpackages
+    // 1) 先构建 SubPackages 的结构节点，以便后续 page 归属
     const subpackages = content.subpackages || content.subPackages || [];
+    const packageRoots: string[] = [];
     if (Array.isArray(subpackages)) {
       for (const pkg of subpackages) {
-        if (pkg.root && pkg.pages && Array.isArray(pkg.pages)) {
+        if (pkg.root) {
           const packageRoot = path.resolve(this.miniappRoot, pkg.root);
           const packageId = `pkg:${pkg.root}`;
           this.addNode({
@@ -158,29 +155,38 @@ export class ProjectStructureBuilder {
             properties: { root: packageRoot },
           });
           this.addLink(this.rootNodeId!, packageId, 'Structure');
-
-          for (const pagePath of pkg.pages) {
-            const fullPagePath = path.join(pkg.root, pagePath);
-            await this.processPage(packageId, fullPagePath, this.miniappRoot);
-          }
-          // TODO: Process subpackage-specific app.js/ts?
+          packageRoots.push(pkg.root);
         }
       }
     }
 
-    // Process Global usingComponents
-    if (content.usingComponents && typeof content.usingComponents === 'object') {
-      for (const [_name, compPath] of Object.entries(content.usingComponents)) {
-        if (typeof compPath === 'string' && !compPath.startsWith('plugin://')) {
-          await this.processComponent(this.rootNodeId!, compPath as string, this.miniappRoot);
+    // 2) 使用 JSONParser 收敛所有 JSON 依赖项，再逐类处理
+    const deps: JsonDependency[] = this.jsonParser.parseObject(
+      content,
+      this.appJsonPath || 'app.json',
+    );
+
+    for (const dep of deps) {
+      if (dep.type === 'page') {
+        const pagePath = dep.path.startsWith('/') ? dep.path.slice(1) : dep.path;
+        // 归属到对应 subpackage，否则归到 App 根
+        const matchedRoot = packageRoots.find((root) => pagePath.startsWith(root + '/'));
+        if (matchedRoot) {
+          const parentId = `pkg:${matchedRoot}`;
+          await this.processPage(parentId, pagePath, this.miniappRoot);
+        } else {
+          await this.processPage(this.rootNodeId!, pagePath, this.miniappRoot);
         }
+      } else if (dep.type === 'component') {
+        await this.processComponent(this.rootNodeId!, dep.path, this.miniappRoot);
+      } else if (dep.type === 'asset') {
+        this.addSingleFileLink(this.rootNodeId!, dep.path, 'Resource');
+      } else if (dep.type === 'theme' || dep.type === 'config') {
+        this.addSingleFileLink(this.rootNodeId!, dep.path, 'Config');
+      } else if (dep.type === 'worker') {
+        this.addSingleFileLink(this.rootNodeId!, dep.path, 'WorkerEntry');
       }
     }
-
-    // TODO: Process TabBar, Theme, Workers etc. (similar to parseEntryContent)
-    this.processTabBar(content);
-    this.processTheme(content);
-    this.processWorkers(content);
   }
 
   private async processPage(
@@ -367,25 +373,22 @@ export class ProjectStructureBuilder {
   // Parses a component/page's JSON file for `usingComponents`
   private async parseComponentJson(ownerId: string, jsonPath: string): Promise<void> {
     if (this.processedJsonFiles.has(jsonPath)) {
-      return; // Avoid redundant processing
+      return; // 避免重复解析
     }
     this.processedJsonFiles.add(jsonPath);
 
     try {
       const content = fs.readFileSync(jsonPath, 'utf-8');
-      const jsonContent = JSON.parse(content);
+      const componentDir = path.dirname(jsonPath);
 
-      if (jsonContent.usingComponents && typeof jsonContent.usingComponents === 'object') {
-        logger.verbose(`Parsing components for: ${ownerId} from ${jsonPath}`);
-        const componentDir = path.dirname(jsonPath);
-        for (const [_name, compPath] of Object.entries(jsonContent.usingComponents)) {
-          if (typeof compPath === 'string' && !compPath.startsWith('plugin://')) {
-            // Resolve component path relative to the JSON file's directory
-            // const absoluteCompPath = path.resolve(componentDir, compPath as string);
-            // processComponent now resolves absolute path and calculates canonical ID internally
-            // We need to provide the correct context (componentDir) for resolving the relative compPath
-            await this.processComponent(ownerId, compPath as string, componentDir); // Use componentDir as currentRoot
-          }
+      // 旧接口可用于通用用途，这里直接使用语义化接口
+
+      // 使用语义化接口确保仅处理组件类依赖
+      const obj = JSON.parse(content);
+      const typedDeps = this.jsonParser.parseObject(obj, jsonPath);
+      for (const dep of typedDeps) {
+        if (dep.type === 'component') {
+          await this.processComponent(ownerId, dep.path, componentDir);
         }
       }
     } catch (error) {
@@ -515,56 +518,6 @@ export class ProjectStructureBuilder {
     // if (exists) return;
 
     this.links.push(link);
-  }
-
-  // --- Start: Added processing functions for TabBar, Theme, Workers ---
-
-  private processTabBar(content: MiniProgramAppJson): void {
-    if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
-      logger.debug('Processing tabBar entries...');
-      content.tabBar.list.forEach((item) => {
-        // pagePath defines a page structure
-        if (item.pagePath) {
-          // Process page structure (json, js, wxml, wxss)
-          // We don't know the parent context here (App or Package), link from App root?
-          // This might re-process pages already found via 'pages' or 'subpackages',
-          // but processPage/processRelatedFiles handles duplicates.
-          this.processPage(this.rootNodeId!, item.pagePath as string, this.miniappRoot);
-        }
-        // Icons are single file dependencies
-        if (item.iconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.iconPath as string, 'Resource');
-        }
-        if (item.selectedIconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.selectedIconPath as string, 'Resource');
-        }
-      });
-    }
-  }
-
-  private processTheme(content: MiniProgramAppJson): void {
-    // Check for themeLocation first
-    if (content.themeLocation && typeof content.themeLocation === 'string') {
-      logger.debug(`Processing themeLocation: ${content.themeLocation}`);
-      this.addSingleFileLink(this.rootNodeId!, content.themeLocation, 'Config');
-    }
-    // Always check for default theme.json
-    logger.debug('Checking for default theme.json');
-    this.addSingleFileLink(this.rootNodeId!, 'theme.json', 'Config');
-  }
-
-  private processWorkers(content: MiniProgramAppJson): void {
-    // Workers field defines entry points for worker threads
-    if (content.workers && typeof content.workers === 'string') {
-      logger.debug(`Processing workers entry: ${content.workers}`);
-      // Treat the worker root directory/file itself as a structural link from App
-      // We might need more sophisticated handling if it's a directory
-      // For now, add link to the file/dir specified
-      this.addSingleFileLink(this.rootNodeId!, content.workers, 'WorkerEntry');
-      // TODO: Potentially need to parse files within the worker directory?
-      // This depends on how workers load dependencies.
-      // For now, just ensure the entry point is marked as used.
-    }
   }
 
   // Helper to add a link for a single file path relative to miniappRoot
