@@ -1,6 +1,6 @@
 {
   "name": "mp-lens",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "微信小程序分析工具 (Unused Code, Dependencies, Visualization)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -96,33 +96,5 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
     "vite": "^6.3.3"
-  },
-  "peerDependencies": {
-    "chalk": "^4.1.2",
-    "commander": "^12.1.0",
-    "glob": "^10.4.1",
-    "inquirer": "^12.6.0",
-    "semver": "^7.7.2",
-    "uuid": "^11.1.0"
-  },
-  "peerDependenciesMeta": {
-    "chalk": {
-      "optional": true
-    },
-    "commander": {
-      "optional": true
-    },
-    "glob": {
-      "optional": true
-    },
-    "inquirer": {
-      "optional": true
-    },
-    "semver": {
-      "optional": true
-    },
-    "uuid": {
-      "optional": true
-    }
   }
 }
