@@ -183,9 +183,21 @@ module.exports = {
 
 更多配置项请参考[示例文件](docs/examples/mp-lens.config.js)。
 
-## 🤝 与 Knip 集成 (可选)
+## 🔍 使用 Knip 进行深度分析 (可选)
 
-`mp-lens` 可与 [Knip](https://knip.dev) 集成，以实现更深层次的代码分析。两者结合能提供更全面的项目清理方案。参考示例配置 `docs/examples/knip.js`，并查看[集成文档](docs/knip-integration.md)。
+[Knip](https://knip.dev) 是一个强大的未使用代码检测工具，可以识别未使用的导出、依赖项和死代码。根据项目类型，我们提供了不同的使用方案：
+
+### 原生小程序项目
+
+对于原生微信小程序项目，`mp-lens` 可与 Knip 集成，帮助 Knip 理解小程序特有的依赖关系（如 WXML、WXSS、组件声明等），实现更深层次的代码分析与清理。
+
+详情请参阅：[**mp-lens 与 Knip 集成指南**](docs/knip-integration.md)
+
+### `uni-app` 项目
+
+对于基于 Vue 的 `uni-app` 项目，由于项目结构不同，**无需使用 mp-lens**，直接使用 Knip 即可。我们提供了针对 `uni-app` 的最佳实践配置：
+
+[**在 uni-app 项目中使用 Knip**](docs/uniapp-knip.md)
 
 ## 🤝 贡献
 

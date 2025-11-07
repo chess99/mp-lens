@@ -41,7 +41,7 @@ yarn add --dev mp-lens
 
 ### 2. 使用示例配置
 
-- 将 `docs/examples/knip.js` 复制到项目根目录并命名为 `knip.js`。
+- 将 `docs/examples/knip.config.js` 复制到项目根目录并命名为 `knip.config.js`。
 - 按需调整源码目录、忽略规则等；该示例已集成 mp-lens 的动态入口发现与小程序文件解析器。
 
 ### 3. 添加 npm script
