@@ -114,13 +114,12 @@ npm test
 check_status "测试失败" "测试通过"
 
 # 执行构建
-info "执行构建..."
-npm run build
-check_status "构建失败" "构建成功"
+# info "执行构建..."
+# npm run build
+# check_status "构建失败" "构建成功"
 
 # 检查 npm ci 是否能正常工作 (这是 GitHub Actions 会执行的命令)
 info "检查 npm ci 是否工作正常..."
-rm -rf node_modules
 npm ci
 check_status "npm ci 失败，package-lock.json 可能不一致" "npm ci 检查通过"
 

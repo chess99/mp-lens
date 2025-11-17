@@ -21,7 +21,7 @@
     "build": "npm run clean && npm run build:ui && tsc",
     "start": "ts-node src/cli.ts",
     "dev": "npm run build:ui && ts-node src/cli.ts",
-    "prepare": "npm run build && husky",
+    "prepare": "husky",
     "clean": "rimraf dist",
     "knip:fix": "npx knip --fix",
     "check:engines": "node scripts/check-engines.js",
