@@ -69,13 +69,13 @@
     "execa": "^5.1.1",
     "glob": "^10.4.1",
     "inquirer": "^12.6.0",
+    "is-installed-globally": "^1.0.0",
     "jscpd": "^4.0.5",
     "modern-ahocorasick": "^2.0.4",
     "posthog-node": "^4.18.0",
     "preact": "^10.22.1",
     "purgecss": "^5.0.0",
     "semver": "^7.7.2",
-    "update-notifier": "^7.3.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -84,7 +84,6 @@
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.2",
     "@types/semver": "^7.7.0",
-    "@types/update-notifier": "^6.0.8",
     "@typescript-eslint/eslint-plugin": "^7.13.0",
     "@typescript-eslint/parser": "^7.13.0",
     "eslint": "^8.57.0",

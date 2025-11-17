@@ -16,8 +16,23 @@ import { version } from './version';
 
 const program = new Command();
 
-// Check for updates before command execution
-checkForUpdates();
+const updateNoticePromise = checkForUpdates();
+let updateNoticeHandled = false;
+
+program.hook('postAction', async () => {
+  if (updateNoticeHandled) {
+    return;
+  }
+  updateNoticeHandled = true;
+  try {
+    const notice = await updateNoticePromise;
+    if (notice) {
+      console.log(notice);
+    }
+  } catch (error) {
+    console.debug('版本提示输出失败：', error);
+  }
+});
 
 // Helper to setup logger based on global options
 function setupLogger(globalOptions: GlobalCliOptions & { verboseLevel?: number; trace?: boolean }) {
