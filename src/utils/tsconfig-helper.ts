@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './debug-logger';
+import { logger } from './debug-logger.js';
 
 // Helper function to recursively find all files in a directory
 function getAllFilesRecursive(dirPath: string, fileList: string[] = []): string[] {

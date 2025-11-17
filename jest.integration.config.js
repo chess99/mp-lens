@@ -1,6 +1,6 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
-module.exports = {
-  preset: 'ts-jest',
+export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   clearMocks: true,
   // Force Jest to exit after tests complete
@@ -19,12 +19,21 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        // ts-jest configuration options
+        useESM: true,
+        tsconfig: 'tsconfig.json',
       },
     ],
+  },
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   // Test timeout for integration tests (longer than unit tests)
   testTimeout: 30000,
   // Verbose output for better debugging
   verbose: true,
+  globals: {
+    'ts-jest': {
+      moduleResolution: 'bundler',
+    },
+  },
 };

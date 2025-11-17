@@ -1,11 +1,27 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
-import inquirer from 'inquirer';
 import * as path from 'path';
-import { analyzeProject } from '../analyzer/analyzer';
-import { CmdCleanOptions, GlobalCliOptions } from '../types/command-options';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
+import * as readline from 'readline';
+import { analyzeProject } from '../analyzer/analyzer.js';
+import { CmdCleanOptions, GlobalCliOptions } from '../types/command-options.js';
+import { initializeCommandContext } from '../utils/command-init.js';
+import { logger } from '../utils/debug-logger.js';
+
+/**
+ * Creates a simple yes/no prompt using Node's readline module.
+ */
+function confirmPrompt(question: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(`${question} (y/N) `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y');
+    });
+  });
+}
 
 /**
  * Cleans unused files: lists, prompts for deletion, or writes changes directly.
@@ -44,16 +60,7 @@ export async function clean(
     // Confirmation before action (only if not writeDirectly)
     let proceed = writeDirectly;
     if (!proceed) {
-      // Prompt only if not in direct write mode
-      const answers = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'proceedConfirm',
-          message: `是否删除这 ${unusedFiles.length} 个文件?`,
-          default: false,
-        },
-      ]);
-      proceed = answers.proceedConfirm;
+      proceed = await confirmPrompt(`是否删除这 ${unusedFiles.length} 个文件?`);
     }
 
     if (!proceed) {

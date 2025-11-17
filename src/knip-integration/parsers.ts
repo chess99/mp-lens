@@ -5,9 +5,9 @@
  * @see https://knip.dev/features/compilers
  */
 
-import { JavaScriptParser } from '../parser/javascript-parser';
-import { WXMLParser } from '../parser/wxml-parser';
-import { WXSSParser } from '../parser/wxss-parser';
+import { JavaScriptParser } from '../parser/javascript-parser.js';
+import { WXMLParser } from '../parser/wxml-parser.js';
+import { WXSSParser } from '../parser/wxss-parser.js';
 
 /**
  * Parse WXML files for dependencies

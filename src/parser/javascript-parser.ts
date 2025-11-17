@@ -1,8 +1,10 @@
 import { parse, ParserPlugin } from '@babel/parser';
-import traverse from '@babel/traverse';
+import { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import * as path from 'path';
-import { logger } from '../utils/debug-logger';
+import { logger } from '../utils/debug-logger.js';
+
+let traverse: any;
 
 export class JavaScriptParser {
   constructor() {
@@ -10,6 +12,10 @@ export class JavaScriptParser {
   }
 
   async parse(content: string, filePath: string): Promise<string[]> {
+    if (!traverse) {
+      traverse = (await import('@babel/traverse')).default;
+    }
+
     try {
       const dependencies = new Set<string>();
 
@@ -82,7 +88,7 @@ export class JavaScriptParser {
   private traverseAST(ast: t.File, dependencies: Set<string>): void {
     traverse(ast, {
       // Handle ES6 import statements
-      ImportDeclaration: (path) => {
+      ImportDeclaration: (path: NodePath<t.ImportDeclaration>) => {
         const source = path.node.source;
         if (t.isStringLiteral(source)) {
           const importPath = source.value;
@@ -91,7 +97,7 @@ export class JavaScriptParser {
       },
 
       // Handle re-exports: export * from '...'
-      ExportAllDeclaration: (path) => {
+      ExportAllDeclaration: (path: NodePath<t.ExportAllDeclaration>) => {
         const source = path.node.source;
         if (t.isStringLiteral(source)) {
           dependencies.add(source.value);
@@ -99,7 +105,7 @@ export class JavaScriptParser {
       },
 
       // Handle re-exports: export { ... } from '...'
-      ExportNamedDeclaration: (path) => {
+      ExportNamedDeclaration: (path: NodePath<t.ExportNamedDeclaration>) => {
         const source = path.node.source;
         if (source && t.isStringLiteral(source)) {
           dependencies.add(source.value);
@@ -107,7 +113,7 @@ export class JavaScriptParser {
       },
 
       // Handle CommonJS require() calls
-      CallExpression: (path) => {
+      CallExpression: (path: NodePath<t.CallExpression>) => {
         const { node } = path;
 
         // Check if it's a require() call
@@ -137,7 +143,7 @@ export class JavaScriptParser {
       },
 
       // Handle dynamic imports
-      Import: (path) => {
+      Import: (path: NodePath<t.Import>) => {
         const parent = path.parent;
         if (
           t.isCallExpression(parent) &&
@@ -150,7 +156,7 @@ export class JavaScriptParser {
       },
 
       // Handle TypeScript import equals: import x = require('...')
-      TSImportEqualsDeclaration: (path) => {
+      TSImportEqualsDeclaration: (path: NodePath<t.TSImportEqualsDeclaration>) => {
         const moduleRef = path.node.moduleReference;
         if (t.isTSExternalModuleReference(moduleRef)) {
           const expr = moduleRef.expression;

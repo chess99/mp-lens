@@ -1,10 +1,10 @@
 import * as path from 'path';
-import { analyzeProject } from '../../analyzer/analyzer';
-import { CmdGraphOptions, GlobalCliOptions } from '../../types/command-options';
-import { initializeCommandContext } from '../../utils/command-init';
-import { logger } from '../../utils/debug-logger';
-import { HandledError } from '../../utils/errors';
-import { generateHtmlGraph, generateJsonGraph } from './graph-utils';
+import { analyzeProject } from '../../analyzer/analyzer.js';
+import { CmdGraphOptions, GlobalCliOptions } from '../../types/command-options.js';
+import { initializeCommandContext } from '../../utils/command-init.js';
+import { logger } from '../../utils/debug-logger.js';
+import { HandledError } from '../../utils/errors.js';
+import { generateHtmlGraph, generateJsonGraph } from './graph-utils.js';
 
 /**
  * 生成项目依赖图

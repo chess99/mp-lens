@@ -1,19 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AnalyzerOptions } from '../types/command-options';
-import { logger } from '../utils/debug-logger';
+import { AnalyzerOptions } from '../types/command-options.js';
+import { logger } from '../utils/debug-logger.js';
 import {
   COMPONENT_DEFINITION_FILE_TYPES,
   IMAGE_FILE_TYPES,
   SupportedFileType,
-} from '../utils/filetypes';
-import { PathResolver } from '../utils/path-resolver';
+} from '../utils/filetypes.js';
+import { PathResolver } from '../utils/path-resolver.js';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
-import { JavaScriptParser } from './javascript-parser';
-import { JSONParser } from './json-parser';
-import { WXMLParser } from './wxml-parser';
-import { WXSSParser } from './wxss-parser';
+import { JavaScriptParser } from './javascript-parser.js';
+import { JSONParser } from './json-parser.js';
+import { WXMLParser } from './wxml-parser.js';
+import { WXSSParser } from './wxss-parser.js';
 
 /**
  * FileParser: Orchestrates parsing of different file types in a WeChat Mini Program.

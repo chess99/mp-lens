@@ -1,9 +1,9 @@
 import * as path from 'path';
-import { analyzeProject } from '../analyzer/analyzer';
-import { GlobalCliOptions } from '../types/command-options';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
-import { COMPONENT_DEFINITION_FILE_TYPES } from '../utils/filetypes';
+import { analyzeProject } from '../analyzer/analyzer.js';
+import { GlobalCliOptions } from '../types/command-options.js';
+import { initializeCommandContext } from '../utils/command-init.js';
+import { logger } from '../utils/debug-logger.js';
+import { COMPONENT_DEFINITION_FILE_TYPES } from '../utils/filetypes.js';
 
 /**
  * Finds potential entry points for a Mini Program project.

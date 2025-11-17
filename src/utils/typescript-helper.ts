@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { logger } from './debug-logger';
+import { logger } from './debug-logger.js';
 
 /**
  * Checks if a .d.ts file is a pure ambient declaration file.

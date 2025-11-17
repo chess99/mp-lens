@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigFileOptions } from '../types/command-options';
-import { logger } from './debug-logger';
+import { ConfigFileOptions } from '../types/command-options.js';
+import { logger } from './debug-logger.js';
 
 /**
  * Loads the mp-lens specific configuration file (e.g., mp-lens.config.js).
@@ -84,26 +84,14 @@ export class ConfigLoader {
    */
   private static async loadJavaScriptConfig(filePath: string): Promise<ConfigFileOptions | null> {
     try {
-      // 删除可能的缓存，以确保获取最新的配置
-      const absolutePath = path.resolve(filePath);
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      delete require.cache[absolutePath];
-
-      // 动态导入JavaScript配置文件
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const config = require(absolutePath);
+      // Use dynamic import() for ESM compatibility. Add a cache-busting query.
+      const fileUrl = new URL(`file://${filePath}?t=${Date.now()}`).href;
+      const module = await import(fileUrl);
+      const config = module.default || module;
 
       // 如果配置导出为函数，则执行它
       if (typeof config === 'function') {
         return await config();
-      }
-
-      // 处理ES模块导出（有default属性）
-      if (config && config.default) {
-        if (typeof config.default === 'function') {
-          return await config.default();
-        }
-        return config.default;
       }
 
       return config;
@@ -119,25 +107,7 @@ export class ConfigLoader {
    */
   private static async loadTypeScriptConfig(filePath: string): Promise<ConfigFileOptions | null> {
     try {
-      // 尝试注册ts-node
-      try {
-        // 直接引用ts-node模块
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const tsNode = require('ts-node');
-
-        tsNode.register({
-          transpileOnly: true,
-          compilerOptions: {
-            module: 'commonjs',
-          },
-        });
-      } catch (e) {
-        const tsNodeError = e as Error;
-        logger.error(`加载TypeScript配置需要安装ts-node: ${tsNodeError.message}`);
-        return null;
-      }
-
-      // 使用与JavaScript相同的加载逻辑
+      // Dynamic import() will be handled by ts-node/esm loader
       return this.loadJavaScriptConfig(filePath);
     } catch (error) {
       logger.error(`加载TypeScript配置文件失败: ${(error as Error).message}`);

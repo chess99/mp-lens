@@ -2,9 +2,9 @@
 // @ts-ignore: Could not find a declaration file for module '@wxml/parser'
 import { parse, Program, WXNode } from '@wxml/parser';
 import * as fs from 'fs';
-import { logger } from '../../utils/debug-logger';
-import { PathResolver } from '../../utils/path-resolver';
-import { normalizeWxmlImportPath } from '../../utils/wxml-path';
+import { logger } from '../../utils/debug-logger.js';
+import { PathResolver } from '../../utils/path-resolver.js';
+import { normalizeWxmlImportPath } from '../../utils/wxml-path.js';
 
 /**
  * Analyzes a WXML file and all its imported/included templates recursively

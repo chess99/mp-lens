@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { clean } from './commands/clean';
-import { cpd } from './commands/cpd';
-import { diffBundle } from './commands/diffBundle';
-import { graph } from './commands/graph';
-import { lint } from './commands/lint';
-import { purgewxss } from './commands/purgewxss';
-import { inferIssueType, shutdownTelemetry, telemetry } from './telemetry';
-import { GlobalCliOptions } from './types/command-options';
-import { logger, LogLevel } from './utils/debug-logger';
-import { HandledError } from './utils/errors';
-import { checkForUpdates } from './utils/version-check';
-import { version } from './version';
+import { clean } from './commands/clean.js';
+import { cpd } from './commands/cpd.js';
+import { diffBundle } from './commands/diffBundle.js';
+import { graph } from './commands/graph/index.js';
+import { lint } from './commands/lint/index.js';
+import { purgewxss } from './commands/purgewxss/index.js';
+import {
+  CommandEvent,
+  ErrorEvent,
+  inferIssueType,
+  shutdownTelemetry,
+  telemetry,
+  UserIssueEvent,
+} from './telemetry/index.js';
+import { GlobalCliOptions } from './types/command-options.js';
+import { logger, LogLevel } from './utils/debug-logger.js';
+import { HandledError } from './utils/errors.js';
+import { checkForUpdates } from './utils/version-check.js';
+import { version } from './version.js';
 
 const program = new Command();
 
@@ -107,7 +114,7 @@ function withTelemetryAction<T>(
       command: commandName,
       version,
       args: commandArgs,
-    } as Omit<import('./telemetry').CommandEvent, 'userId' | 'timestamp'>);
+    } as Omit<CommandEvent, 'userId' | 'timestamp'>);
     setupLogger(cliOptions);
     try {
       await action(cliOptions, ...args);
@@ -121,7 +128,7 @@ function withTelemetryAction<T>(
           issueMessage: error.message,
           version,
           args: commandArgs,
-        } as Omit<import('./telemetry').UserIssueEvent, 'userId' | 'timestamp'>);
+        } as Omit<UserIssueEvent, 'userId' | 'timestamp'>);
       } else {
         // 上报系统错误
         telemetry.capture({
@@ -131,7 +138,7 @@ function withTelemetryAction<T>(
           errorMessage: (error as Error).message,
           stack: (error as Error).stack,
           args: commandArgs,
-        } as Omit<import('./telemetry').ErrorEvent, 'userId' | 'timestamp'>);
+        } as Omit<ErrorEvent, 'userId' | 'timestamp'>);
       }
       const err = error as Error;
       commandErrorHandler(`Command failed: ${err.message}`, err.stack);

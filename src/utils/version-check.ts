@@ -1,8 +1,9 @@
 import chalk from 'chalk';
 import execa from 'execa';
 import semver from 'semver';
-import { version } from '../version';
+import { version } from '../version.js';
 
+// Check for updates
 const PACKAGE_NAME = 'mp-lens';
 const CHECK_TIMEOUT_MS = 4000;
 

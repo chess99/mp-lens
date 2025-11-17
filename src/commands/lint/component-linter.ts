@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from '../../utils/debug-logger';
-import { filterStandardWxmlTags } from './standard-wxml-tags';
-import { LintIssue } from './types';
+import { logger } from '../../utils/debug-logger.js';
+import { filterStandardWxmlTags } from './standard-wxml-tags.js';
+import { LintIssue } from './types.js';
 
 /**
  * Performs component usage linting by comparing declarations with usage

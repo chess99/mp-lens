@@ -1,6 +1,6 @@
 import { execSync } from 'child_process';
-import { logger } from './debug-logger';
-import { HandledError } from './errors';
+import { logger } from './debug-logger.js';
+import { HandledError } from './errors.js';
 
 /**
  * 检查当前是否在 Git 仓库中

@@ -1,7 +1,7 @@
-import { isTelemetryEnabled } from './config';
-import { TelemetryEvent } from './events';
-import { sendToPostHog } from './posthog';
-import { getOrCreateUserId } from './user';
+import { isTelemetryEnabled } from './config.js';
+import { TelemetryEvent } from './events.js';
+import { sendToPostHog } from './posthog.js';
+import { getOrCreateUserId } from './user.js';
 
 class TelemetryService {
   private enabled: boolean = true; // Default to true, will be properly set in init

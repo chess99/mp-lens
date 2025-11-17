@@ -1,12 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigFileOptions, GlobalCliOptions } from '../types/command-options';
-import { MiniProgramAppJson } from '../types/miniprogram';
-import { ConfigLoader } from './config-loader';
-import { logger } from './debug-logger';
-import { HandledError } from './errors';
-import { findAppJsonConfig } from './fs-finder';
-import { loadTsConfigTypes } from './tsconfig-helper';
+import { ConfigFileOptions, GlobalCliOptions } from '../types/command-options.js';
+import { MiniProgramAppJson } from '../types/miniprogram.js';
+import { ConfigLoader } from './config-loader.js';
+import { logger } from './debug-logger.js';
+import { HandledError } from './errors.js';
+import { findAppJsonConfig } from './fs-finder.js';
+import { loadTsConfigTypes } from './tsconfig-helper.js';
 
 // Define the structure of the initialized context returned
 interface CommandExecutionContext {

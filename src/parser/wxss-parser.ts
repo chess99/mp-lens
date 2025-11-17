@@ -1,4 +1,4 @@
-import { logger } from '../utils/debug-logger';
+import { logger } from '../utils/debug-logger.js';
 
 export class WXSSParser {
   constructor() {

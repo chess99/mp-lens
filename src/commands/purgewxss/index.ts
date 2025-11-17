@@ -7,12 +7,12 @@ import {
   AnalyzerOptions,
   CmdPurgeWxssOptions,
   GlobalCliOptions,
-} from '../../types/command-options';
-import { initializeCommandContext } from '../../utils/command-init';
-import { logger } from '../../utils/debug-logger';
-import { HandledError } from '../../utils/errors';
-import { PathResolver } from '../../utils/path-resolver';
-import { analyzeWxmlForPurge, WxmlPurgeAnalysisResult } from './analyzeWxmlForPurge';
+} from '../../types/command-options.js';
+import { initializeCommandContext } from '../../utils/command-init.js';
+import { logger } from '../../utils/debug-logger.js';
+import { HandledError } from '../../utils/errors.js';
+import { PathResolver } from '../../utils/path-resolver.js';
+import { analyzeWxmlForPurge, WxmlPurgeAnalysisResult } from './analyzeWxmlForPurge.js';
 
 async function performPurge(
   projectRoot: string,

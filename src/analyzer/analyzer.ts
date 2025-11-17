@@ -1,13 +1,13 @@
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
-import { AnalyzerOptions } from '../types/command-options';
-import { logger } from '../utils/debug-logger';
-import { HandledError } from '../utils/errors';
-import { IMAGE_FILE_TYPES, MINI_PROGRAM_FILE_TYPES } from '../utils/filetypes';
-import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper';
-import { GraphLink, ProjectStructure } from './project-structure';
-import { ProjectStructureBuilder } from './project-structure-builder';
+import { AnalyzerOptions } from '../types/command-options.js';
+import { logger } from '../utils/debug-logger.js';
+import { HandledError } from '../utils/errors.js';
+import { IMAGE_FILE_TYPES, MINI_PROGRAM_FILE_TYPES } from '../utils/filetypes.js';
+import { findPureAmbientDeclarationFiles } from '../utils/typescript-helper.js';
+import { ProjectStructureBuilder } from './project-structure-builder.js';
+import { GraphLink, ProjectStructure } from './project-structure.js';
 
 interface AnalysisResult {
   projectStructure: ProjectStructure;

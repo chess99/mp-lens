@@ -1,5 +1,5 @@
-import { ProjectStructure } from '../../analyzer/project-structure';
-import { AssetResolver } from '../../utils/asset-resolver';
+import { ProjectStructure } from '../../analyzer/project-structure.js';
+import { AssetResolver } from '../../utils/asset-resolver.js';
 
 /**
  * HtmlGenerator选项

@@ -2,9 +2,9 @@ import * as fs from 'fs';
 import * as glob from 'glob';
 import AhoCorasick from 'modern-ahocorasick';
 import * as path from 'path';
-import { analyzeProject } from '../analyzer/analyzer';
-import { initializeCommandContext } from './command-init';
-import { IMAGE_FILE_TYPES } from './filetypes';
+import { analyzeProject } from '../analyzer/analyzer.js';
+import { initializeCommandContext } from './command-init.js';
+import { IMAGE_FILE_TYPES } from './filetypes.js';
 
 /**
  * 检测项目中未被使用的资源文件（如图片）。

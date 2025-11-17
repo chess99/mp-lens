@@ -1,16 +1,16 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { analyzeProject } from '../../analyzer/analyzer';
-import { CmdLintOptions, GlobalCliOptions } from '../../types/command-options';
-import { initializeCommandContext } from '../../utils/command-init';
-import { logger } from '../../utils/debug-logger';
-import { HandledError } from '../../utils/errors';
-import { generateNodeIdAndLabel } from '../../utils/id-helper';
-import { PathResolver } from '../../utils/path-resolver';
-import { analyzeWxmlTags } from './analyzeWxmlTags';
-import { lintComponentUsage } from './component-linter';
-import { LintResult } from './types';
+import { analyzeProject } from '../../analyzer/analyzer.js';
+import { CmdLintOptions, GlobalCliOptions } from '../../types/command-options.js';
+import { initializeCommandContext } from '../../utils/command-init.js';
+import { logger } from '../../utils/debug-logger.js';
+import { HandledError } from '../../utils/errors.js';
+import { generateNodeIdAndLabel } from '../../utils/id-helper.js';
+import { PathResolver } from '../../utils/path-resolver.js';
+import { analyzeWxmlTags } from './analyzeWxmlTags.js';
+import { lintComponentUsage } from './component-linter.js';
+import { LintResult } from './types.js';
 
 /**
  * Reads global components from app.json

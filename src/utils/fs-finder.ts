@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './debug-logger';
+import { logger } from './debug-logger.js';
 
 // Basic validation for app.json content
 function isValidAppJson(content: any): boolean {

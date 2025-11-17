@@ -1,15 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileParser } from '../parser/file-parser';
-import { AnalyzerOptions } from '../types/command-options';
-import { MiniProgramAppJson } from '../types/miniprogram';
-import { logger } from '../utils/debug-logger';
+import { FileParser } from '../parser/file-parser.js';
+import { AnalyzerOptions } from '../types/command-options.js';
+import { MiniProgramAppJson } from '../types/miniprogram.js';
+import { logger } from '../utils/debug-logger.js';
 import {
   COMPONENT_DEFINITION_FILE_TYPES,
   COMPONENT_IMPLEMENTATION_FILE_TYPES,
-} from '../utils/filetypes';
-import { PathResolver } from '../utils/path-resolver';
-import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
+} from '../utils/filetypes.js';
+import { PathResolver } from '../utils/path-resolver.js';
+import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure.js';
 
 export class ProjectStructureBuilder {
   private nodes: Map<string, GraphNode> = new Map();

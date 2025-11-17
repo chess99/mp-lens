@@ -2,20 +2,20 @@ import chalk from 'chalk';
 import * as fs from 'fs';
 import { sync as globSync } from 'glob';
 import * as path from 'path';
-import { analyzeProject } from '../analyzer/analyzer';
-import { GraphNode } from '../analyzer/project-structure';
-import { CmdDiffOptions, GlobalCliOptions } from '../types/command-options';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
-import { HandledError } from '../utils/errors';
-import { IMAGE_FILE_TYPES } from '../utils/filetypes';
+import { analyzeProject } from '../analyzer/analyzer.js';
+import { GraphNode } from '../analyzer/project-structure.js';
+import { CmdDiffOptions, GlobalCliOptions } from '../types/command-options.js';
+import { initializeCommandContext } from '../utils/command-init.js';
+import { logger } from '../utils/debug-logger.js';
+import { HandledError } from '../utils/errors.js';
+import { IMAGE_FILE_TYPES } from '../utils/filetypes.js';
 import {
   branchOrCommitExists,
   getDefaultBranch,
   GitSwitchManager,
   isGitRepository,
   isWorkingDirectoryClean,
-} from '../utils/git-helper';
+} from '../utils/git-helper.js';
 
 interface PackageAnalysisResult {
   totalSize: number;

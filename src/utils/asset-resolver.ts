@@ -1,6 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './debug-logger';
+import { fileURLToPath } from 'url';
+import { logger } from './debug-logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * 资源解析器

@@ -1,10 +1,10 @@
-import execa from 'execa';
+import { execa } from 'execa';
 import * as fs from 'fs';
 import path from 'path';
-import { CmdCpdOptions, GlobalCliOptions } from '../types/command-options';
-import { initializeCommandContext } from '../utils/command-init';
-import { logger } from '../utils/debug-logger';
-import { HandledError } from '../utils/errors';
+import { CmdCpdOptions, GlobalCliOptions } from '../types/command-options.js';
+import { initializeCommandContext } from '../utils/command-init.js';
+import { logger } from '../utils/debug-logger.js';
+import { HandledError } from '../utils/errors.js';
 
 /**
  * mp-lens cpd 命令实现，自动调用 jscpd 检查重复代码（通过 execa 调用 CLI）

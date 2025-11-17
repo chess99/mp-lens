@@ -3,8 +3,8 @@
  * 在每个测试文件运行前执行的全局设置
  */
 
-import { logger } from '../src/utils/debug-logger';
-import { silenceLogger } from './helpers/logger';
+import { logger } from '../src/utils/debug-logger.js';
+import { silenceLogger } from './helpers/logger.js';
 
 // 设置测试环境变量
 process.env.NODE_ENV = 'test';

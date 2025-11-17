@@ -1,7 +1,7 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
-module.exports = {
-  preset: 'ts-jest', // Use the ts-jest preset
-  testEnvironment: 'node', // Specify the test environment
+export default {
+  preset: 'ts-jest/presets/default-esm',
+  testEnvironment: 'node',
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
   // Force Jest to exit after tests complete
@@ -22,15 +22,22 @@ module.exports = {
     '^.+\\.tsx?$': [
       'ts-jest',
       {
-        // ts-jest configuration options go here
-        // Example: specify tsconfig if not standardly named or located
-        // tsconfig: 'tsconfig.test.json'
+        useESM: true,
+        tsconfig: 'tsconfig.json',
       },
     ],
+  },
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   // Optional: module name mapper for aliases (if needed and not handled by tsconfig paths)
   // moduleNameMapper: {
   //   '^@/(.*)$': '<rootDir>/src/$1'
   // },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  globals: {
+    'ts-jest': {
+      moduleResolution: 'bundler',
+    },
+  },
 };

@@ -1,4 +1,4 @@
-import { MiniProgramAppJson } from './miniprogram';
+import { MiniProgramAppJson } from './miniprogram.js';
 
 export interface GlobalCliOptions {
   config?: string;

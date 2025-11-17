@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { AnalyzerOptions } from '../types/command-options';
-import { logger } from './debug-logger';
-import { SupportedFileType } from './filetypes';
+import { AnalyzerOptions } from '../types/command-options.js';
+import { logger } from './debug-logger.js';
+import { SupportedFileType } from './filetypes.js';
 
 export class PathResolver {
   private projectRoot: string;

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigLoader } from './config-loader';
-import { logger } from './debug-logger';
+import { ConfigLoader } from './config-loader.js';
+import { logger } from './debug-logger.js';
 
 /**
  * 从 tsconfig.json 读取并解析 paths 别名，返回绝对路径数组

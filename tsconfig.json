@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -12,11 +12,19 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "lib": ["ES2018", "ES2019", "DOM"],
+    "lib": ["ES2022", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "types": ["node", "jest"]
   },
+  // A comment to force a refresh
   "include": ["src/**/*", ".eslintrc.js"],
-  "exclude": ["node_modules", "**/*.test.ts", "dist", ".ui-build-temp", "scripts/**/*.js"]
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "dist",
+    ".ui-build-temp",
+    "scripts/**/*.js",
+    "src/ui/**/*"
+  ]
 }
