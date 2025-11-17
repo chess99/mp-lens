@@ -1,15 +1,17 @@
 /**
  * Verbosity levels for logging:
- * 0 = ESSENTIAL: Only critical information (errors, warnings, final results)
- * 1 = NORMAL: Basic debug information (DEFAULT with --verbose flag)
- * 2 = VERBOSE: Detailed debug information (configuration, processing steps)
- * 3 = TRACE: Extremely detailed information (path resolution, all file operations)
+ * 0 = ERROR: Only errors
+ * 1 = ESSENTIAL: Critical information (errors + warnings + final results)
+ * 2 = NORMAL: Basic debug information (DEFAULT with --verbose flag)
+ * 3 = VERBOSE: Detailed debug information (configuration, processing steps)
+ * 4 = TRACE: Extremely detailed information (path resolution, all file operations)
  */
 export enum LogLevel {
-  ESSENTIAL = 0,
-  NORMAL = 1,
-  VERBOSE = 2,
-  TRACE = 3,
+  ERROR = 0,
+  ESSENTIAL = 1,
+  NORMAL = 2,
+  VERBOSE = 3,
+  TRACE = 4,
 }
 
 interface LoggerOptions {
@@ -36,7 +38,7 @@ class DebugLogger {
    */
   constructor(options: Partial<LoggerOptions> = {}) {
     this.options = {
-      level: options.level ?? (options.level === 0 ? 0 : LogLevel.ESSENTIAL),
+      level: typeof options.level === 'number' ? options.level : LogLevel.ESSENTIAL,
       projectRoot: options.projectRoot,
       useRelativePaths: options.useRelativePaths ?? true,
       useColors: options.useColors ?? true,
@@ -80,29 +82,29 @@ class DebugLogger {
   /**
    * Log a message at ESSENTIAL level (always shown)
    */
-  info(message: string, ...args: any[]): void {
+  info(message: string, ...args: unknown[]): void {
     this._log('INFO', LogLevel.ESSENTIAL, message, ...args);
   }
 
   /**
    * Log a warning message (always shown)
    */
-  warn(message: string, ...args: any[]): void {
+  warn(message: string, ...args: unknown[]): void {
     this._log('WARN', LogLevel.ESSENTIAL, message, ...args);
   }
 
   /**
    * Log an error message (always shown)
    */
-  error(message: string, ...args: any[]): void {
-    this._log('ERROR', LogLevel.ESSENTIAL, message, ...args);
+  error(message: string, ...args: unknown[]): void {
+    this._log('ERROR', LogLevel.ERROR, message, ...args);
   }
 
   /**
    * Log a message at NORMAL level
    * Only shown when verbose flag is enabled
    */
-  debug(message: string, ...args: any[]): void {
+  debug(message: string, ...args: unknown[]): void {
     this._log('DEBUG', LogLevel.NORMAL, message, ...args);
   }
 
@@ -110,7 +112,7 @@ class DebugLogger {
    * Log a message at VERBOSE level
    * Requires verbosity level of 2 or higher
    */
-  verbose(message: string, ...args: any[]): void {
+  verbose(message: string, ...args: unknown[]): void {
     this._log('VERBOSE', LogLevel.VERBOSE, message, ...args);
   }
 
@@ -118,7 +120,7 @@ class DebugLogger {
    * Log a message at TRACE level
    * Requires verbosity level of 3
    */
-  trace(message: string, ...args: any[]): void {
+  trace(message: string, ...args: unknown[]): void {
     this._log('TRACE', LogLevel.TRACE, message, ...args);
   }
 
@@ -137,7 +139,7 @@ class DebugLogger {
   /**
    * Internal logging implementation
    */
-  private _log(prefix: string, level: LogLevel, message: string, ...args: any[]): void {
+  private _log(prefix: string, level: LogLevel, message: string, ...args: unknown[]): void {
     if (this.options.level < level) {
       return;
     }
@@ -176,9 +178,27 @@ class DebugLogger {
       }
     }
 
-    console.log(`${prefix} - ${formatted}`);
+    const writer = this.getWriter(prefix);
+    writer(`${prefix} - ${formatted}`);
+  }
+
+  private getWriter(prefix: string): (line: string) => void {
+    switch (prefix) {
+      case 'ERROR':
+        return console.error;
+      case 'WARN':
+        return console.warn;
+      default:
+        return console.log;
+    }
   }
 }
 
 // Create a default instance for convenient import
-export const logger = new DebugLogger();
+const isTestEnv =
+  typeof process !== 'undefined' &&
+  (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined);
+
+export const logger = new DebugLogger({
+  level: isTestEnv ? LogLevel.ERROR : LogLevel.ESSENTIAL,
+});

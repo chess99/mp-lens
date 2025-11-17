@@ -17,6 +17,7 @@ module.exports = {
     'tests/fixtures/**',
     'scripts/**',
     'docs/examples/**',
+    'jest.config.js',
   ],
   rules: {
     '@typescript-eslint/explicit-module-boundary-types': 'warn',

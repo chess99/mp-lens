@@ -32,6 +32,5 @@ module.exports = {
   // moduleNameMapper: {
   //   '^@/(.*)$': '<rootDir>/src/$1'
   // },
-  // Optional: setup files to run before each test file
-  // setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
 };

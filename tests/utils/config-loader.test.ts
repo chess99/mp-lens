@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigFileOptions } from '../../src/types/command-options';
 import { ConfigLoader } from '../../src/utils/config-loader';
+import { logger } from '../../src/utils/debug-logger';
+import { silenceLogger } from '../helpers/logger';
 
 // Get actual path module *before* mocking
 const actualPath = jest.requireActual('path');
@@ -76,11 +78,6 @@ jest.mock(
 // --- Test Suite ---
 
 describe('ConfigLoader', () => {
-  // Store original console methods and spies
-  let consoleLogSpy: jest.SpyInstance;
-  let consoleWarnSpy: jest.SpyInstance;
-  let consoleErrorSpy: jest.SpyInstance;
-
   beforeEach(() => {
     // Reset general mocks
     jest.clearAllMocks();
@@ -122,21 +119,9 @@ describe('ConfigLoader', () => {
         `Mock fs.readFileSync: ENOENT: no such file or directory, open '${filePath}'`,
       );
     });
-
-    // Reset/Recreate console spies
-    consoleLogSpy?.mockRestore();
-    consoleWarnSpy?.mockRestore();
-    consoleErrorSpy?.mockRestore();
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    // Restore console methods
-    consoleLogSpy?.mockRestore();
-    consoleWarnSpy?.mockRestore();
-    consoleErrorSpy?.mockRestore();
     // Reset modules potentially modified by tests (like error.js mock override)
     jest.resetModules();
   });
@@ -265,7 +250,7 @@ describe('ConfigLoader', () => {
     expect(loadedConfig).toBeNull();
     expect(fs.readFileSync).toHaveBeenCalledWith(fullConfigPath, 'utf-8');
     // Verify error was logged without checking the specific message
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it('should return null if no config file is found during auto-search', async () => {
@@ -292,7 +277,7 @@ describe('ConfigLoader', () => {
     expect(loadedConfig).toBeNull();
     expect(fs.readFileSync).toHaveBeenCalledWith(fullConfigPath, 'utf-8');
     // Verify error was logged without checking the specific message
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it('should return null and log error if JS loading fails (require throws)', async () => {
@@ -303,7 +288,7 @@ describe('ConfigLoader', () => {
 
     expect(loadedConfig).toBeNull(); // Loader should catch the error from require
     // Verify error was logged without checking the specific message
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
     expect(mockTsNodeRegister).not.toHaveBeenCalled();
   });
 
@@ -326,7 +311,7 @@ describe('ConfigLoader', () => {
     expect(loadedConfig).toBeNull();
     expect(mockTsNodeRegister).toHaveBeenCalledTimes(1); // Registration happens before require
     // Verify error was logged without checking the specific message
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it('should return null and log error if TS loading fails because ts-node registration fails', async () => {
@@ -346,14 +331,14 @@ describe('ConfigLoader', () => {
     // Need to reset modules to pick up the new ts-node mock
     jest.resetModules();
     const { ConfigLoader: ReloadedConfigLoader } = await import('../../src/utils/config-loader');
-    // Re-spy on console after resetModules if necessary
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { logger: reloadedLogger } = await import('../../src/utils/debug-logger');
+    const reloadedLoggerSpies = silenceLogger(reloadedLogger);
 
     const loadedConfig = await ReloadedConfigLoader.loadConfig(configPath, projectRoot);
 
     expect(loadedConfig).toBeNull();
     // Verify error was logged without checking the specific message
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(reloadedLoggerSpies.error).toHaveBeenCalled();
   });
 
   it('should return null and log warning for unsupported config file extensions', async () => {

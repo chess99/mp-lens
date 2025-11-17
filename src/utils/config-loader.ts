@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigFileOptions } from '../types/command-options';
+import { logger } from './debug-logger';
 
 /**
  * Loads the mp-lens specific configuration file (e.g., mp-lens.config.js).
@@ -29,12 +30,12 @@ export class ConfigLoader {
     for (const configName of possibleConfigs) {
       const fullPath = path.join(projectRoot, configName);
       if (fs.existsSync(fullPath)) {
-        console.log(`找到配置文件: ${fullPath}`);
+        logger.info(`找到配置文件: ${fullPath}`);
         return this.loadConfigFile(fullPath);
       }
     }
 
-    console.log(`未找到配置文件，将使用默认配置`);
+    logger.info('未找到配置文件，将使用默认配置');
     return null;
   }
 
@@ -56,11 +57,11 @@ export class ConfigLoader {
         case '.json':
           return this.loadJsonConfig(filePath);
         default:
-          console.warn(`不支持的配置文件格式: ${ext}`);
+          logger.warn(`不支持的配置文件格式: ${ext}`);
           return null;
       }
     } catch (error) {
-      console.error(`加载配置文件失败: ${(error as Error).message}`);
+      logger.error(`加载配置文件失败: ${(error as Error).message}`);
       return null;
     }
   }
@@ -73,7 +74,7 @@ export class ConfigLoader {
       const content = fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(content);
     } catch (error) {
-      console.error(`解析JSON配置文件失败: ${(error as Error).message}`);
+      logger.error(`解析JSON配置文件失败: ${(error as Error).message}`);
       return null;
     }
   }
@@ -107,7 +108,7 @@ export class ConfigLoader {
 
       return config;
     } catch (error) {
-      console.error(`加载JavaScript配置文件失败: ${(error as Error).message}`);
+      logger.error(`加载JavaScript配置文件失败: ${(error as Error).message}`);
       return null;
     }
   }
@@ -132,14 +133,14 @@ export class ConfigLoader {
         });
       } catch (e) {
         const tsNodeError = e as Error;
-        console.error(`加载TypeScript配置需要安装ts-node: ${tsNodeError.message}`);
+        logger.error(`加载TypeScript配置需要安装ts-node: ${tsNodeError.message}`);
         return null;
       }
 
       // 使用与JavaScript相同的加载逻辑
       return this.loadJavaScriptConfig(filePath);
     } catch (error) {
-      console.error(`加载TypeScript配置文件失败: ${(error as Error).message}`);
+      logger.error(`加载TypeScript配置文件失败: ${(error as Error).message}`);
       return null;
     }
   }

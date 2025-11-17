@@ -3,6 +3,9 @@
  * 在每个测试文件运行前执行的全局设置
  */
 
+import { logger } from '../src/utils/debug-logger';
+import { silenceLogger } from './helpers/logger';
+
 // 设置测试环境变量
 process.env.NODE_ENV = 'test';
 process.env.MP_LENS_TELEMETRY_DISABLED = 'true'; // 默认禁用遥测
@@ -15,12 +18,10 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-// 清理控制台输出（可选）
-const _originalConsoleError = console.error;
-const _originalConsoleWarn = console.warn;
+const loggerSpies = silenceLogger(logger);
 
 beforeEach(() => {
-  // 可以在这里添加每个测试前的设置
+  Object.values(loggerSpies).forEach((spy) => spy.mockClear());
 });
 
 afterEach(() => {
