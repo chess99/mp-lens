@@ -1,39 +1,39 @@
 import chalk from 'chalk';
-import { execSync } from 'child_process';
 import semver from 'semver';
 import { version } from '../version';
 
+const PACKAGE_NAME = 'mp-lens';
+
 export async function checkForUpdates(): Promise<void> {
   try {
-    // 如果当前版本是 unknown，跳过版本检查
     if (version === 'unknown') {
       console.debug('当前版本未知，跳过版本检查');
       return;
     }
 
-    // 获取最新版本
-    const latestVersion = execSync('npm view mp-lens version').toString().trim();
+    // 动态导入 ESM 模块
+    const updateNotifier = (await import('update-notifier')).default;
+    const notifier = updateNotifier({
+      pkg: { name: PACKAGE_NAME, version },
+      updateCheckInterval: 0,
+      shouldNotifyInNpmScript: true,
+    });
 
-    // 比较版本
-    if (semver.gt(latestVersion, version)) {
+    const updateInfo = await notifier.fetchInfo();
+    const currentVersion = updateInfo.current ?? version;
+    const latestVersion = updateInfo.latest;
+
+    if (latestVersion && semver.gt(latestVersion, currentVersion)) {
       console.log('\n' + chalk.yellow('⚠️  发现新版本！'));
-      console.log(chalk.gray(`当前版本：${version}`));
+      console.log(chalk.gray(`当前版本：${currentVersion}`));
       console.log(chalk.green(`最新版本：${latestVersion}`));
-      console.log(chalk.blue('\n要更新到最新版本，请运行：'));
-
-      // 检测是否通过 npx 运行
-      const isNpx = process.env.npm_config_user_agent?.includes('npx');
-      if (isNpx) {
-        console.log(chalk.cyan('  npx mp-lens@latest <命令>'));
-        console.log(chalk.gray('  或者安装到本地项目：'));
-        console.log(chalk.cyan('  npm install --save-dev mp-lens@latest'));
-      } else {
-        console.log(chalk.cyan('  npm install -g mp-lens@latest'));
-      }
-      console.log(); // 添加空行
+      console.log(chalk.blue('\n升级示例：'));
+      console.log(chalk.cyan('  npm install -g mp-lens@latest'));
+      console.log(chalk.cyan('  npx mp-lens@latest <命令>'));
+      console.log(chalk.cyan('  npm install --save-dev mp-lens@latest'));
+      console.log();
     }
   } catch (error) {
-    // 静默处理错误，不影响主程序运行
     console.debug('版本检查失败：', error);
   }
 }
