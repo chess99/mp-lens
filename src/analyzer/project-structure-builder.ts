@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileParser } from '../parser/file-parser';
+import { extractJsonComponentReferences } from '../parser/json-dependencies';
 import { AnalyzerOptions } from '../types/command-options';
 import { MiniProgramAppJson } from '../types/miniprogram';
 import { logger } from '../utils/debug-logger';
@@ -14,6 +15,7 @@ import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './pr
 export class ProjectStructureBuilder {
   private nodes: Map<string, GraphNode> = new Map();
   private links: GraphLink[] = [];
+  private linkKeys: Set<string> = new Set();
   private miniappRoot: string;
   private projectRoot: string;
   private fileParser: FileParser;
@@ -178,9 +180,9 @@ export class ProjectStructureBuilder {
     }
 
     // TODO: Process TabBar, Theme, Workers etc. (similar to parseEntryContent)
-    this.processTabBar(content);
-    this.processTheme(content);
-    this.processWorkers(content);
+    await this.processTabBar(content);
+    await this.processTheme(content);
+    await this.processWorkers(content);
   }
 
   private async processPage(
@@ -375,18 +377,10 @@ export class ProjectStructureBuilder {
       const content = fs.readFileSync(jsonPath, 'utf-8');
       const jsonContent = JSON.parse(content);
 
-      if (jsonContent.usingComponents && typeof jsonContent.usingComponents === 'object') {
-        logger.verbose(`Parsing components for: ${ownerId} from ${jsonPath}`);
-        const componentDir = path.dirname(jsonPath);
-        for (const [_name, compPath] of Object.entries(jsonContent.usingComponents)) {
-          if (typeof compPath === 'string' && !compPath.startsWith('plugin://')) {
-            // Resolve component path relative to the JSON file's directory
-            // const absoluteCompPath = path.resolve(componentDir, compPath as string);
-            // processComponent now resolves absolute path and calculates canonical ID internally
-            // We need to provide the correct context (componentDir) for resolving the relative compPath
-            await this.processComponent(ownerId, compPath as string, componentDir); // Use componentDir as currentRoot
-          }
-        }
+      logger.verbose(`Parsing components for: ${ownerId} from ${jsonPath}`);
+      const componentDir = path.dirname(jsonPath);
+      for (const compPath of extractJsonComponentReferences(jsonContent)) {
+        await this.processComponent(ownerId, compPath, componentDir);
       }
     } catch (error) {
       logger.warn(`Failed to read or parse component JSON: ${jsonPath}`, error);
@@ -407,11 +401,11 @@ export class ProjectStructureBuilder {
       // Assuming parseFile gives a list of absolute paths of dependencies
       const dependencies = await this.fileParser.parseFile(filePath);
 
-      for (const depAbsolutePath of dependencies) {
+      for (const dependency of dependencies) {
+        const depAbsolutePath = dependency.targetFile;
         const targetNode = this.addNodeForFile(depAbsolutePath, 'Module');
         if (targetNode) {
-          // Use 'Import' as the default dependency link type
-          this.addLink(moduleNode.id, targetNode.id, 'Import');
+          this.addLink(moduleNode.id, targetNode.id, dependency.linkType, dependency.kind);
 
           // --- Populate referredBy ---
           if (!targetNode.properties) targetNode.properties = {};
@@ -505,62 +499,68 @@ export class ProjectStructureBuilder {
       return;
     }
 
+    const linkKey = `${sourceId}\0${targetId}\0${type}\0${dependencyType ?? ''}`;
+    if (this.linkKeys.has(linkKey)) {
+      return;
+    }
+    this.linkKeys.add(linkKey);
+
     const link: GraphLink = { source: sourceId, target: targetId, type };
     if (dependencyType) {
       link.dependencyType = dependencyType;
     }
-
-    // Optional: Check for duplicates if needed
-    // const exists = this.links.some(l => l.source === sourceId && l.target === targetId && l.type === type);
-    // if (exists) return;
 
     this.links.push(link);
   }
 
   // --- Start: Added processing functions for TabBar, Theme, Workers ---
 
-  private processTabBar(content: MiniProgramAppJson): void {
+  private async processTabBar(content: MiniProgramAppJson): Promise<void> {
     if (content.tabBar && content.tabBar.list && Array.isArray(content.tabBar.list)) {
       logger.debug('Processing tabBar entries...');
-      content.tabBar.list.forEach((item) => {
+      for (const item of content.tabBar.list) {
         // pagePath defines a page structure
         if (item.pagePath) {
           // Process page structure (json, js, wxml, wxss)
           // We don't know the parent context here (App or Package), link from App root?
           // This might re-process pages already found via 'pages' or 'subpackages',
           // but processPage/processRelatedFiles handles duplicates.
-          this.processPage(this.rootNodeId!, item.pagePath as string, this.miniappRoot);
+          await this.processPage(this.rootNodeId!, item.pagePath as string, this.miniappRoot);
         }
         // Icons are single file dependencies
         if (item.iconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.iconPath as string, 'Resource');
+          await this.addSingleFileLink(this.rootNodeId!, item.iconPath as string, 'Resource');
         }
         if (item.selectedIconPath) {
-          this.addSingleFileLink(this.rootNodeId!, item.selectedIconPath as string, 'Resource');
+          await this.addSingleFileLink(
+            this.rootNodeId!,
+            item.selectedIconPath as string,
+            'Resource',
+          );
         }
-      });
+      }
     }
   }
 
-  private processTheme(content: MiniProgramAppJson): void {
+  private async processTheme(content: MiniProgramAppJson): Promise<void> {
     // Check for themeLocation first
     if (content.themeLocation && typeof content.themeLocation === 'string') {
       logger.debug(`Processing themeLocation: ${content.themeLocation}`);
-      this.addSingleFileLink(this.rootNodeId!, content.themeLocation, 'Config');
+      await this.addSingleFileLink(this.rootNodeId!, content.themeLocation, 'Config');
     }
     // Always check for default theme.json
     logger.debug('Checking for default theme.json');
-    this.addSingleFileLink(this.rootNodeId!, 'theme.json', 'Config');
+    await this.addSingleFileLink(this.rootNodeId!, 'theme.json', 'Config');
   }
 
-  private processWorkers(content: MiniProgramAppJson): void {
+  private async processWorkers(content: MiniProgramAppJson): Promise<void> {
     // Workers field defines entry points for worker threads
     if (content.workers && typeof content.workers === 'string') {
       logger.debug(`Processing workers entry: ${content.workers}`);
       // Treat the worker root directory/file itself as a structural link from App
       // We might need more sophisticated handling if it's a directory
       // For now, add link to the file/dir specified
-      this.addSingleFileLink(this.rootNodeId!, content.workers, 'WorkerEntry');
+      await this.addSingleFileLink(this.rootNodeId!, content.workers, 'WorkerEntry');
       // TODO: Potentially need to parse files within the worker directory?
       // This depends on how workers load dependencies.
       // For now, just ensure the entry point is marked as used.
@@ -568,7 +568,11 @@ export class ProjectStructureBuilder {
   }
 
   // Helper to add a link for a single file path relative to miniappRoot
-  private addSingleFileLink(sourceId: string, relativePath: string, linkType: LinkType): void {
+  private async addSingleFileLink(
+    sourceId: string,
+    relativePath: string,
+    linkType: LinkType,
+  ): Promise<void> {
     const absolutePath = path.resolve(this.miniappRoot, relativePath);
     if (fs.existsSync(absolutePath)) {
       const node = this.addNodeForFile(absolutePath, 'Module');
@@ -578,7 +582,7 @@ export class ProjectStructureBuilder {
         // For simple configs/resources, maybe not needed initially.
         // For workers entry .js, it would be needed.
         if (linkType === 'WorkerEntry') {
-          this.parseModuleDependencies(node);
+          await this.parseModuleDependencies(node);
         }
       }
     } else {

@@ -8,6 +8,12 @@ import {
   SupportedFileType,
 } from '../utils/filetypes';
 import { PathResolver } from '../utils/path-resolver';
+import {
+  DependencyKind,
+  linkTypeForDependencyKind,
+  ParsedDependency,
+  ResolvedDependency,
+} from './dependency-types';
 
 // Import specialized parsers with corrected paths relative to src/analyzer/
 import { JavaScriptParser } from './javascript-parser';
@@ -46,9 +52,9 @@ export class FileParser {
   /**
    * Parses a single file by reading its content and delegating text analysis to the appropriate parser.
    * Handles path resolution centrally.
-   * Returns a list of absolute paths to the file's dependencies.
+   * Returns a list of resolved dependencies with their source-specific dependency kind.
    */
-  async parseFile(filePath: string): Promise<string[]> {
+  async parseFile(filePath: string): Promise<ResolvedDependency[]> {
     const ext = path.extname(filePath).toLowerCase();
 
     try {
@@ -84,12 +90,20 @@ export class FileParser {
           return [];
       }
 
+      const parsedDependencies = rawDependencies.map((rawPath) =>
+        this.toParsedDependency(rawPath, filePath, ext),
+      );
+
       // Resolve all raw dependency paths to absolute paths
-      const resolvedDependencies: string[] = [];
-      for (const rawPath of rawDependencies) {
-        const resolvedPath = this.resolveDependencyPath(rawPath, filePath, ext);
+      const resolvedDependencies: ResolvedDependency[] = [];
+      for (const dependency of parsedDependencies) {
+        const resolvedPath = this.resolveDependencyPath(dependency);
         if (resolvedPath) {
-          resolvedDependencies.push(resolvedPath);
+          resolvedDependencies.push({
+            ...dependency,
+            targetFile: resolvedPath,
+            linkType: linkTypeForDependencyKind(dependency.kind),
+          });
         }
       }
 
@@ -105,58 +119,93 @@ export class FileParser {
   /**
    * Resolves a raw dependency path to an absolute path based on file type context
    */
-  private resolveDependencyPath(
+  private toParsedDependency(
     rawPath: string,
-    sourcePath: string,
+    sourceFile: string,
     sourceExt: string,
-  ): string | null {
-    // Determine allowed extensions based on source file type and dependency context
-    let allowedExtensions: readonly SupportedFileType[];
+  ): ParsedDependency {
+    return {
+      sourceFile,
+      rawPath,
+      kind: this.inferDependencyKind(rawPath, sourceExt),
+    };
+  }
 
+  private inferDependencyKind(rawPath: string, sourceExt: string): DependencyKind {
     switch (sourceExt) {
       case '.js':
       case '.ts':
-        allowedExtensions = ['js', 'ts', 'd.ts', 'json'];
-        break;
       case '.wxs':
-        allowedExtensions = ['wxs']; // WXS files can only import other WXS files
-        break;
+        return path.extname(rawPath).toLowerCase() === '.json' ? 'config' : 'script';
       case '.wxml':
-        // WXML can reference .wxml (import/include), .wxs, and image files
-        // Determine type based on path characteristics
         if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_FILE_TYPES;
-        } else if (rawPath.includes('.wxs') || rawPath.endsWith('.wxs')) {
-          allowedExtensions = ['wxs'];
-        } else {
-          // Default to WXML for import/include
-          allowedExtensions = ['wxml'];
+          return 'resource';
         }
-        break;
+        if (rawPath.includes('.wxs') || rawPath.endsWith('.wxs')) {
+          return 'script';
+        }
+        return 'template';
       case '.wxss':
       case '.less':
-        // WXSS can import other WXSS files or reference image files
-        if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_FILE_TYPES;
+        return this.isImagePath(rawPath) ? 'resource' : 'style';
+      case '.json':
+        return this.isImagePath(rawPath) ? 'resource' : 'component';
+      default:
+        return 'script';
+    }
+  }
+
+  private resolveDependencyPath(dependency: ParsedDependency): string | null {
+    // Determine allowed extensions based on source file type and dependency context
+    let allowedExtensions: readonly SupportedFileType[];
+
+    switch (dependency.kind) {
+      case 'script':
+        if (path.extname(dependency.sourceFile).toLowerCase() === '.wxs') {
+          allowedExtensions = ['wxs'];
         } else {
-          allowedExtensions = ['wxss', 'less'];
+          allowedExtensions = ['js', 'ts', 'd.ts', 'json', 'wxs'];
         }
         break;
-      case '.json':
-        // JSON files can reference various file types depending on context
-        // For pages and components, we need to find all related files
-        if (this.isImagePath(rawPath)) {
-          allowedExtensions = IMAGE_FILE_TYPES;
-        } else {
-          // For pages/components, try to find the main file first
-          allowedExtensions = COMPONENT_DEFINITION_FILE_TYPES;
-        }
+      case 'config':
+        allowedExtensions = ['json'];
+        break;
+      case 'component':
+        allowedExtensions = COMPONENT_DEFINITION_FILE_TYPES;
+        break;
+      case 'template':
+        allowedExtensions = ['wxml'];
+        break;
+      case 'style':
+        allowedExtensions = ['wxss', 'less'];
+        break;
+      case 'resource':
+        allowedExtensions = IMAGE_FILE_TYPES;
+        break;
+      case 'worker':
+        allowedExtensions = ['js', 'ts'];
         break;
       default:
-        allowedExtensions = [];
+        allowedExtensions = ['js', 'ts', 'd.ts', 'json'];
     }
 
-    return this.pathResolver.resolveAnyPath(rawPath, sourcePath, allowedExtensions);
+    return this.pathResolver.resolveAnyPath(
+      this.pathForResolution(dependency),
+      dependency.sourceFile,
+      allowedExtensions,
+    );
+  }
+
+  private pathForResolution(dependency: ParsedDependency): string {
+    const sourceExt = path.extname(dependency.sourceFile).toLowerCase();
+    const shouldResolveRelativeToSource =
+      (sourceExt === '.wxss' || sourceExt === '.less') &&
+      (dependency.kind === 'style' || dependency.kind === 'resource') &&
+      !dependency.rawPath.startsWith('.') &&
+      !dependency.rawPath.startsWith('/') &&
+      !/^(data:|https?:\/\/|\/\/)/.test(dependency.rawPath);
+
+    return shouldResolveRelativeToSource ? `./${dependency.rawPath}` : dependency.rawPath;
   }
 
   /**

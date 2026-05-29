@@ -217,18 +217,14 @@ function processNodeRecursive(
 
   const aggregatedModuleIds = new Set<string>();
 
-  // 1. Collect modules from the current node's own direct/constituent files and their dependencies
+  // 1. Collect modules from the current node's own direct/constituent files.
+  // Dependency-only imports are intentionally excluded from tree ownership stats; they remain
+  // visible through dependency graph/detail views.
   if (nodeData.type !== 'Module') {
     // App, Page, Package, Component
     const directModules = findDirectStructuralModules(currentGraphNodeId, allLinks, nodeMap);
     for (const moduleNode of directModules) {
-      const modulesReachableFromThisFile = collectAllReachableModulesFrom(
-        moduleNode.id,
-        nodeMap,
-        linksFromMap,
-        collectionCache,
-      );
-      modulesReachableFromThisFile.forEach((id) => aggregatedModuleIds.add(id));
+      aggregatedModuleIds.add(moduleNode.id);
     }
   } else {
     // If the current node itself is a Module (e.g. if root is a module, or a module somehow becomes a tree node)

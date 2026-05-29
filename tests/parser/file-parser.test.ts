@@ -1,5 +1,8 @@
 import { FileParser } from '../../src/parser/file-parser';
 import { AnalyzerOptions } from '../../src/types/command-options';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // 暴露私有方法进行测试的技巧
 class TestableFileParser extends FileParser {
@@ -78,6 +81,75 @@ describe('FileParser', () => {
       expect(parser.testIsImagePath('.')).toBe(false);
       expect(parser.testIsImagePath('..')).toBe(false);
       expect(parser.testIsImagePath('.hidden.png')).toBe(true);
+    });
+  });
+
+  describe('parseFile', () => {
+    function createFixture(files: Record<string, string>) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mp-lens-parser-'));
+      for (const [relativePath, content] of Object.entries(files)) {
+        const absolutePath = path.join(root, relativePath);
+        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+        fs.writeFileSync(absolutePath, content);
+      }
+      const options: AnalyzerOptions = {
+        miniappRoot: root,
+        appJsonPath: path.join(root, 'app.json'),
+      };
+      return { root, parser: new FileParser(root, options) };
+    }
+
+    it('returns resolved dependencies with dependency kinds', async () => {
+      const { root, parser } = createFixture({
+        'pages/index/index.js': "const util = require('../../utils/util');\n",
+        'pages/index/index.wxml':
+          '<import src="../../templates/card.wxml" /><image src="../../assets/logo.png" />',
+        'pages/index/index.wxss':
+          "@import 'base.wxss';\n.icon{background:url('../../assets/icon.svg')}",
+        'pages/index/base.wxss': '',
+        'utils/util.js': '',
+        'templates/card.wxml': '<view />',
+        'assets/logo.png': '',
+        'assets/icon.svg': '',
+      });
+
+      await expect(parser.parseFile(path.join(root, 'pages/index/index.js'))).resolves.toEqual([
+        expect.objectContaining({
+          kind: 'script',
+          rawPath: '../../utils/util',
+          targetFile: path.join(root, 'utils/util.js'),
+        }),
+      ]);
+
+      await expect(parser.parseFile(path.join(root, 'pages/index/index.wxml'))).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'template',
+            rawPath: '../../templates/card.wxml',
+            targetFile: path.join(root, 'templates/card.wxml'),
+          }),
+          expect.objectContaining({
+            kind: 'resource',
+            rawPath: '../../assets/logo.png',
+            targetFile: path.join(root, 'assets/logo.png'),
+          }),
+        ]),
+      );
+
+      await expect(parser.parseFile(path.join(root, 'pages/index/index.wxss'))).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'style',
+            rawPath: 'base.wxss',
+            targetFile: path.join(root, 'pages/index/base.wxss'),
+          }),
+          expect.objectContaining({
+            kind: 'resource',
+            rawPath: '../../assets/icon.svg',
+            targetFile: path.join(root, 'assets/icon.svg'),
+          }),
+        ]),
+      );
     });
   });
 });

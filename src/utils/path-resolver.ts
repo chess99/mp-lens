@@ -222,6 +222,13 @@ export class PathResolver {
       return false;
     }
 
+    // Mini Program template/style/resource references often omit './' for same-directory
+    // files, e.g. @import "base.wxss" or url(images/icon.png). Treat explicit file
+    // references as local paths before applying bare-package heuristics.
+    if (path.extname(importPath)) {
+      return false;
+    }
+
     if (importPath.startsWith('@')) {
       const scope = importPath.split('/')[0];
       const aliases = this.getAliases();
