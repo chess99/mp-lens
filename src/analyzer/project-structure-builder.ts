@@ -181,6 +181,7 @@ export class ProjectStructureBuilder {
 
     // TODO: Process TabBar, Theme, Workers etc. (similar to parseEntryContent)
     await this.processTabBar(content);
+    await this.processSitemap(content);
     await this.processTheme(content);
     await this.processWorkers(content);
   }
@@ -208,49 +209,17 @@ export class ProjectStructureBuilder {
     componentBasePath: string, // Path from usingComponents (e.g., '/components/comp', '../../comp')
     currentRoot: string, // Directory of the JSON file that declared the component
   ): Promise<GraphNode | null> {
-    let absoluteBasePath: string;
+    const absoluteBasePath = this.resolveDefinitionBasePath(componentBasePath, currentRoot, [
+      'json',
+    ]);
 
-    // 找到 usingComponents 指定的组件的路径, 内有 alias 的替换等处理
-    const resolutionContextPath = path.join(currentRoot, 'index.json');
-    const resolvedEntryPath = this.pathResolver.resolveAnyPath(
-      componentBasePath,
-      resolutionContextPath,
-      ['json'],
+    logger.trace(
+      `[processComponent] Resolved '${componentBasePath}' (ctx: '${currentRoot}') -> '${absoluteBasePath}'`,
     );
-
-    if (resolvedEntryPath) {
-      const baseName = path.basename(resolvedEntryPath);
-      const dirName = path.dirname(resolvedEntryPath);
-      if (baseName.startsWith('index.')) {
-        absoluteBasePath = dirName;
-      } else {
-        absoluteBasePath = resolvedEntryPath.slice(0, -path.extname(resolvedEntryPath).length);
-      }
-      logger.trace(
-        `[processComponent] PathResolver 解析 '${componentBasePath}' (ctx: '${currentRoot}') -> entry '${resolvedEntryPath}', base '${absoluteBasePath}'`,
-      );
-    } else {
-      // Fallback to previous behavior if alias-aware resolution failed
-      if (componentBasePath.startsWith('/')) {
-        absoluteBasePath = path.resolve(this.miniappRoot, componentBasePath.substring(1));
-      } else {
-        absoluteBasePath = path.resolve(currentRoot, componentBasePath);
-      }
-      logger.trace(
-        `[processComponent] Fallback 解析 '${componentBasePath}' (ctx: '${currentRoot}') -> '${absoluteBasePath}'`,
-      );
-    }
 
     // Normalize the path to ensure that '.../comp' and '.../comp/index' are treated as the same entity.
     // The canonical form for IDs and basePaths will be WITHOUT '/index'.
-    let canonicalBasePath = absoluteBasePath;
-    const indexSuffix = path.sep + 'index';
-    if (absoluteBasePath.endsWith(indexSuffix)) {
-      canonicalBasePath = absoluteBasePath.slice(0, -indexSuffix.length);
-      logger.trace(
-        `[processComponent] Normalized component path from '${absoluteBasePath}' to '${canonicalBasePath}' for ID and basePath.`,
-      );
-    }
+    const canonicalBasePath = this.canonicalizeDefinitionBasePath(absoluteBasePath);
 
     // Create a canonical ID relative to the miniapp root
     const canonicalRelativePath = path.relative(this.miniappRoot, canonicalBasePath);
@@ -302,44 +271,14 @@ export class ProjectStructureBuilder {
   ): Promise<void> {
     // Resolve absolute path based on the context provided by the caller
     // Needs the same logic as processComponent to handle '/' prefix
-    let absoluteBasePath: string;
-    if (path.isAbsolute(basePath)) {
-      absoluteBasePath = basePath;
-    } else {
-      const resolutionContextPath = path.join(currentRoot, 'index.json');
-      const resolvedEntryPath = this.pathResolver.resolveAnyPath(
-        basePath,
-        resolutionContextPath,
-        COMPONENT_DEFINITION_FILE_TYPES,
-      );
-
-      if (resolvedEntryPath) {
-        const baseName = path.basename(resolvedEntryPath);
-        const dirName = path.dirname(resolvedEntryPath);
-        if (baseName.startsWith('index.')) {
-          absoluteBasePath = dirName;
-        } else {
-          absoluteBasePath = resolvedEntryPath.slice(0, -path.extname(resolvedEntryPath).length);
-        }
-      } else if (basePath.startsWith('/')) {
-        absoluteBasePath = path.resolve(this.miniappRoot, basePath.substring(1));
-      } else {
-        absoluteBasePath = path.resolve(currentRoot, basePath);
-      }
-    }
+    const absoluteBasePath = this.resolveDefinitionBasePath(
+      basePath,
+      currentRoot,
+      COMPONENT_DEFINITION_FILE_TYPES,
+    );
 
     for (const ext of COMPONENT_DEFINITION_FILE_TYPES) {
-      // Check both patterns: basePath.ext and basePath/index.ext
-      const filePathDirect = absoluteBasePath + '.' + ext;
-      const filePathIndex = path.join(absoluteBasePath, 'index.' + ext);
-
-      let foundFilePath: string | null = null;
-
-      if (fs.existsSync(filePathDirect)) {
-        foundFilePath = filePathDirect;
-      } else if (fs.existsSync(filePathIndex)) {
-        foundFilePath = filePathIndex;
-      }
+      const foundFilePath = this.findDefinitionFile(absoluteBasePath, ext);
 
       // If either path was found, process it
       if (foundFilePath) {
@@ -419,7 +358,7 @@ export class ProjectStructureBuilder {
           // Recursively parse the dependency if it hasn't been parsed yet
           const depExt = path.extname(depAbsolutePath).toLowerCase();
           if (
-            !'.json'.includes(depExt) && // Avoid parsing JSON again here
+            depExt !== '.json' && // Avoid parsing JSON again here
             !this.parsedModules.has(depAbsolutePath)
           ) {
             await this.parseModuleDependencies(targetNode);
@@ -513,6 +452,69 @@ export class ProjectStructureBuilder {
     this.links.push(link);
   }
 
+  private resolveDefinitionBasePath(
+    basePath: string,
+    currentRoot: string,
+    allowedExtensions: readonly (typeof COMPONENT_DEFINITION_FILE_TYPES)[number][],
+  ): string {
+    if (this.isProjectAbsolutePath(basePath)) {
+      return basePath;
+    }
+
+    const resolutionContextPath = path.join(currentRoot, 'index.json');
+    const resolvedEntry = this.pathResolver.resolveAnyPathWithMetadata(
+      basePath,
+      resolutionContextPath,
+      allowedExtensions,
+    );
+
+    if (resolvedEntry) {
+      return resolvedEntry.basePath;
+    }
+
+    if (basePath.startsWith('/')) {
+      return path.resolve(this.miniappRoot, basePath.substring(1));
+    }
+
+    return path.resolve(currentRoot, basePath);
+  }
+
+  private isProjectAbsolutePath(filePath: string): boolean {
+    const relativeToProject = path.relative(this.projectRoot, filePath);
+    const relativeToMiniapp = path.relative(this.miniappRoot, filePath);
+    return (
+      path.isAbsolute(filePath) &&
+      (!relativeToProject.startsWith('..') || !relativeToMiniapp.startsWith('..'))
+    );
+  }
+
+  private canonicalizeDefinitionBasePath(absoluteBasePath: string): string {
+    const indexSuffix = path.sep + 'index';
+    if (!absoluteBasePath.endsWith(indexSuffix)) {
+      return absoluteBasePath;
+    }
+
+    const canonicalBasePath = absoluteBasePath.slice(0, -indexSuffix.length);
+    logger.trace(
+      `[ProjectStructureBuilder] Normalized definition base path from '${absoluteBasePath}' to '${canonicalBasePath}'.`,
+    );
+    return canonicalBasePath;
+  }
+
+  private findDefinitionFile(absoluteBasePath: string, ext: string): string | null {
+    const filePathDirect = absoluteBasePath + '.' + ext;
+    if (fs.existsSync(filePathDirect)) {
+      return filePathDirect;
+    }
+
+    const filePathIndex = path.join(absoluteBasePath, 'index.' + ext);
+    if (fs.existsSync(filePathIndex)) {
+      return filePathIndex;
+    }
+
+    return null;
+  }
+
   // --- Start: Added processing functions for TabBar, Theme, Workers ---
 
   private async processTabBar(content: MiniProgramAppJson): Promise<void> {
@@ -551,6 +553,13 @@ export class ProjectStructureBuilder {
     // Always check for default theme.json
     logger.debug('Checking for default theme.json');
     await this.addSingleFileLink(this.rootNodeId!, 'theme.json', 'Config');
+  }
+
+  private async processSitemap(content: MiniProgramAppJson): Promise<void> {
+    if (content.sitemapLocation && typeof content.sitemapLocation === 'string') {
+      logger.debug(`Processing sitemapLocation: ${content.sitemapLocation}`);
+      await this.addSingleFileLink(this.rootNodeId!, content.sitemapLocation, 'Config');
+    }
   }
 
   private async processWorkers(content: MiniProgramAppJson): Promise<void> {

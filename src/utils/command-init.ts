@@ -53,14 +53,16 @@ export async function initializeCommandContext(
   } as Partial<GlobalCliOptions & ConfigFileOptions>;
 
   // 3. Path Resolution
-  const resolvePathIfNeeded = (p: string | undefined): string | undefined => {
+  const resolveProjectPathIfNeeded = (p: string | undefined): string | undefined => {
     if (p && typeof p === 'string' && !path.isAbsolute(p)) {
       return path.resolve(projectRoot, p);
     }
     return p;
   };
-  mergedConfig.miniappRoot = resolvePathIfNeeded(mergedConfig.miniappRoot);
-  mergedConfig.appJsonPath = resolvePathIfNeeded(mergedConfig.appJsonPath);
+  mergedConfig.miniappRoot = resolveProjectPathIfNeeded(mergedConfig.miniappRoot);
+  if (mergedConfig.entryFile && !mergedConfig.appJsonPath) {
+    mergedConfig.appJsonPath = mergedConfig.entryFile;
+  }
 
   // --- Start: Auto-detection logic ---
   if (!mergedConfig.miniappRoot && !mergedConfig.appJsonPath) {
@@ -279,17 +281,24 @@ function loadAliasesFromTsConfig(projectRoot: string): { [key: string]: string[]
 
     const result: { [key: string]: string[] } = {};
     for (const [alias, targets] of Object.entries(tsconfig.compilerOptions.paths)) {
-      const normalizedAlias = alias.replace(/\/\*$/, '');
-      result[normalizedAlias] = (targets as string[]).map((t) => {
-        const targetPath = (t as string).replace(/\/\*$/, '');
-        return path.resolve(baseDir, targetPath);
-      });
+      const normalizedAlias = normalizeAliasKey(alias);
+      result[normalizedAlias] = (targets as string[]).map((t) =>
+        path.resolve(baseDir, normalizeAliasTarget(t as string)),
+      );
     }
     return result;
   } catch (e) {
     logger.warn(`无法解析 tsconfig.json 以加载别名: ${(e as Error).message}`);
     return {};
   }
+}
+
+function normalizeAliasKey(alias: string): string {
+  return alias.replace(/\/\*$/, '');
+}
+
+function normalizeAliasTarget(target: string): string {
+  return target.replace(/\/\*$/, '');
 }
 
 // === Exclude building helpers ===

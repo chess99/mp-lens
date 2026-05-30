@@ -48,6 +48,18 @@ export function extractJsonDependencies(jsonContent: JsonObject): string[] {
     }
   }
 
+  if (typeof jsonContent.sitemapLocation === 'string') {
+    dependencies.push(jsonContent.sitemapLocation);
+  }
+
+  if (typeof jsonContent.themeLocation === 'string') {
+    dependencies.push(jsonContent.themeLocation);
+  }
+
+  if (typeof jsonContent.workers === 'string') {
+    dependencies.push(jsonContent.workers);
+  }
+
   dependencies.push(...extractJsonComponentReferences(jsonContent));
 
   return dependencies;

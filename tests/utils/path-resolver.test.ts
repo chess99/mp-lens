@@ -15,6 +15,7 @@ jest.mock('path', () => ({
   resolve: jest.fn((...args) => actualPath.resolve(...args)),
   join: jest.fn((...args) => actualPath.join(...args)),
   dirname: jest.fn((p) => actualPath.dirname(p)),
+  basename: jest.fn((p) => actualPath.basename(p)),
   extname: jest.fn((p) => actualPath.extname(p)),
   relative: jest.fn((...args) => actualPath.relative(...args)),
   isAbsolute: jest.fn((p) => actualPath.isAbsolute(p)),
@@ -142,6 +143,7 @@ describe('PathResolver', () => {
     (path.join as jest.Mock).mockImplementation((...args) => actualPath.join(...args));
     (path.relative as jest.Mock).mockImplementation((...args) => actualPath.relative(...args));
     (path.dirname as jest.Mock).mockImplementation((p) => actualPath.dirname(p));
+    (path.basename as jest.Mock).mockImplementation((p) => actualPath.basename(p));
     (path.extname as jest.Mock).mockImplementation((p) => actualPath.extname(p));
     (path.isAbsolute as jest.Mock).mockImplementation((p) => actualPath.isAbsolute(p));
 
@@ -227,6 +229,26 @@ describe('PathResolver', () => {
 
       expect(resolved).toBe(resolvedAliasPath);
       // No AliasResolver used anymore
+    });
+
+    it('should resolve README-style wildcard aliases', () => {
+      const sourcePath = actualPath.resolve(projectRoot, 'src/index.js');
+      const aliasPath = '@/utils/helper';
+      const resolvedAliasPath = actualPath.resolve(projectRoot, 'src/utils/helper.js');
+
+      const optionsWithAliases: AnalyzerOptions = {
+        verbose: false,
+        miniappRoot: projectRoot,
+        appJsonPath: actualPath.resolve(projectRoot, 'app.json'),
+        aliases: { '@/*': ['src/*'] },
+      };
+      const resolverWithAliases = new PathResolver(projectRoot, optionsWithAliases);
+
+      mockPathExists(resolvedAliasPath);
+
+      const resolved = resolverWithAliases.resolveAnyPath(aliasPath, sourcePath, ['js', 'ts']);
+
+      expect(resolved).toBe(resolvedAliasPath);
     });
 
     it('should return null for non-existent files', () => {

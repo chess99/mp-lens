@@ -4,6 +4,7 @@ export interface GlobalCliOptions {
   config?: string;
   project: string;
   miniappRoot?: string;
+  entryFile?: string;
   appJsonPath?: string;
   exclude?: string[];
   essentialFiles?: string;

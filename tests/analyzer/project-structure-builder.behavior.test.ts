@@ -109,6 +109,29 @@ describe('ProjectStructureBuilder behavior', () => {
     expect(new Set(duplicateKeys).size).toBe(duplicateKeys.length);
   });
 
+  it('marks custom sitemapLocation files reachable from app.json', async () => {
+    const root = createFixture({
+      'app.json': JSON.stringify({
+        pages: ['pages/index/index'],
+        sitemapLocation: 'configs/custom-sitemap.json',
+      }),
+      'app.js': '',
+      'pages/index/index.js': '',
+      'configs/custom-sitemap.json': JSON.stringify({ rules: [] }),
+    });
+
+    const result = await analyzeProject(
+      root,
+      optionsFor(root, {
+        pages: ['pages/index/index'],
+        sitemapLocation: 'configs/custom-sitemap.json',
+      }),
+    );
+
+    expect(result.reachableNodeIds.has(path.join(root, 'configs/custom-sitemap.json'))).toBe(true);
+    expect(result.unusedFiles).not.toContain(path.join(root, 'configs/custom-sitemap.json'));
+  });
+
   it('uses one canonical component node for direct and index-style component paths', async () => {
     const root = createFixture({
       'app.json': JSON.stringify({

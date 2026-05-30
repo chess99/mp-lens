@@ -4,6 +4,11 @@ import { AnalyzerOptions } from '../types/command-options';
 import { logger } from './debug-logger';
 import { SupportedFileType } from './filetypes';
 
+export interface ResolvedPath {
+  filePath: string;
+  basePath: string;
+}
+
 export class PathResolver {
   private projectRoot: string;
   private options: AnalyzerOptions;
@@ -27,6 +32,16 @@ export class PathResolver {
     sourcePath: string,
     allowedExtensions: readonly SupportedFileType[],
   ): string | null {
+    return (
+      this.resolveAnyPathWithMetadata(importPath, sourcePath, allowedExtensions)?.filePath ?? null
+    );
+  }
+
+  public resolveAnyPathWithMetadata(
+    importPath: string,
+    sourcePath: string,
+    allowedExtensions: readonly SupportedFileType[],
+  ): ResolvedPath | null {
     logger.trace(
       `Resolving import '${importPath}' from '${sourcePath}' with allowed extensions: [${allowedExtensions.join(
         ', ',
@@ -53,7 +68,7 @@ export class PathResolver {
         logger.trace(
           `Found existing file at true absolute path: ${existingAbsolutePath}. Returning directly.`,
         );
-        return existingAbsolutePath;
+        return this.toResolvedPath(existingAbsolutePath);
       } else {
         logger.trace(
           `Absolute path '${importPath}' not found directly. Will proceed to normal resolution (might be root-relative).`,
@@ -88,7 +103,7 @@ export class PathResolver {
       const existingPath = this.findExistingPath(potentialBasePath, allowedExtensions);
       if (existingPath) {
         logger.trace(`Resolved '${importPath}' to existing file: ${existingPath}`);
-        return existingPath;
+        return this.toResolvedPath(existingPath);
       } else if (isAlias) {
         logger.warn(
           `Alias resolved to '${potentialBasePath}', but no existing file found with extensions [${allowedExtensions.join(
@@ -102,6 +117,16 @@ export class PathResolver {
       logger.warn(`Failed to resolve import '${importPath}' from '${sourcePath}'.`);
     }
     return null;
+  }
+
+  private toResolvedPath(filePath: string): ResolvedPath {
+    const baseName = path.basename(filePath);
+    const dirName = path.dirname(filePath);
+    const basePath = baseName.startsWith('index.')
+      ? dirName
+      : filePath.slice(0, -path.extname(filePath).length);
+
+    return { filePath, basePath };
   }
 
   /**
@@ -185,7 +210,7 @@ export class PathResolver {
   private isAliasPath(importPath: string): boolean {
     const aliases = this.getAliases();
     if (!aliases) return false;
-    const keys = Object.keys(aliases);
+    const keys = Object.keys(aliases).map((alias) => this.normalizeAliasKey(alias));
     if (keys.length === 0) return false;
     if (importPath in aliases) return true;
     for (const alias of keys) {
@@ -198,13 +223,15 @@ export class PathResolver {
     const aliases = this.getAliases();
     if (!aliases) return null;
     for (const [alias, targets] of Object.entries(aliases)) {
-      const aliasPrefix = `${alias}/`;
-      if (importPath === alias || importPath.startsWith(aliasPrefix)) {
-        const remaining = importPath === alias ? '' : importPath.substring(aliasPrefix.length);
+      const normalizedAlias = this.normalizeAliasKey(alias);
+      const aliasPrefix = `${normalizedAlias}/`;
+      if (importPath === normalizedAlias || importPath.startsWith(aliasPrefix)) {
+        const remaining =
+          importPath === normalizedAlias ? '' : importPath.substring(aliasPrefix.length);
         const targetList = Array.isArray(targets) ? targets : [targets as string];
         if (targetList.length === 0) return null;
         // Use first target
-        const base = targetList[0];
+        const base = this.normalizeAliasTarget(targetList[0]);
         const baseDir = path.isAbsolute(base) ? base : path.resolve(this.projectRoot, base);
         return path.join(baseDir, remaining);
       }
@@ -232,10 +259,13 @@ export class PathResolver {
     if (importPath.startsWith('@')) {
       const scope = importPath.split('/')[0];
       const aliases = this.getAliases();
+      const normalizedAliases = aliases
+        ? Object.keys(aliases).map((alias) => this.normalizeAliasKey(alias))
+        : [];
       if (
         aliases &&
-        (scope in aliases ||
-          Object.keys(aliases).some((alias) => alias === scope || alias.startsWith(`${scope}/`)))
+        (normalizedAliases.includes(scope) ||
+          normalizedAliases.some((alias) => alias === scope || alias.startsWith(`${scope}/`)))
       ) {
         return false; // configured alias scope
       }
@@ -259,5 +289,13 @@ export class PathResolver {
 
   private getAliases(): { [key: string]: string | string[] } | null {
     return this.options.aliases || null;
+  }
+
+  private normalizeAliasKey(alias: string): string {
+    return alias.replace(/\/\*$/, '');
+  }
+
+  private normalizeAliasTarget(target: string): string {
+    return target.replace(/\/\*$/, '');
   }
 }
