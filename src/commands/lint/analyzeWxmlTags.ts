@@ -6,136 +6,212 @@ import { logger } from '../../utils/debug-logger';
 import { PathResolver } from '../../utils/path-resolver';
 import { normalizeWxmlImportPath } from '../../utils/wxml-path';
 
+type WXElementNode = Extract<WXNode, { type: 'WXElement' }>;
+
+interface TemplateDefinition {
+  filePath: string;
+  name: string;
+  node: WXElementNode;
+}
+
+interface WxmlReference {
+  filePath: string;
+  kind: 'import' | 'include';
+}
+
+interface ParsedWxmlFile {
+  ast: Program;
+  references: WxmlReference[];
+}
+
 /**
- * Analyzes a WXML file and all its imported/included templates recursively
- * to extract a map of tag name -> set of WXML files where it is used.
+ * Analyzes the rendered content reachable from a WXML file.
  *
- * @param wxmlFilePath Path to the WXML file to analyze
- * @param pathResolver Instance of PathResolver to resolve import/include paths
- * @param visited Set of already visited files (to prevent infinite loops)
- * @returns Map<tag, Set<wxmlFile>>
+ * Imported template declarations are collected first, but their bodies only
+ * count when reached through a static `<template is="name">`. Includes are
+ * treated as inline content. This avoids treating every template in an
+ * imported template library as used.
  */
 export async function analyzeWxmlTags(
   wxmlFilePath: string,
   pathResolver: PathResolver,
   visited: Set<string> = new Set(),
 ): Promise<Map<string, Set<string>>> {
-  // Check for circular imports
-  if (visited.has(wxmlFilePath)) {
-    return new Map();
-  }
-  visited.add(wxmlFilePath);
-
   const tagToFiles = new Map<string, Set<string>>();
+  const parsedFiles = new Map<string, ParsedWxmlFile>();
+  const templatesByFile = new Map<string, Map<string, TemplateDefinition>>();
 
-  try {
-    // Read WXML file content
-    const content = fs.readFileSync(wxmlFilePath, 'utf-8');
-    // Parse WXML content to AST
-    const ast = parse(content);
-    // Collect tags in this file
-    collectTagsWithSource(ast, wxmlFilePath, tagToFiles);
-    // Process imports and includes
-    const importPaths = extractImportPaths(ast);
-    for (const importPath of importPaths) {
-      try {
-        const resolvedPath = pathResolver.resolveAnyPath(importPath, wxmlFilePath, ['wxml']);
-        if (resolvedPath) {
-          const importedTagToFiles = await analyzeWxmlTags(resolvedPath, pathResolver, visited);
-          // Merge importedTagToFiles into tagToFiles
-          for (const [tag, files] of importedTagToFiles.entries()) {
-            if (!tagToFiles.has(tag)) tagToFiles.set(tag, new Set());
-            for (const f of files) tagToFiles.get(tag)!.add(f);
+  const loadFile = (filePath: string): void => {
+    if (visited.has(filePath) || parsedFiles.has(filePath)) return;
+    visited.add(filePath);
+
+    try {
+      const ast = parse(fs.readFileSync(filePath, 'utf-8'));
+      const references = extractWxmlReferences(ast, filePath, pathResolver);
+      parsedFiles.set(filePath, { ast, references });
+      templatesByFile.set(filePath, extractTemplateDefinitions(ast, filePath));
+      for (const reference of references) loadFile(reference.filePath);
+    } catch (err) {
+      logger.error(`Error analyzing WXML file ${filePath}: ${err}`);
+    }
+  };
+
+  loadFile(wxmlFilePath);
+
+  const renderedTemplateDefinitions = new Set<string>();
+  const renderedFileStack = new Set<string>();
+
+  const addTag = (tag: string, sourceFile: string): void => {
+    if (!tagToFiles.has(tag)) tagToFiles.set(tag, new Set());
+    tagToFiles.get(tag)!.add(sourceFile);
+  };
+
+  const getVisibleTemplates = (scopeFile: string): Map<string, TemplateDefinition> => {
+    const visibleTemplates = new Map<string, TemplateDefinition>();
+    const imports = parsedFiles
+      .get(scopeFile)
+      ?.references.filter((reference) => reference.kind === 'import');
+    for (const imported of imports || []) {
+      for (const [name, definition] of templatesByFile.get(imported.filePath) || []) {
+        visibleTemplates.set(name, definition);
+      }
+    }
+    for (const [name, definition] of templatesByFile.get(scopeFile) || []) {
+      visibleTemplates.set(name, definition);
+    }
+    return visibleTemplates;
+  };
+
+  const resolveTemplates = (nameExpression: string, scopeFile: string): TemplateDefinition[] => {
+    const visibleTemplates = getVisibleTemplates(scopeFile);
+    if (!nameExpression.includes('{{')) {
+      const definition = visibleTemplates.get(nameExpression);
+      return definition ? [definition] : [];
+    }
+
+    const pattern = new RegExp(
+      `^${nameExpression
+        .split(/{{[\s\S]*?}}/)
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('.*')}$`,
+    );
+    return Array.from(visibleTemplates.entries())
+      .filter(([name]) => pattern.test(name))
+      .map(([, definition]) => definition);
+  };
+
+  const collectRenderedNode = (node: WXNode | Program, sourceFile: string): void => {
+    if (node.type === 'Program') {
+      for (const child of node.body || []) collectRenderedNode(child, sourceFile);
+      return;
+    }
+
+    if (node.type !== 'WXElement') return;
+
+    if (node.name === 'import') return;
+
+    if (node.name === 'include') {
+      const includePath = getAttributeValue(node, 'src');
+      if (!includePath) return;
+      const resolvedPath = resolveWxmlPath(includePath, sourceFile, pathResolver);
+      if (resolvedPath) collectRenderedFile(resolvedPath);
+      return;
+    }
+
+    if (node.name === 'template') {
+      if (getAttributeValue(node, 'name')) return;
+      const templateName = getAttributeValue(node, 'is');
+      if (templateName) {
+        for (const definition of resolveTemplates(templateName, sourceFile)) {
+          const definitionId = `${definition.filePath}:${definition.name}`;
+          if (!renderedTemplateDefinitions.has(definitionId)) {
+            renderedTemplateDefinitions.add(definitionId);
+            for (const child of definition.node.children || []) {
+              collectRenderedNode(child, definition.filePath);
+            }
           }
         }
-      } catch (err) {
-        logger.warn(`Error processing import ${importPath} in ${wxmlFilePath}: ${err}`);
       }
+      return;
     }
-    return tagToFiles;
-  } catch (err) {
-    logger.error(`Error analyzing WXML file ${wxmlFilePath}: ${err}`);
-    return tagToFiles;
-  }
+
+    addTag(node.name, sourceFile);
+    for (const attr of node.startTag?.attributes || []) {
+      if (attr.key?.startsWith('generic:') && attr.value) addTag(attr.value, sourceFile);
+    }
+    for (const child of node.children || []) collectRenderedNode(child, sourceFile);
+  };
+
+  const collectRenderedFile = (filePath: string): void => {
+    if (renderedFileStack.has(filePath)) return;
+    const parsedFile = parsedFiles.get(filePath);
+    if (!parsedFile) return;
+
+    renderedFileStack.add(filePath);
+    collectRenderedNode(parsedFile.ast, filePath);
+    renderedFileStack.delete(filePath);
+  };
+
+  collectRenderedFile(wxmlFilePath);
+  return tagToFiles;
 }
 
-/**
- * Collects all tag names in the AST, mapping each tag to the WXML file where it is found.
- */
-function collectTagsWithSource(
+function extractTemplateDefinitions(
   ast: WXNode | Program,
-  wxmlFilePath: string,
-  tagToFiles: Map<string, Set<string>>,
-): void {
+  filePath: string,
+): Map<string, TemplateDefinition> {
+  const definitions = new Map<string, TemplateDefinition>();
+
+  walkElements(ast, (node) => {
+    if (node.name !== 'template') return;
+    const name = getAttributeValue(node, 'name');
+    if (name) definitions.set(name, { filePath, name, node });
+  });
+
+  return definitions;
+}
+
+function extractWxmlReferences(
+  ast: WXNode | Program,
+  sourceFile: string,
+  pathResolver: PathResolver,
+): WxmlReference[] {
+  const references: WxmlReference[] = [];
+
+  walkElements(ast, (node) => {
+    if (node.name !== 'import' && node.name !== 'include') return;
+    const importPath = getAttributeValue(node, 'src');
+    if (!importPath) return;
+    const resolvedPath = resolveWxmlPath(importPath, sourceFile, pathResolver);
+    if (resolvedPath) references.push({ filePath: resolvedPath, kind: node.name });
+  });
+
+  return references;
+}
+
+function resolveWxmlPath(
+  importPath: string,
+  sourceFile: string,
+  pathResolver: PathResolver,
+): string | null {
+  try {
+    return pathResolver.resolveAnyPath(normalizeWxmlImportPath(importPath), sourceFile, ['wxml']);
+  } catch (err) {
+    logger.warn(`Error processing import ${importPath} in ${sourceFile}: ${err}`);
+    return null;
+  }
+}
+
+function getAttributeValue(node: WXElementNode, key: string): string | undefined {
+  const value = node.startTag?.attributes?.find((attr) => attr.key === key)?.value;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function walkElements(ast: WXNode | Program, callback: (node: WXElementNode) => void): void {
   if (ast.type === 'WXElement') {
-    if (!tagToFiles.has(ast.name)) tagToFiles.set(ast.name, new Set());
-    tagToFiles.get(ast.name)!.add(wxmlFilePath);
-    // Process attributes for generic components
-    const attrs = ast.startTag?.attributes;
-    if (attrs && Array.isArray(attrs)) {
-      for (const attr of attrs) {
-        if (attr.key && attr.key.startsWith('generic:') && attr.value) {
-          if (!tagToFiles.has(attr.value)) tagToFiles.set(attr.value, new Set());
-          tagToFiles.get(attr.value)!.add(wxmlFilePath);
-        }
-      }
-    }
-  }
-  // Recursively process children
-  if (ast.type === 'WXElement' && Array.isArray(ast.children)) {
-    for (const child of ast.children) {
-      collectTagsWithSource(child, wxmlFilePath, tagToFiles);
-    }
-  }
-  // Handle Program/body
-  if (ast.type === 'Program' && Array.isArray(ast.body)) {
-    for (const node of ast.body) {
-      collectTagsWithSource(node, wxmlFilePath, tagToFiles);
-    }
-  }
-}
-
-/**
- * Extracts import and include paths from the AST
- *
- * @param ast WXML AST node or Program
- * @returns Array of import/include paths
- */
-function extractImportPaths(ast: WXNode | Program): string[] {
-  const importPaths: string[] = [];
-  findImportTags(ast, importPaths);
-  return importPaths;
-}
-
-/**
- * Recursively finds import and include tags in the AST
- *
- * @param ast WXML AST node or Program
- * @param importPaths Array to store found paths
- */
-function findImportTags(ast: WXNode | Program, importPaths: string[]): void {
-  if (ast.type === 'WXElement' && (ast.name === 'import' || ast.name === 'include')) {
-    // Find src attribute from startTag.attributes per wxml-parser AST docs
-    const attrs = ast.startTag?.attributes;
-    if (attrs && Array.isArray(attrs)) {
-      const srcAttr = attrs.find((attr) => attr.key === 'src');
-      if (srcAttr && srcAttr.value) {
-        importPaths.push(normalizeWxmlImportPath(srcAttr.value));
-      }
-    }
-  }
-
-  // Recursively process children
-  if (ast.type === 'WXElement' && Array.isArray(ast.children)) {
-    for (const child of ast.children) {
-      findImportTags(child, importPaths);
-    }
-  }
-
-  // Handle Program/body
-  if (ast.type === 'Program' && Array.isArray(ast.body)) {
-    for (const node of ast.body) {
-      findImportTags(node, importPaths);
-    }
+    callback(ast);
+    for (const child of ast.children || []) walkElements(child, callback);
+  } else if (ast.type === 'Program') {
+    for (const node of ast.body || []) walkElements(node, callback);
   }
 }

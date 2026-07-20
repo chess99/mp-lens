@@ -40,7 +40,6 @@ describe('analyzeProject Integration Tests', () => {
       'isolated/a.js',
       'isolated/b.js',
       'isolated/c.js',
-      'components/test-component/test-component.js',
     ];
     const expectedUnusedFiles = expectedUnusedRelativePaths.map((file) =>
       actualPath.resolve(fixtureProjectRoot, file),
@@ -55,6 +54,10 @@ describe('analyzeProject Integration Tests', () => {
       'pages/index/index.wxml',
       'pages/index/index.wxss',
       'pages/index/index.json',
+      'components/test-component/test-component.js',
+      'components/test-component/test-component.json',
+      'components/test-component/test-component.wxml',
+      'templates/component-templates.wxml',
       'utils/util.js', // Used by index.js and test-component.js
       'tsconfig.json', // Default essential
       'mp-lens.config.js', // Default essential

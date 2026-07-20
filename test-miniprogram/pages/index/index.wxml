@@ -1,5 +1,28 @@
+<import src="../../templates/component-templates.wxml"></import>
+
+<template name="local-component-template">
+  <local-template-component></local-template-component>
+</template>
+
+<template name="unused-local-component-template">
+  <unused-local-template-component></unused-local-template-component>
+</template>
+
 <view class="container">
   <view class="message">{{message}}</view>
   <view class="time">Current time: {{formattedTime}}</view>
   <test-component title="Test Component"></test-component>
+
+  <!-- A custom component may intentionally shadow a standard WXML tag. -->
+  <rich-text title="Custom rich text component"></rich-text>
+
+  <!-- Ordinary string properties do not count as component usage. -->
+  <dynamic-list componentType="dynamic-item"></dynamic-list>
+
+  <!-- Components inside local and imported template declarations count as used. -->
+  <template is="local-component-template"></template>
+  <template is="external-component-template"></template>
+
+  <!-- Non-standard tags without usingComponents declarations are reported. -->
+  <div>Unsupported HTML tag example</div>
 </view>

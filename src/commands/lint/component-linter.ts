@@ -39,12 +39,28 @@ export function lintComponentUsage(
     // Extract component generics if they exist
     const componentGenerics = jsonData.componentGenerics || {};
 
-    // Merge local components with global components to form all declared components
-    const declaredComponents: Record<string, string> = {
-      ...globalComponents,
+    // componentPlaceholder references components without rendering their tags
+    // directly in WXML. Both the replaced component (key) and a custom
+    // placeholder component (value) count as usage.
+    const componentPlaceholder = jsonData.componentPlaceholder || {};
+
+    // Global components satisfy declarations, but must not be reported as unused
+    // once per page/component. Only declarations owned by this JSON file are
+    // candidates for declared-not-used diagnostics.
+    const locallyDeclaredComponents: Record<string, string> = {
       ...localUsingComponents,
       ...componentGenerics,
     };
+    const declaredComponents: Record<string, string> = {
+      ...globalComponents,
+      ...locallyDeclaredComponents,
+    };
+
+    const usedTags = new Set(usedTagToFiles.keys());
+    for (const tag of Object.keys(componentPlaceholder)) usedTags.add(tag);
+    for (const tag of Object.values(componentPlaceholder)) {
+      if (typeof tag === 'string') usedTags.add(tag);
+    }
 
     // Filter out standard WXML tags from used tags
     const usedCustomTags = Array.from(usedTagToFiles.keys()).filter(
@@ -52,8 +68,8 @@ export function lintComponentUsage(
     );
 
     // Find components declared but not used
-    for (const [componentTag, componentPath] of Object.entries(declaredComponents)) {
-      if (!usedCustomTags.includes(componentTag)) {
+    for (const [componentTag, componentPath] of Object.entries(locallyDeclaredComponents)) {
+      if (!usedTags.has(componentTag)) {
         result.declaredNotUsed.push({
           componentTag,
           path: componentPath,
