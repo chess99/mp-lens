@@ -100,13 +100,23 @@ export async function analyzeWxmlTags(
       .map(([, definition]) => definition);
   };
 
-  const collectRenderedNode = (node: WXNode | Program, sourceFile: string): void => {
+  const collectRenderedNode = (
+    node: WXNode | Program,
+    sourceFile: string,
+    isIncludedContent = false,
+  ): void => {
     if (node.type === 'Program') {
-      for (const child of node.body || []) collectRenderedNode(child, sourceFile);
+      for (const child of node.body || []) {
+        collectRenderedNode(child, sourceFile, isIncludedContent);
+      }
       return;
     }
 
     if (node.type !== 'WXElement') return;
+
+    // WXML include inlines ordinary rendered content, but explicitly excludes
+    // template and wxs nodes from the included file.
+    if (isIncludedContent && (node.name === 'template' || node.name === 'wxs')) return;
 
     if (node.name === 'import') return;
 
@@ -114,7 +124,7 @@ export async function analyzeWxmlTags(
       const includePath = getAttributeValue(node, 'src');
       if (!includePath) return;
       const resolvedPath = resolveWxmlPath(includePath, sourceFile, pathResolver);
-      if (resolvedPath) collectRenderedFile(resolvedPath);
+      if (resolvedPath) collectRenderedFile(resolvedPath, true);
       return;
     }
 
@@ -139,16 +149,18 @@ export async function analyzeWxmlTags(
     for (const attr of node.startTag?.attributes || []) {
       if (attr.key?.startsWith('generic:') && attr.value) addTag(attr.value, sourceFile);
     }
-    for (const child of node.children || []) collectRenderedNode(child, sourceFile);
+    for (const child of node.children || []) {
+      collectRenderedNode(child, sourceFile, isIncludedContent);
+    }
   };
 
-  const collectRenderedFile = (filePath: string): void => {
+  const collectRenderedFile = (filePath: string, isIncludedContent = false): void => {
     if (renderedFileStack.has(filePath)) return;
     const parsedFile = parsedFiles.get(filePath);
     if (!parsedFile) return;
 
     renderedFileStack.add(filePath);
-    collectRenderedNode(parsedFile.ast, filePath);
+    collectRenderedNode(parsedFile.ast, filePath, isIncludedContent);
     renderedFileStack.delete(filePath);
   };
 

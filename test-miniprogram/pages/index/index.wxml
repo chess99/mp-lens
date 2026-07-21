@@ -16,6 +16,9 @@
   <!-- A custom component may intentionally shadow a standard WXML tag. -->
   <rich-text title="Custom rich text component"></rich-text>
 
+  <!-- A placeholder is reachable only when its mapped component is rendered. -->
+  <async-panel></async-panel>
+
   <!-- Ordinary string properties do not count as component usage. -->
   <dynamic-list componentType="dynamic-item"></dynamic-list>
 

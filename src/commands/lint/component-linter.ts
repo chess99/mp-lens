@@ -39,9 +39,9 @@ export function lintComponentUsage(
     // Extract component generics if they exist
     const componentGenerics = jsonData.componentGenerics || {};
 
-    // componentPlaceholder references components without rendering their tags
-    // directly in WXML. Both the replaced component (key) and a custom
-    // placeholder component (value) count as usage.
+    // A placeholder is reachable only when its mapped component is rendered.
+    // Placeholder mappings are intentionally propagated for one step because
+    // configuring another effective placeholder on a placeholder is invalid.
     const componentPlaceholder = jsonData.componentPlaceholder || {};
 
     // Global components satisfy declarations, but must not be reported as unused
@@ -56,20 +56,27 @@ export function lintComponentUsage(
       ...locallyDeclaredComponents,
     };
 
-    const usedTags = new Set(usedTagToFiles.keys());
-    for (const tag of Object.keys(componentPlaceholder)) usedTags.add(tag);
-    for (const tag of Object.values(componentPlaceholder)) {
-      if (typeof tag === 'string') usedTags.add(tag);
+    const directlyUsedTags = new Set(usedTagToFiles.keys());
+    const effectiveUsedTagToFiles = new Map<string, Set<string>>(
+      Array.from(usedTagToFiles, ([tag, files]) => [tag, new Set(files)]),
+    );
+    for (const [componentTag, placeholderTag] of Object.entries(componentPlaceholder)) {
+      if (!directlyUsedTags.has(componentTag) || typeof placeholderTag !== 'string') continue;
+      if (!effectiveUsedTagToFiles.has(placeholderTag)) {
+        effectiveUsedTagToFiles.set(placeholderTag, new Set());
+      }
+      effectiveUsedTagToFiles.get(placeholderTag)!.add(jsonFilePath);
     }
+    const effectiveUsedTags = new Set(effectiveUsedTagToFiles.keys());
 
     // Filter out standard WXML tags from used tags
-    const usedCustomTags = Array.from(usedTagToFiles.keys()).filter(
+    const usedCustomTags = Array.from(effectiveUsedTags).filter(
       (tag) => filterStandardWxmlTags(new Set([tag])).size > 0,
     );
 
     // Find components declared but not used
     for (const [componentTag, componentPath] of Object.entries(locallyDeclaredComponents)) {
-      if (!usedTags.has(componentTag)) {
+      if (!effectiveUsedTags.has(componentTag)) {
         result.declaredNotUsed.push({
           componentTag,
           path: componentPath,
@@ -80,7 +87,7 @@ export function lintComponentUsage(
     // Find tags used but not declared
     for (const tag of usedCustomTags) {
       if (!declaredComponents[tag]) {
-        const usedIn = Array.from(usedTagToFiles.get(tag) || []);
+        const usedIn = Array.from(effectiveUsedTagToFiles.get(tag) || []);
         result.usedNotDeclared.push({
           componentTag: tag,
           usedIn,

@@ -38,7 +38,7 @@ describe('component usage linting', () => {
     expect(issue.usedNotDeclared).toEqual([]);
   });
 
-  it('counts componentPlaceholder keys and custom values as component usage', () => {
+  it('does not count unreachable componentPlaceholder mappings as usage', () => {
     fs.writeFileSync(wxmlPath, '<view />');
     fs.writeFileSync(
       jsonPath,
@@ -60,7 +60,91 @@ describe('component usage linting', () => {
       {},
     );
 
+    expect(issue.declaredNotUsed.map(({ componentTag }) => componentTag)).toEqual([
+      'async-component',
+      'loading-placeholder',
+    ]);
+  });
+
+  it('counts a one-step componentPlaceholder for a rendered component as usage', () => {
+    fs.writeFileSync(wxmlPath, '<async-component />');
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        usingComponents: {
+          'async-component': '/components/async',
+          'loading-placeholder': '/components/loading',
+        },
+        componentPlaceholder: {
+          'async-component': 'loading-placeholder',
+        },
+      }),
+    );
+
+    const issue = lintComponentUsage(
+      wxmlPath,
+      jsonPath,
+      new Map([['async-component', new Set([wxmlPath])]]),
+      {},
+    );
+
     expect(issue.declaredNotUsed).toEqual([]);
+    expect(issue.usedNotDeclared).toEqual([]);
+  });
+
+  it('reports a reachable custom placeholder that is not declared', () => {
+    fs.writeFileSync(wxmlPath, '<async-component />');
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        usingComponents: { 'async-component': '/components/async' },
+        componentPlaceholder: { 'async-component': 'loading-placeholder' },
+      }),
+    );
+
+    const issue = lintComponentUsage(
+      wxmlPath,
+      jsonPath,
+      new Map([['async-component', new Set([wxmlPath])]]),
+      {},
+    );
+
+    expect(issue.usedNotDeclared).toEqual([
+      {
+        componentTag: 'loading-placeholder',
+        usedIn: [jsonPath],
+        suggestion: `Consider adding 'loading-placeholder' to the usingComponents section in index.json`,
+      },
+    ]);
+  });
+
+  it('does not propagate componentPlaceholder mappings as a chain', () => {
+    fs.writeFileSync(wxmlPath, '<async-component />');
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify({
+        usingComponents: {
+          'async-component': '/components/async',
+          'first-placeholder': '/components/first-placeholder',
+          'second-placeholder': '/components/second-placeholder',
+        },
+        componentPlaceholder: {
+          'async-component': 'first-placeholder',
+          'first-placeholder': 'second-placeholder',
+        },
+      }),
+    );
+
+    const issue = lintComponentUsage(
+      wxmlPath,
+      jsonPath,
+      new Map([['async-component', new Set([wxmlPath])]]),
+      {},
+    );
+
+    expect(issue.declaredNotUsed.map(({ componentTag }) => componentTag)).toEqual([
+      'second-placeholder',
+    ]);
   });
 
   it('does not report globally declared components as unused in every file', () => {
@@ -169,5 +253,29 @@ describe('component usage linting', () => {
     const usedTags = await analyzeWxmlTags(wxmlPath, pathResolver);
 
     expect(usedTags.get('included-component')).toEqual(new Set([includedWxmlPath]));
+  });
+
+  it('excludes template contents from included files', async () => {
+    const includedWxmlPath = path.join(tempDir, 'included.wxml');
+    fs.writeFileSync(wxmlPath, '<include src="./included.wxml" />');
+    fs.writeFileSync(
+      includedWxmlPath,
+      [
+        '<included-component />',
+        '<template name="included-template"><template-component /></template>',
+        '<template is="included-template" />',
+        '<wxs module="helper">module.exports = {}</wxs>',
+      ].join('\n'),
+    );
+    const pathResolver = new PathResolver(tempDir, {
+      miniappRoot: tempDir,
+      appJsonPath: path.join(tempDir, 'app.json'),
+    });
+
+    const usedTags = await analyzeWxmlTags(wxmlPath, pathResolver);
+
+    expect(usedTags.get('included-component')).toEqual(new Set([includedWxmlPath]));
+    expect(usedTags.has('template-component')).toBe(false);
+    expect(usedTags.has('wxs')).toBe(false);
   });
 });
