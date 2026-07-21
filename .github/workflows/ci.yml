@@ -8,13 +8,19 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        node-version:
-          - 22
-          - 24
+        include:
+          - os: ubuntu-latest
+            node-version: 22
+          - os: ubuntu-latest
+            node-version: 24
+          - os: windows-latest
+            node-version: 22
+          - os: macos-latest
+            node-version: 22
     steps:
       - uses: actions/checkout@v4
 

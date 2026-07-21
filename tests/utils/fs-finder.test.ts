@@ -20,10 +20,13 @@ jest.mock('fs', () => ({
       mockFs.files[absolutePath] = files[filePath];
       // Add all parent directories
       let currentDir = path.dirname(absolutePath);
-      while (currentDir !== '/' && currentDir !== '.') {
+      let parentDir = path.dirname(currentDir);
+      while (parentDir !== currentDir) {
         mockFs.dirs.add(currentDir);
-        currentDir = path.dirname(currentDir);
+        currentDir = parentDir;
+        parentDir = path.dirname(currentDir);
       }
+      mockFs.dirs.add(currentDir);
       mockFs.dirs.add(path.dirname(absolutePath));
     }
     // Add base directories from file paths

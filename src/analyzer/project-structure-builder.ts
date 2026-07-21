@@ -9,6 +9,8 @@ import {
   COMPONENT_DEFINITION_FILE_TYPES,
   COMPONENT_IMPLEMENTATION_FILE_TYPES,
 } from '../utils/filetypes';
+import { generateNodeIdAndLabel } from '../utils/id-helper';
+import { isPathWithinRoot } from '../utils/path-containment';
 import { PathResolver } from '../utils/path-resolver';
 import { GraphLink, GraphNode, LinkType, NodeType, ProjectStructure } from './project-structure';
 
@@ -221,19 +223,19 @@ export class ProjectStructureBuilder {
     // The canonical form for IDs and basePaths will be WITHOUT '/index'.
     const canonicalBasePath = this.canonicalizeDefinitionBasePath(absoluteBasePath);
 
-    // Create a canonical ID relative to the miniapp root
-    const canonicalRelativePath = path.relative(this.miniappRoot, canonicalBasePath);
-    // Ensure canonical path doesn't start with '../' if resolution somehow failed
-    if (canonicalRelativePath.startsWith('..')) {
+    if (!isPathWithinRoot(this.miniappRoot, canonicalBasePath)) {
+      const canonicalRelativePath = path.relative(this.miniappRoot, canonicalBasePath);
       logger.warn(
         `[processComponent] Calculated canonical path '${canonicalRelativePath}' seems incorrect for absolute path '${absoluteBasePath}' relative to miniapp root '${this.miniappRoot}'. Skipping component.`,
       );
-      return null; // Or handle error differently
+      return null;
     }
 
-    // TODO: 使用 id-helper.ts 中的函数来生成 ID 和 label
-    const canonicalComponentId = `comp:${canonicalRelativePath}`;
-    const componentLabel = canonicalRelativePath; // Use the normalized path for label
+    const { id: canonicalComponentId, label: componentLabel } = generateNodeIdAndLabel(
+      'Component',
+      canonicalBasePath,
+      this.miniappRoot,
+    );
 
     // Check if the canonical node already exists
     if (this.nodes.has(canonicalComponentId)) {
@@ -461,6 +463,12 @@ export class ProjectStructureBuilder {
       return basePath;
     }
 
+    // Mini-program component paths beginning with '/' are relative to the
+    // mini-program root, not to the operating-system filesystem root.
+    if (basePath.startsWith('/')) {
+      return path.resolve(this.miniappRoot, basePath.substring(1));
+    }
+
     const resolutionContextPath = path.join(currentRoot, 'index.json');
     const resolvedEntry = this.pathResolver.resolveAnyPathWithMetadata(
       basePath,
@@ -472,19 +480,13 @@ export class ProjectStructureBuilder {
       return resolvedEntry.basePath;
     }
 
-    if (basePath.startsWith('/')) {
-      return path.resolve(this.miniappRoot, basePath.substring(1));
-    }
-
     return path.resolve(currentRoot, basePath);
   }
 
   private isProjectAbsolutePath(filePath: string): boolean {
-    const relativeToProject = path.relative(this.projectRoot, filePath);
-    const relativeToMiniapp = path.relative(this.miniappRoot, filePath);
     return (
       path.isAbsolute(filePath) &&
-      (!relativeToProject.startsWith('..') || !relativeToMiniapp.startsWith('..'))
+      (isPathWithinRoot(this.projectRoot, filePath) || isPathWithinRoot(this.miniappRoot, filePath))
     );
   }
 

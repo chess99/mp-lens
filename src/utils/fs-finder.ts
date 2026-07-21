@@ -29,6 +29,10 @@ const DEFAULT_EXCLUDE_DIRS = [
   'miniprogram_npm', // Often contains copies
 ];
 
+function toDisplayPath(root: string, filePath: string): string {
+  return path.relative(root, filePath).replace(/\\/g, '/');
+}
+
 /**
  * Searches for a valid app.json within a project directory to automatically determine
  * miniappRoot and appJsonPath.
@@ -56,7 +60,7 @@ export function findAppJsonConfig(
 
       for (const entry of entries) {
         const fullPath = path.resolve(currentDir, entry.name);
-        const relativePath = path.relative(projectRoot, fullPath); // For logging/debugging
+        const relativePath = toDisplayPath(projectRoot, fullPath); // For logging/debugging
 
         if (entry.isDirectory()) {
           // Check if directory should be excluded
@@ -94,16 +98,16 @@ export function findAppJsonConfig(
   searchDir(projectRoot);
 
   if (foundAppJsons.length === 1) {
-    logger.info(`自动检测到入口文件: ${path.relative(projectRoot, foundAppJsons[0].appJsonPath)}`);
+    logger.info(`自动检测到入口文件: ${toDisplayPath(projectRoot, foundAppJsons[0].appJsonPath)}`);
     logger.info(
-      `自动检测到小程序根目录: ${path.relative(projectRoot, foundAppJsons[0].miniappRoot)}`,
+      `自动检测到小程序根目录: ${toDisplayPath(projectRoot, foundAppJsons[0].miniappRoot)}`,
     );
     return foundAppJsons[0];
   } else if (foundAppJsons.length > 1) {
     logger.warn(
       `发现多个有效的 app.json 文件。无法自动检测配置。请指定 --miniapp-root 和 --entry-file。发现的位置:`,
     );
-    foundAppJsons.forEach((f) => logger.warn(`  - ${path.relative(projectRoot, f.appJsonPath)}`));
+    foundAppJsons.forEach((f) => logger.warn(`  - ${toDisplayPath(projectRoot, f.appJsonPath)}`));
     return 'ambiguous';
   } else {
     logger.debug('No valid app.json found for auto-detection.');

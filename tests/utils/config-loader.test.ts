@@ -41,7 +41,7 @@ jest.mock(
 );
 
 // --- Test Constants ---
-const projectRoot = '/fake/project/root'; // Use a consistent fake root
+const projectRoot = actualPath.resolve('fake/project/root');
 const mockConfig: ConfigFileOptions = {
   appJsonPath: './app.json',
   exclude: ['node_modules/**', 'dist/**'],
@@ -49,36 +49,45 @@ const mockConfig: ConfigFileOptions = {
   miniappRoot: 'miniprogram',
 };
 
-// --- Mock Specific Config Files using static absolute paths ---
-// Jest requires the first argument to jest.mock to be a literal string or resolvable path.
-// Using absolute paths based on the known test projectRoot.
-jest.mock('/fake/project/root/my-config.js', () => mockConfig, { virtual: true });
-jest.mock(
-  '/fake/project/root/my-config-func.js',
-  () => jest.fn(() => Promise.resolve(mockConfig)),
-  { virtual: true },
-);
-jest.mock('/fake/project/root/my-config-es.js', () => ({ default: mockConfig }), { virtual: true });
-jest.mock(
-  '/fake/project/root/my-config-es-func.js',
-  () => ({ default: jest.fn(() => Promise.resolve(mockConfig)) }),
-  { virtual: true },
-);
-jest.mock('/fake/project/root/my-config.ts', () => mockConfig, { virtual: true });
-jest.mock('/fake/project/root/mp-lens.config.js', () => mockConfig, { virtual: true });
-jest.mock('/fake/project/root/mp-lens.config.ts', () => mockConfig, { virtual: true });
-jest.mock(
-  '/fake/project/root/error.js',
-  () => {
-    throw new Error('Mocked Syntax Error in JS');
-  },
-  { virtual: true },
-);
-
 // --- Test Suite ---
 
 describe('ConfigLoader', () => {
   beforeEach(() => {
+    jest.doMock(actualPath.resolve(projectRoot, 'my-config.js'), () => mockConfig, {
+      virtual: true,
+    });
+    jest.doMock(
+      actualPath.resolve(projectRoot, 'my-config-func.js'),
+      () => jest.fn(() => Promise.resolve(mockConfig)),
+      { virtual: true },
+    );
+    jest.doMock(
+      actualPath.resolve(projectRoot, 'my-config-es.js'),
+      () => ({ default: mockConfig }),
+      { virtual: true },
+    );
+    jest.doMock(
+      actualPath.resolve(projectRoot, 'my-config-es-func.js'),
+      () => ({ default: jest.fn(() => Promise.resolve(mockConfig)) }),
+      { virtual: true },
+    );
+    jest.doMock(actualPath.resolve(projectRoot, 'my-config.ts'), () => mockConfig, {
+      virtual: true,
+    });
+    jest.doMock(actualPath.resolve(projectRoot, 'mp-lens.config.js'), () => mockConfig, {
+      virtual: true,
+    });
+    jest.doMock(actualPath.resolve(projectRoot, 'mp-lens.config.ts'), () => mockConfig, {
+      virtual: true,
+    });
+    jest.doMock(
+      actualPath.resolve(projectRoot, 'error.js'),
+      () => {
+        throw new Error('Mocked Syntax Error in JS');
+      },
+      { virtual: true },
+    );
+
     // Reset general mocks
     jest.clearAllMocks();
     (fs.existsSync as jest.Mock).mockReset();
@@ -298,7 +307,7 @@ describe('ConfigLoader', () => {
 
     // Temporarily override the globally mocked module *for this test*
     jest.doMock(
-      '/fake/project/root/my-config.ts',
+      actualPath.resolve(projectRoot, 'my-config.ts'),
       () => {
         throw requireError;
       },
