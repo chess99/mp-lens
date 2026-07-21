@@ -1,0 +1,3 @@
+<view class="test-component">
+  <slot></slot>
+</view>

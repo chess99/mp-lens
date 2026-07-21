@@ -1,0 +1,12 @@
+<template name="external-component-template">
+  <external-template-component></external-template-component>
+  <template is="external-{{variant}}"></template>
+</template>
+
+<template name="external-variant">
+  <dynamic-template-component></dynamic-template-component>
+</template>
+
+<template name="unused-external-component-template">
+  <unused-external-template-component></unused-external-template-component>
+</template>

@@ -1,3 +1,19 @@
 {
-  "usingComponents": {}
+  "usingComponents": {
+    "test-component": "/components/test-component/test-component",
+    "rich-text": "/components/test-component/test-component",
+    "async-panel": "/components/test-component/test-component",
+    "loading-placeholder": "/components/test-component/test-component",
+    "dynamic-list": "/components/test-component/test-component",
+    "dynamic-item": "/components/test-component/test-component",
+    "local-template-component": "/components/test-component/test-component",
+    "unused-local-template-component": "/components/test-component/test-component",
+    "external-template-component": "/components/test-component/test-component",
+    "dynamic-template-component": "/components/test-component/test-component",
+    "unused-external-template-component": "/components/test-component/test-component",
+    "unused-component": "/components/test-component/test-component"
+  },
+  "componentPlaceholder": {
+    "async-panel": "loading-placeholder"
+  }
 }
