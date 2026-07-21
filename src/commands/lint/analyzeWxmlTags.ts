@@ -28,9 +28,14 @@ interface ParsedWxmlFile {
  * Analyzes the rendered content reachable from a WXML file.
  *
  * Imported template declarations are collected first, but their bodies only
- * count when reached through a static `<template is="name">`. Includes are
- * treated as inline content. This avoids treating every template in an
+ * count when reached through a `<template is="name">` invocation. Includes
+ * are treated as inline content. This avoids treating every template in an
  * imported template library as used.
+ *
+ * @param wxmlFilePath Path to the WXML entry file to analyze
+ * @param pathResolver Path resolver used for import and include references
+ * @param visited Set of files already loaded, used to prevent reference cycles
+ * @returns Map from each reachable tag to the WXML files where it is used
  */
 export async function analyzeWxmlTags(
   wxmlFilePath: string,
@@ -41,6 +46,11 @@ export async function analyzeWxmlTags(
   const parsedFiles = new Map<string, ParsedWxmlFile>();
   const templatesByFile = new Map<string, Map<string, TemplateDefinition>>();
 
+  /**
+   * Loads a WXML file and recursively discovers its import/include dependencies.
+   *
+   * @param filePath Absolute path of the WXML file to load
+   */
   const loadFile = (filePath: string): void => {
     if (visited.has(filePath) || parsedFiles.has(filePath)) return;
     visited.add(filePath);
@@ -61,11 +71,24 @@ export async function analyzeWxmlTags(
   const renderedTemplateDefinitions = new Set<string>();
   const renderedFileStack = new Set<string>();
 
+  /**
+   * Records a reachable tag and the WXML file that contains it.
+   *
+   * @param tag WXML tag name
+   * @param sourceFile File in which the tag occurs
+   */
   const addTag = (tag: string, sourceFile: string): void => {
     if (!tagToFiles.has(tag)) tagToFiles.set(tag, new Set());
     tagToFiles.get(tag)!.add(sourceFile);
   };
 
+  /**
+   * Returns templates visible in a file, with local definitions taking
+   * precedence over imported definitions of the same name.
+   *
+   * @param scopeFile WXML file whose template scope should be resolved
+   * @returns Visible template definitions keyed by template name
+   */
   const getVisibleTemplates = (scopeFile: string): Map<string, TemplateDefinition> => {
     const visibleTemplates = new Map<string, TemplateDefinition>();
     const imports = parsedFiles
@@ -82,6 +105,14 @@ export async function analyzeWxmlTags(
     return visibleTemplates;
   };
 
+  /**
+   * Resolves a template `is` value against definitions visible from a file.
+   * Interpolated values conservatively match compatible template names.
+   *
+   * @param nameExpression Value of the template `is` attribute
+   * @param scopeFile WXML file containing the template invocation
+   * @returns Template definitions that the invocation may render
+   */
   const resolveTemplates = (nameExpression: string, scopeFile: string): TemplateDefinition[] => {
     const visibleTemplates = getVisibleTemplates(scopeFile);
     if (!nameExpression.includes('{{')) {
@@ -100,6 +131,13 @@ export async function analyzeWxmlTags(
       .map(([, definition]) => definition);
   };
 
+  /**
+   * Traverses rendered nodes and records component tags reachable from them.
+   *
+   * @param node AST node or program to traverse
+   * @param sourceFile WXML file containing the node
+   * @param isIncludedContent Whether the node originates from an include target
+   */
   const collectRenderedNode = (
     node: WXNode | Program,
     sourceFile: string,
@@ -154,6 +192,12 @@ export async function analyzeWxmlTags(
     }
   };
 
+  /**
+   * Traverses a loaded WXML file while preventing recursive rendering cycles.
+   *
+   * @param filePath Absolute path of the loaded WXML file
+   * @param isIncludedContent Whether the file is being rendered through include
+   */
   const collectRenderedFile = (filePath: string, isIncludedContent = false): void => {
     if (renderedFileStack.has(filePath)) return;
     const parsedFile = parsedFiles.get(filePath);
@@ -168,6 +212,13 @@ export async function analyzeWxmlTags(
   return tagToFiles;
 }
 
+/**
+ * Collects named template declarations from a WXML AST.
+ *
+ * @param ast Parsed WXML AST
+ * @param filePath File containing the template declarations
+ * @returns Template definitions keyed by template name
+ */
 function extractTemplateDefinitions(
   ast: WXNode | Program,
   filePath: string,
@@ -183,6 +234,14 @@ function extractTemplateDefinitions(
   return definitions;
 }
 
+/**
+ * Resolves all import and include references declared in a WXML AST.
+ *
+ * @param ast Parsed WXML AST
+ * @param sourceFile File containing the references
+ * @param pathResolver Resolver used to locate referenced WXML files
+ * @returns Resolved WXML references with their import/include kind
+ */
 function extractWxmlReferences(
   ast: WXNode | Program,
   sourceFile: string,
@@ -201,6 +260,14 @@ function extractWxmlReferences(
   return references;
 }
 
+/**
+ * Resolves a WXML reference relative to its source file.
+ *
+ * @param importPath Path declared by an import or include element
+ * @param sourceFile File containing the reference
+ * @param pathResolver Resolver used to locate the target file
+ * @returns Absolute target path, or null when the reference cannot be resolved
+ */
 function resolveWxmlPath(
   importPath: string,
   sourceFile: string,
@@ -214,11 +281,24 @@ function resolveWxmlPath(
   }
 }
 
+/**
+ * Reads a string attribute value from a WXML element.
+ *
+ * @param node WXML element node
+ * @param key Attribute name
+ * @returns Attribute value when it is a string
+ */
 function getAttributeValue(node: WXElementNode, key: string): string | undefined {
   const value = node.startTag?.attributes?.find((attr) => attr.key === key)?.value;
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Walks every element in a WXML AST in document order.
+ *
+ * @param ast WXML node or program to traverse
+ * @param callback Callback invoked for each element
+ */
 function walkElements(ast: WXNode | Program, callback: (node: WXElementNode) => void): void {
   if (ast.type === 'WXElement') {
     callback(ast);
