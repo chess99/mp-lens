@@ -1,3 +1,5 @@
+
+
 [![npm](https://img.shields.io/npm/v/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
 [![License](https://img.shields.io/npm/l/mp-lens.svg?style=flat)](https://github.com/chess99/mp-lens/blob/master/LICENSE)
 [![downloads](https://img.shields.io/npm/dm/mp-lens.svg?style=flat)](https://www.npmjs.org/package/mp-lens)
@@ -31,6 +33,8 @@ npx mp-lens clean
 - **包体差异分析（清理前后对比）:** 对比两个 Git 提交（分支或标签）之间的包体构成和大小差异 (`diff` 命令)。
 
 ## 安装（可选）
+
+需要 Node.js >= 22。
 
 如需本地安装以获得更快的执行体验：
 
