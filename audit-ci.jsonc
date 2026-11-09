@@ -25,6 +25,13 @@
       },
     },
     {
+      "GHSA-gcqx-w48m-w2h4|jest-cli>create-jest>jest-config>deepmerge": {
+        "active": true,
+        "expiry": "2026-12-09T00:00:00+08:00",
+        "notes": "npm 10 报告的 Jest CLI 配置依赖链，详见 docs/dependency-security.md。",
+      },
+    },
+    {
       "GHSA-gcqx-w48m-w2h4|jest-config>deepmerge>": {
         "active": true,
         "expiry": "2026-12-09T00:00:00+08:00",
