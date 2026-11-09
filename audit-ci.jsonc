@@ -1,0 +1,35 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "low": true,
+  "package-manager": "npm",
+  "allowlist": [
+    {
+      "GHSA-gcqx-w48m-w2h4|ts-jest>jest>@jest/core>jest-config>deepmerge": {
+        "active": true,
+        "expiry": "2026-12-09T00:00:00+08:00",
+        "notes": "仅用于本地 Jest 配置合并；deepmerge 4.3.1 及最新版 Jest 暂无上游修复。详见 docs/dependency-security.md。",
+      },
+    },
+    {
+      "GHSA-gcqx-w48m-w2h4|create-jest>jest-config>deepmerge>": {
+        "active": true,
+        "expiry": "2026-12-09T00:00:00+08:00",
+        "notes": "仅限 Jest 配置依赖链，与 ts-jest 使用同一临时例外。",
+      },
+    },
+    {
+      "GHSA-gcqx-w48m-w2h4|jest-cli>@jest/core>jest-config>deepmerge>": {
+        "active": true,
+        "expiry": "2026-12-09T00:00:00+08:00",
+        "notes": "仅限 Jest 配置依赖链，详见 docs/dependency-security.md。",
+      },
+    },
+    {
+      "GHSA-gcqx-w48m-w2h4|jest-config>deepmerge>": {
+        "active": true,
+        "expiry": "2026-12-09T00:00:00+08:00",
+        "notes": "仅限 Jest 配置依赖链，详见 docs/dependency-security.md。",
+      },
+    },
+  ],
+}
